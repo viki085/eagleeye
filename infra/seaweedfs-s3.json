@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "eagleeye-local",
+      "credentials": [
+        {
+          "accessKey": "eagleeye",
+          "secretKey": "eagleeye-local-secret"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+name: eagleeye
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # S3-compatible object store. (MinIO withdrew its public Docker images in 2025/26,
+  # so the local stack uses SeaweedFS; Phase 2 swaps to real S3 via the ObjectStore port.)
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.52
+    command:
+      [
+        "server",
+        "-s3",
+        "-s3.port=8333",
+        "-s3.config=/etc/seaweedfs/s3.json",
+        "-dir=/data",
+      ]
+    ports:
+      - "8333:8333"
+    volumes:
+      - seaweed-data:/data
+      - ./seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      # curl exits 0 on any HTTP response; 403 on anonymous S3 access means "serving"
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8333"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  redis-data:
+  qdrant-data:
+  seaweed-data:

@@ -1,0 +1,7 @@
+{
+  "name": "eagleeye-root",
+  "private": true,
+  "devDependencies": {
+    "supabase": "^2.20.5"
+  }
+}
