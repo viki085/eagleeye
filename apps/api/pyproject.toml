@@ -5,11 +5,13 @@ description = "EagleEye API service: REST + SSE"
 requires-python = ">=3.12"
 dependencies = [
     "eagleeye-core",
+    "eagleeye-llm",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "redis>=5.2",
     "httpx>=0.28",
     "asyncpg>=0.30",
+    "pyjwt[crypto]>=2.10",
 ]
 
 [dependency-groups]
@@ -21,6 +23,7 @@ dev = [
 
 [tool.uv.sources]
 eagleeye-core = { workspace = true }
+eagleeye-llm = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

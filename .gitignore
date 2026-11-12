@@ -37,3 +37,4 @@ Thumbs.db
 *.log
 tmp/
 Section 12 Complete Agent Design and Interview Playbook.pdf
+.playwright-mcp/
