@@ -5,27 +5,32 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/chat/composer";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
+import { SourceDrawer } from "@/components/chat/source-drawer";
+import { DocumentsPanel } from "@/components/documents/documents-panel";
 import { useApi } from "@/hooks/use-api";
-import type { ChatSummary } from "@/lib/api";
+import { useDocuments } from "@/hooks/use-documents";
+import type { ChatSummary, Citation } from "@/lib/api";
+import { isCitation, toUiMessage, type UiMessage } from "@/lib/messages";
 import { consumeSse } from "@/lib/sse";
-
-interface UiMessage {
-  key: string;
-  role: "user" | "assistant";
-  text: string;
-}
 
 interface StreamState {
   runId: string;
   text: string;
+  status: string | null;
+  citations: readonly Citation[];
 }
+
+const STAGE_TEXT: Record<string, string> = { retrieving: "Searching documents…" };
 
 export default function ChatPage() {
   const api = useApi();
+  const docs = useDocuments(api);
+  const [me, setMe] = useState<string | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [stream, setStream] = useState<StreamState | null>(null);
+  const [openCitation, setOpenCitation] = useState<Citation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -40,33 +45,35 @@ export default function ChatPage() {
 
   useEffect(() => {
     void refreshChats();
-  }, [refreshChats]);
+    api
+      .getMe()
+      .then((u) => setMe(u.id))
+      .catch(() => setMe(null));
+  }, [api, refreshChats]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, stream?.text]);
+  }, [messages, stream?.text, stream?.status]);
+
+  const loadMessages = useCallback(
+    async (chatId: string): Promise<UiMessage[]> => {
+      const detail = await api.getChat(chatId);
+      return detail.messages.map(toUiMessage);
+    },
+    [api],
+  );
 
   const openChat = useCallback(
     async (chatId: string) => {
       setActiveChatId(chatId);
       setError(null);
       try {
-        const detail = await api.getChat(chatId);
-        setMessages(
-          detail.messages.map((m) => ({
-            key: m.id,
-            role: m.role,
-            text: m.parts.parts
-              .filter((p) => p.type === "text")
-              .map((p) => p.text ?? "")
-              .join(""),
-          })),
-        );
+        setMessages(await loadMessages(chatId));
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load chat");
       }
     },
-    [api],
+    [loadMessages],
   );
 
   const handleNewChat = useCallback(() => {
@@ -88,6 +95,38 @@ export default function ChatPage() {
     [api, activeChatId, handleNewChat, refreshChats],
   );
 
+  const runStream = useCallback(
+    async (runId: string) => {
+      const body = await api.openRunStream(runId);
+      let acc = "";
+      let cites: readonly Citation[] = [];
+      setStream({ runId, text: "", status: null, citations: [] });
+      await consumeSse(body, (evt) => {
+        const data = evt.data as Record<string, unknown>;
+        if (evt.event === "status") {
+          const stage = typeof data.stage === "string" ? data.stage : "";
+          setStream((s) => (s ? { ...s, status: STAGE_TEXT[stage] ?? null } : s));
+        } else if (evt.event === "text.delta") {
+          acc += typeof data.text === "string" ? data.text : "";
+          setStream((s) => (s ? { ...s, text: acc } : s));
+        } else if (evt.event === "citation" && isCitation(data)) {
+          cites = [...cites, data];
+        } else if (evt.event === "chat.updated") {
+          const d = data as { chat_id: string; title: string };
+          setChats((prev) => prev.map((c) => (c.id === d.chat_id ? { ...c, title: d.title } : c)));
+        } else if (evt.event === "run.done") {
+          const done: UiMessage = { key: `run-${runId}`, role: "assistant", text: acc, citations: cites };
+          setMessages((prev) => [...prev, done]);
+          setStream(null);
+        } else if (evt.event === "run.error") {
+          setError(typeof data.user_message === "string" ? data.user_message : "The run failed.");
+          setStream(null);
+        }
+      });
+    },
+    [api],
+  );
+
   const handleSend = useCallback(
     async (text: string) => {
       setBusy(true);
@@ -102,65 +141,27 @@ export default function ChatPage() {
         }
         setMessages((prev) => [
           ...prev,
-          { key: `local-${Date.now()}`, role: "user", text },
+          { key: `local-${Date.now()}`, role: "user", text, citations: [] },
         ]);
-        const { run_id } = await api.sendMessage(chatId, text, crypto.randomUUID());
-        setStream({ runId: run_id, text: "" });
-
-        const body = await api.openRunStream(run_id);
-        let acc = "";
-        await consumeSse(body, (evt) => {
-          if (evt.event === "text.delta") {
-            const delta = (evt.data as { text?: string }).text ?? "";
-            acc += delta;
-            setStream({ runId: run_id, text: acc });
-          } else if (evt.event === "chat.updated") {
-            const d = evt.data as { chat_id: string; title: string };
-            setChats((prev) =>
-              prev.map((c) => (c.id === d.chat_id ? { ...c, title: d.title } : c)),
-            );
-          } else if (evt.event === "run.done") {
-            setMessages((prev) => [
-              ...prev,
-              { key: `run-${run_id}`, role: "assistant", text: acc },
-            ]);
-            setStream(null);
-          } else if (evt.event === "run.error") {
-            const d = evt.data as { user_message?: string };
-            setError(d.user_message ?? "The run failed.");
-            setStream(null);
-          }
-        });
+        const { run_id } = await api.sendMessage(chatId, text, crypto.randomUUID(), docs.selectedIds);
+        await runStream(run_id);
       } catch (e: unknown) {
         // Stream dropped mid-run: the run continues server-side, so recover the
         // persisted answer instead of failing the turn.
         setStream(null);
-        const recovered = await recoverAfterStreamDrop();
-        if (!recovered) {
-          setError(e instanceof Error ? e.message : "Send failed");
-        }
+        const recovered = chatId !== null && (await recoverAfterStreamDrop(chatId));
+        if (!recovered) setError(e instanceof Error ? e.message : "Send failed");
       } finally {
         setBusy(false);
       }
 
-      async function recoverAfterStreamDrop(): Promise<boolean> {
-        if (chatId === null) return false;
+      async function recoverAfterStreamDrop(id: string): Promise<boolean> {
         for (let attempt = 0; attempt < 5; attempt++) {
           await new Promise((r) => setTimeout(r, 1500));
           try {
-            const detail = await api.getChat(chatId);
-            const last = detail.messages.at(-1);
-            if (last?.role === "assistant") {
-              setMessages(
-                detail.messages.map((m) => ({
-                  key: m.id,
-                  role: m.role,
-                  text: m.parts.parts
-                    .filter((p) => p.type === "text")
-                    .map((p) => p.text ?? "")
-                    .join(""),
-                })),
-              );
+            const loaded = await loadMessages(id);
+            if (loaded.at(-1)?.role === "assistant") {
+              setMessages(loaded);
               return true;
             }
           } catch {
@@ -170,8 +171,11 @@ export default function ChatPage() {
         return false;
       }
     },
-    [api, activeChatId, refreshChats],
+    [api, activeChatId, refreshChats, runStream, loadMessages, docs.selectedIds],
   );
+
+  const selectedCount = docs.selectedIds.length;
+  const closeDrawer = useCallback(() => setOpenCitation(null), []);
 
   return (
     <div className="flex h-screen">
@@ -189,14 +193,22 @@ export default function ChatPage() {
             {messages.length === 0 && stream === null && (
               <div className="mt-24 text-center text-neutral-400">
                 <p className="text-lg font-medium">What can I help you with?</p>
-                <p className="mt-1 text-sm">Phase 1 — streaming chat over your configured LLM.</p>
+                <p className="mt-1 text-sm">
+                  Upload documents on the right and ask about them — answers cite their sources.
+                </p>
               </div>
             )}
             {messages.map((m) => (
-              <MessageBubble key={m.key} role={m.role} text={m.text} />
+              <MessageBubble
+                key={m.key}
+                role={m.role}
+                text={m.text}
+                citations={m.citations}
+                onOpenCitation={setOpenCitation}
+              />
             ))}
             {stream !== null && (
-              <MessageBubble role="assistant" text={stream.text} streaming />
+              <MessageBubble role="assistant" text={stream.text} statusText={stream.status} streaming />
             )}
             {error !== null && (
               <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
@@ -205,8 +217,18 @@ export default function ChatPage() {
             )}
           </div>
         </div>
-        <Composer disabled={busy} onSend={(t) => void handleSend(t)} />
+        <Composer
+          disabled={busy}
+          onSend={(t) => void handleSend(t)}
+          contextNote={
+            selectedCount > 0
+              ? `${selectedCount} document${selectedCount === 1 ? "" : "s"} selected`
+              : null
+          }
+        />
       </main>
+      <DocumentsPanel state={docs} currentUserId={me} />
+      <SourceDrawer api={api} citation={openCitation} onClose={closeDrawer} />
     </div>
   );
 }

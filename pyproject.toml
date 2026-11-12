@@ -1,5 +1,11 @@
 [tool.uv.workspace]
-members = ["apps/api", "packages/core", "packages/llm"]
+members = [
+    "apps/api",
+    "apps/ingest-worker",
+    "packages/core",
+    "packages/llm",
+    "packages/retrieval",
+]
 
 [tool.ruff]
 line-length = 100
@@ -11,3 +17,5 @@ ignore = ["S101"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--import-mode=importlib"

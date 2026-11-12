@@ -1,7 +1,6 @@
 import json
 
 import asyncpg
-
 from eagleeye_core.config import get_settings
 
 

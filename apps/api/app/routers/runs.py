@@ -3,10 +3,9 @@ import logging
 import time
 from collections.abc import AsyncIterator
 
+from eagleeye_core.envelope import ok
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-
-from eagleeye_core.envelope import ok
 
 from app.auth import CurrentUser
 from app.events import TERMINAL_EVENTS, read_events

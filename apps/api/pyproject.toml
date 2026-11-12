@@ -6,6 +6,9 @@ requires-python = ">=3.12"
 dependencies = [
     "eagleeye-core",
     "eagleeye-llm",
+    "eagleeye-retrieval",
+    "celery[redis]>=5.4",
+    "python-multipart>=0.0.18",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "redis>=5.2",
@@ -24,6 +27,7 @@ dev = [
 [tool.uv.sources]
 eagleeye-core = { workspace = true }
 eagleeye-llm = { workspace = true }
+eagleeye-retrieval = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

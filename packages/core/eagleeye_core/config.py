@@ -26,6 +26,15 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     model_fast: str = "gpt-4o-mini"
     model_capable: str = "gpt-4o"
+    embed_model: str = "text-embedding-3-small"
+    embed_dim: int = 1536
+
+    docs_bucket: str = "eagleeye-local-docs"
+    max_upload_mb: int = 25
+    qdrant_collection: str = "enterprise_chunks"
+    enterprise_upload_open: bool = True  # Phase 2: any user may upload enterprise docs
+    rag_top_k: int = 5
+    rag_min_score: float = 0.25  # cosine floor below which retrieval is "low relevance"
 
     clerk_secret_key: str = ""
     clerk_publishable_key: str = Field(

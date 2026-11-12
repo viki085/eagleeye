@@ -1,6 +1,5 @@
-from fastapi import APIRouter
-
 from eagleeye_core.envelope import ok
+from fastapi import APIRouter
 
 from app.auth import CurrentUser
 

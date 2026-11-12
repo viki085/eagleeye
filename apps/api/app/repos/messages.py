@@ -47,11 +47,12 @@ async def insert_user_message(
 async def insert_assistant_message(
     conn: asyncpg.Connection,
     chat_id: str,
-    text: str,
+    parts: list[dict],
     run_id: str,
     tokens_in: int,
     tokens_out: int,
 ) -> asyncpg.Record:
+    """`parts`: a text part plus optional {"type": "citations", "items": [...]}."""
     msg_no = await next_msg_no(conn, chat_id)
     return await conn.fetchrow(
         """
@@ -61,7 +62,7 @@ async def insert_assistant_message(
         """,
         chat_id,
         msg_no,
-        {"parts": [{"type": "text", "text": text}]},
+        {"parts": parts},
         run_id,
         tokens_in,
         tokens_out,

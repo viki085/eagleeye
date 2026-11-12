@@ -1,0 +1,32 @@
+import asyncio
+import logging
+import uuid
+
+from ingest_worker.celery_app import INGEST_TASK, app
+from ingest_worker.errors import IngestError
+from ingest_worker.pipeline import mark_failed, run_pipeline
+
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+BASE_BACKOFF_S = 5
+GENERIC_FAILURE = "Processing failed after several attempts. Try uploading again."
+
+
+@app.task(name=INGEST_TASK, bind=True, max_retries=MAX_RETRIES)
+def ingest_document(self, document_id: str) -> None:  # noqa: ANN001 — celery binds self
+    try:
+        uuid.UUID(document_id)
+    except (ValueError, TypeError):
+        logger.error("rejecting ingest task with invalid document id %r", document_id)
+        return
+    try:
+        asyncio.run(run_pipeline(document_id))
+    except Exception as exc:
+        retries = self.request.retries
+        if retries < MAX_RETRIES:
+            logger.warning("ingest %s transient failure (try %d): %s", document_id, retries, exc)
+            raise self.retry(exc=exc, countdown=BASE_BACKOFF_S * 2**retries) from exc
+        logger.exception("ingest %s failed after %d retries", document_id, retries)
+        message = exc.user_message if isinstance(exc, IngestError) else GENERIC_FAILURE
+        asyncio.run(mark_failed(document_id, message))

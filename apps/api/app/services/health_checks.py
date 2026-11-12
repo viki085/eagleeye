@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import asyncpg
 import httpx
 import redis.asyncio as aioredis
-
 from eagleeye_core.config import get_settings
 
 logger = logging.getLogger(__name__)

@@ -6,10 +6,9 @@ from typing import Annotated
 
 import httpx
 import jwt
+from eagleeye_core.config import Settings, get_settings
 from fastapi import Depends, Header, HTTPException, Request
 from jwt import PyJWKClient
-
-from eagleeye_core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 

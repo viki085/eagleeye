@@ -1,14 +1,25 @@
 import asyncpg
 
 
-async def create_run(conn: asyncpg.Connection, chat_id: str, user_id: str) -> str:
+async def create_run(
+    conn: asyncpg.Connection, chat_id: str, user_id: str, params: dict | None = None
+) -> str:
     return str(
         await conn.fetchval(
-            "INSERT INTO runs (chat_id, user_id, status) VALUES ($1, $2, 'QUEUED') RETURNING id",
+            """
+            INSERT INTO runs (chat_id, user_id, status, params)
+            VALUES ($1, $2, 'QUEUED', $3) RETURNING id
+            """,
             chat_id,
             user_id,
+            params or {},
         )
     )
+
+
+async def get_params(pool: asyncpg.Pool, run_id: str) -> dict:
+    params = await pool.fetchval("SELECT params FROM runs WHERE id = $1", run_id)
+    return params if isinstance(params, dict) else {}
 
 
 async def get_owned_run(pool: asyncpg.Pool, run_id: str, user_id: str) -> asyncpg.Record | None:

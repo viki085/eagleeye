@@ -19,9 +19,65 @@ export interface ChatSummary {
   updated_at: string;
 }
 
+export type DocumentScope = "personal" | "enterprise";
+
+export type DocumentStatus =
+  | "UPLOADING"
+  | "SCANNING"
+  | "PARSING"
+  | "CHUNKING"
+  | "EMBEDDING"
+  | "READY"
+  | "FAILED";
+
+export interface DocumentSummary {
+  id: string;
+  scope: DocumentScope;
+  owner_id: string | null;
+  uploaded_by: string;
+  title: string;
+  filename: string;
+  mime: string;
+  size_bytes: number;
+  status: DocumentStatus;
+  error: string | null;
+  page_count: number | null;
+  chunk_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Citation {
+  n: number;
+  document_id: string;
+  chunk_id: string;
+  title: string;
+  page: number | null;
+  heading_path: string[];
+  scope: DocumentScope;
+  snippet: string;
+}
+
+export interface ChunkDetail {
+  id: string;
+  chunk_no: number;
+  content: string;
+  heading_path: string[];
+  page: number | null;
+  document: { id: string; title: string };
+}
+
+export interface Me {
+  id: string;
+  email: string;
+  display_name: string | null;
+  role: string;
+}
+
 export interface MessagePart {
   type: string;
   text?: string;
+  items?: Citation[];
 }
 
 export interface ChatMessage {
@@ -60,12 +116,14 @@ export class ApiClient {
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     const token = await this.getToken();
+    // FormData bodies must let the browser set the multipart boundary header.
+    const isJson = typeof init?.body === "string";
     const resp = await fetch(`${API_URL}${path}`, {
       ...init,
       headers: {
         ...(init?.headers ?? {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...(isJson ? { "Content-Type": "application/json" } : {}),
       },
       cache: "no-store",
     });
@@ -102,11 +160,39 @@ export class ApiClient {
     return this.request(`/v1/chats/${chatId}`, { method: "DELETE" });
   }
 
-  sendMessage(chatId: string, text: string, idempotencyKey: string): Promise<{ run_id: string }> {
+  sendMessage(
+    chatId: string,
+    text: string,
+    idempotencyKey: string,
+    docIds: readonly string[] = [],
+  ): Promise<{ run_id: string }> {
     return this.request(`/v1/chats/${chatId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ text, idempotency_key: idempotencyKey }),
+      body: JSON.stringify({ text, idempotency_key: idempotencyKey, doc_ids: docIds }),
     });
+  }
+
+  getMe(): Promise<Me> {
+    return this.request<Me>("/v1/me");
+  }
+
+  listDocuments(): Promise<DocumentSummary[]> {
+    return this.request<DocumentSummary[]>("/v1/documents");
+  }
+
+  uploadDocument(file: File, scope: DocumentScope): Promise<DocumentSummary> {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("scope", scope);
+    return this.request<DocumentSummary>("/v1/documents", { method: "POST", body: form });
+  }
+
+  deleteDocument(docId: string): Promise<{ id: string }> {
+    return this.request(`/v1/documents/${docId}`, { method: "DELETE" });
+  }
+
+  getChunk(docId: string, chunkId: string): Promise<ChunkDetail> {
+    return this.request<ChunkDetail>(`/v1/documents/${docId}/chunks/${chunkId}`);
   }
 
   async openRunStream(runId: string, signal?: AbortSignal): Promise<ReadableStream<Uint8Array>> {

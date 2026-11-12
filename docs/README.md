@@ -56,6 +56,8 @@ All milestones below run on the local Docker Compose stack; AWS (Phase 2 of ADR-
 | 5 | Hardening: guardrails, load test to 2k concurrent, security review | Load-test + security sign-off |
 | 6 (Phase 2) | AWS lift: Terraform, ECS Fargate, Supabase Cloud, managed Redis/Qdrant | Cloud deploy green; parity with local demo |
 
+**Build status (2026-11-12):** milestones 0 and 1 done. Milestone 2 (RAG) is functionally complete — upload, ingest worker, dual-store hybrid retrieval, cited answers (see C4 §9 "As built"); its exit criterion (golden-set recall@5) waits on the eval harness.
+
 ## Notes on the reference site
 
 I could read DocLens' engineering write-up (architecture, memory, streaming, RAG, safety gate) but **not** its interactive product-tour content or the demo UI, because those are client-rendered. UI decisions in C1 follow your description (chat centre, right sidebar for documents) plus DocLens patterns. If you want pixel-level parity, I can walk through the live demo in a browser and capture screenshots.

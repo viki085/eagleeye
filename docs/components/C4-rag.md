@@ -70,7 +70,21 @@ Enterprise (Qdrant): 5M chunks × ~1.5 KB (1024-d float32 + payload) ≈ ~8 GB �
 ## 8. Quality evaluation
 Golden set (≥ 150 Q/A with source chunks across enterprise + personal): recall@k, MRR, answer faithfulness (LLM-judge + human spot checks), citation precision. Run on every change to chunking/embedding/prompt; nightly on prod-like index. Embedding model change = full re-index in shadow column, compare, swap.
 
-## 9. Open questions
+## 9. As built — Phase 2 (local)
+
+| Area | Implemented | Deferred |
+|------|-------------|----------|
+| Upload | `POST /v1/documents` multipart via API (ADR-27); extension allow-list; SHA-256 dedup per scope (409); key `{scope}/{doc_id}/original{ext}` | Presigned PUT, malware scan |
+| Ingest | Celery `ingest` queue (`apps/ingest-worker`, `--pool=solo` on Windows); stages SCANNING → PARSING → CHUNKING → EMBEDDING → READY/FAILED; magic-byte check; 3 retries with backoff, permanent errors shown to the user | DLQ, admin reprocess, versioning |
+| Parse | `pypdf` (heuristic headings), `python-docx` (style headings + tables), Markdown/text | OCR, pptx/html/xlsx, table/image enrichment |
+| Chunk | Heading-stack paths; ≤3,000 chars, soft 2,400, 300 overlap inside long sections only; tiny sections merge only under a shared parent heading (never across top-level topics) | Token-based sizing |
+| Embed | `EMBED_MODEL` via LiteLLM, contextual header (title + heading path) | — |
+| Stores | Enterprise → Qdrant `enterprise_chunks` (point id = chunk id); personal → `document_chunks.embedding` (pgvector HNSW) | ACL payloads / groups |
+| Retrieval | `packages/retrieval`: fast-tier query rewrite (≤4 queries) → per query Qdrant ∥ pgvector ∥ tsvector (OR-lexeme) → RRF 0.7/0.3 → RRF across queries → top 5 → **hydrate re-applies the access predicate** | Rerank, neighbour expansion, semantic cache |
+| Answer | Grounded system prompt with numbered `<context>` (document text neutralised, marked untrusted); `[n]` → `citation` SSE events + persisted `citations` message part; UI chips open the exact chunk | Output assertion re-check |
+| Relevance floor | `RAG_MIN_SCORE=0.25` cosine. Local calibration: on-topic questions 0.50–0.55, off-topic 0.10 | Golden-set calibration |
+
+## 10. Open questions
 - Languages besides English? (affects embedding model/tokenizer choice).
 - Do enterprise docs have existing labels/classification we should import as ACLs?
 - Connectors (SharePoint, Confluence, S3 sync) priority for v1 vs v2 (D4).

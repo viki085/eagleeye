@@ -1,13 +1,15 @@
 import asyncio
 import logging
+from uuid import UUID
 
+from eagleeye_core.envelope import ok
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from eagleeye_core.envelope import ok
-
 from app.auth import CurrentUser
+from app.errors import ApiException
 from app.repos import chats as chats_repo
+from app.repos import documents as docs_repo
 from app.repos import messages as messages_repo
 from app.repos import runs as runs_repo
 from app.services.run_executor import execute_run
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chats", tags=["chats"])
 
 MAX_MESSAGE_CHARS = 8000
+MAX_SELECTED_DOCS = 20
 
 
 class RenameBody(BaseModel):
@@ -25,6 +28,7 @@ class RenameBody(BaseModel):
 class SendMessageBody(BaseModel):
     text: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
     idempotency_key: str = Field(min_length=8, max_length=64)
+    doc_ids: list[UUID] = Field(default_factory=list, max_length=MAX_SELECTED_DOCS)
 
 
 @router.get("")
@@ -77,14 +81,30 @@ async def send_message(
     if duplicate is not None:
         return ok({"run_id": str(duplicate["run_id"]), "deduplicated": True})
 
+    doc_ids = list(dict.fromkeys(str(d) for d in body.doc_ids))
+    if doc_ids:
+        visible = await docs_repo.filter_visible_ready(pool, doc_ids, user.id)
+        if len(visible) != len(doc_ids):
+            raise ApiException(
+                422, "VALIDATION_ERROR", "Some selected documents are unavailable or not ready."
+            )
+
     async with pool.acquire() as conn, conn.transaction():
-        run_id = await runs_repo.create_run(conn, chat_id, user.id)
+        run_id = await runs_repo.create_run(conn, chat_id, user.id, {"doc_ids": doc_ids})
         await messages_repo.insert_user_message(
             conn, chat_id, body.text, run_id, body.idempotency_key
         )
 
     task = asyncio.create_task(
-        execute_run(pool, app.state.redis, app.state.llm, run_id, chat_id, user.id)
+        execute_run(
+            pool,
+            app.state.redis,
+            app.state.llm,
+            run_id,
+            chat_id,
+            user.id,
+            retriever=getattr(app.state, "retriever", None),
+        )
     )
     app.state.run_tasks[run_id] = task
     task.add_done_callback(lambda _t: app.state.run_tasks.pop(run_id, None))

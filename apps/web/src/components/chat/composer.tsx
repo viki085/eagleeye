@@ -5,9 +5,10 @@ import { useState } from "react";
 interface ComposerProps {
   disabled: boolean;
   onSend: (text: string) => void;
+  contextNote?: string | null;
 }
 
-export function Composer({ disabled, onSend }: ComposerProps) {
+export function Composer({ disabled, onSend, contextNote = null }: ComposerProps) {
   const [text, setText] = useState("");
 
   const submit = () => {
@@ -42,6 +43,7 @@ export function Composer({ disabled, onSend }: ComposerProps) {
         </button>
       </div>
       <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-neutral-400">
+        {contextNote !== null && <span className="font-medium text-blue-600">{contextNote} · </span>}
         Enter to send · Shift+Enter for a new line
       </p>
     </div>
