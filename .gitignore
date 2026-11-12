@@ -1,0 +1,39 @@
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Docker volumes (bind-mounted data)
+infra/volumes/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Artifacts & scratch
+*.log
+tmp/
+Section 12 Complete Agent Design and Interview Playbook.pdf
