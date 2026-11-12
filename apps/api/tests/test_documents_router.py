@@ -2,11 +2,10 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.auth import AuthedUser, get_current_user
 from app.main import create_app
 from app.repos import documents as docs_repo
+from fastapi.testclient import TestClient
 
 ME = AuthedUser(str(uuid.uuid4()), "user_me", "me@example.com", None, "member")
 OTHER_ID = str(uuid.uuid4())
@@ -30,7 +29,7 @@ class FakeQueue:
     def __init__(self) -> None:
         self.sent: list[str] = []
 
-    async def enqueue(self, document_id: str) -> None:
+    async def enqueue_ingest(self, document_id: str) -> None:
         self.sent.append(document_id)
 
 
@@ -98,7 +97,7 @@ def env(monkeypatch: pytest.MonkeyPatch) -> dict:
     app.dependency_overrides[get_current_user] = lambda: ME
     app.state.pool = object()
     app.state.store = FakeStore()
-    app.state.ingest_queue = FakeQueue()
+    app.state.task_queue = FakeQueue()
     app.state.enterprise_store = FakeVectors()
     return {"client": TestClient(app), "docs": fake, "state": app.state}
 
@@ -113,7 +112,7 @@ def test_upload_stores_and_enqueues(env: dict) -> None:
     body = resp.json()["data"]
     assert body["status"] == "UPLOADING" and body["title"] == "policy"
     assert "s3_key" not in body and "sha256" not in body
-    assert env["state"].ingest_queue.sent == [body["id"]]
+    assert env["state"].task_queue.sent == [body["id"]]
     assert list(env["state"].store.objects) == [f"personal/{body['id']}/original.txt"]
 
 

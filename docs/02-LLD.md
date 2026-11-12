@@ -66,18 +66,19 @@ Errors: `400 validation, 401, 403, 404, 409 duplicate, 413 too large, 422, 429 r
 
 ### 2.3 SSE event vocabulary (single sink stamps gapless `seq` from 0)
 ```
-run.started      {run_id, model_tier}
-guard.result     {safe, intent}
-step.started     {step_id, parent_id, kind: tool|agent|llm, name, input_summary}
-step.finished    {step_id, status: ok|error, output_summary, duration_ms, tokens, cost}
-reasoning.delta  {step_id, text}              # optional, collapsible in UI
-text.delta       {text}                       # batched ~40 ms
-citation         {n, document_id, chunk_id, title, page}
-artifact         {artifact_id, type: table|chart|profile, title, preview?}
-progress         {message, pct?}              # long jobs
-run.done         {message_id, usage{in,out,cost}, degraded?}
+run.started      {run_id}
+guard.result     {safe, intent, route}
+step.started     {step_id, parent_id, kind: guard|llm|tool|retrieval|check, name, input_summary}
+step.finished    {step_id, status: ok|error|skipped, output_summary, duration_ms, tokens, cost}
+text.delta       {text}
+text.replace     {text}                       # output filter / citation cleanup replaced the answer
+citation         {n, document_id, chunk_id, title, page, heading_path, scope, snippet}
+chat.updated     {chat_id, title}
+artifact         {artifact_id, type: table|chart|profile, title, preview?}   # Phase 4–5
+run.done         {message_id, status, degraded, cancelled, usage{in,out,cost}}
 run.error        {code, user_message}         # after 200, errors are events
 ```
+Names live in `packages/events/eagleeye_events/names.py`; the web fold is `apps/web/src/lib/run-fold.ts`.
 Client folds events into message parts; backend persists the same fold (a shared test fixture verifies both folds produce identical parts).
 
 Transport: fetch-based SSE client (needs POST/Authorization header); ALB idle timeout 300 s; 15 s heartbeat comments; server reads from Redis Stream `run:{id}:events`.

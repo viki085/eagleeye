@@ -1,12 +1,25 @@
 from dataclasses import dataclass, field
 
+ALL_SCOPES: tuple[str, ...] = ("enterprise", "personal")
+
 
 @dataclass(frozen=True)
 class AccessScope:
-    """Who is asking and (optionally) which documents they narrowed to."""
+    """Who is asking and (optionally) which documents / scopes they narrowed to.
+
+    `user_id` always comes from the authenticated run, never from model output.
+    """
 
     user_id: str
     doc_ids: tuple[str, ...] | None = None
+    scopes: tuple[str, ...] = ALL_SCOPES
+
+    @property
+    def restricts_scope(self) -> bool:
+        return set(self.scopes) != set(ALL_SCOPES)
+
+    def includes(self, scope: str) -> bool:
+        return scope in self.scopes
 
 
 @dataclass(frozen=True)

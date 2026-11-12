@@ -20,7 +20,6 @@ async def keyword_search(
 ) -> list[str]:
     if not _WORD.search(query):
         return []
-    doc_param = 4 if scope.doc_ids else None
     rows = await pool.fetch(
         f"""
         WITH q AS (
@@ -33,7 +32,7 @@ async def keyword_search(
         FROM document_chunks c
         JOIN documents d ON d.id = c.document_id
         CROSS JOIN q
-        WHERE c.tsv @@ q.query AND {access_predicate(3, doc_param)}
+        WHERE c.tsv @@ q.query AND {access_predicate(3, scope)}
         ORDER BY rank DESC, c.id
         LIMIT $2
         """,  # noqa: S608 — predicate is built from constants, values are bound

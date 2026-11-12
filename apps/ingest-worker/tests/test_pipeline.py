@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
 import pytest
-
 from eagleeye_core.storage import ObjectNotFoundError
 from ingest_worker import pipeline
 from ingest_worker.chunking import Chunk

@@ -1,26 +1,36 @@
+"""Redis Stream event sink/reader. One writer per run stamps a gapless `seq` (LLD §2.3)."""
+
 import json
 from typing import Any
 
 import redis.asyncio as aioredis
 
+from eagleeye_events.names import RUN_DONE, RUN_ERROR
+
 STREAM_TTL_S = 3600
-TERMINAL_EVENTS = {"run.done", "run.error"}
+TERMINAL_EVENTS = {RUN_DONE, RUN_ERROR}
+
+
+CANCEL_TTL_S = 600
 
 
 def stream_key(run_id: str) -> str:
     return f"run:{run_id}:events"
 
 
-class EventSink:
-    """Single writer per run → gapless seq stamped by the sink (LLD §2.3)."""
+def cancel_key(run_id: str) -> str:
+    """Set by the API when the user presses Stop; polled by the agent worker."""
+    return f"run:{run_id}:cancel"
 
+
+class EventSink:
     def __init__(self, redis: aioredis.Redis, run_id: str) -> None:
         self._redis = redis
         self._key = stream_key(run_id)
         self._seq = 0
 
     async def emit(self, event: str, data: dict[str, Any]) -> None:
-        payload = {"seq": self._seq, "event": event, "data": json.dumps(data)}
+        payload = {"seq": self._seq, "event": event, "data": json.dumps(data, default=str)}
         await self._redis.xadd(self._key, payload)
         if self._seq == 0:
             await self._redis.expire(self._key, STREAM_TTL_S)

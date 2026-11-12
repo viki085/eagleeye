@@ -8,15 +8,17 @@ Full design pack: [docs/README.md](docs/README.md)
 
 ```
 apps/web            Next.js frontend
-apps/api            FastAPI: REST + SSE
-apps/agent-worker   Celery: LangGraph agent graphs      (Phase 3)
-apps/ingest-worker  Celery: scan/parse/chunk/embed/upsert pipeline
+apps/api            FastAPI: auth, REST, run admission, SSE streaming
+apps/agent-worker   Celery: executes agent runs (queue `agent`)
+apps/ingest-worker  Celery: scan/parse/chunk/embed/upsert pipeline (queue `ingest`)
 apps/data-gateway   Internal SQL executor               (Phase 4)
 packages/core       Shared config, envelope, ObjectStore port, queue names
-packages/llm        LLMGateway + Embedder ports, LiteLLM adapters
+packages/llm        LLMGateway (tools, fallback) + Embedder ports, LiteLLM adapters
+packages/events     Run event vocabulary + Redis Stream sink/reader
 packages/retrieval  Hybrid retrieval: Qdrant + pgvector + tsvector, RRF, access filter
+packages/agents     Agent graph: guard → router → simple | RAG | supervisor ⇄ tools → checks
 infra/              docker-compose.yml (Phase 1 local stack)
-evals/              Golden sets + eval harness          (Phase 6)
+evals/              Guard smoke eval (golden sets + harness in Phase 6)
 docs/               Design pack (HLD, LLD, components, ADRs)
 ```
 
@@ -39,18 +41,24 @@ npx supabase migration up
 uv sync --all-packages
 uv run --package eagleeye-api uvicorn app.main:app --app-dir apps/api --port 8000
 
-# 4. Ingest worker (separate terminal; --pool=solo is required on Windows)
-uv run --package eagleeye-ingest-worker celery -A ingest_worker.celery_app worker --pool=solo -Q ingest -l info
+# 4. Agent worker (separate terminal) — answers every chat message
+uv run --package eagleeye-agent-worker celery -A agent_worker.celery_app worker --pool=threads --concurrency=8 -Q agent -l info -n agent@%h
 
-# 5. Web
+# 5. Ingest worker (separate terminal; --pool=solo is required on Windows)
+uv run --package eagleeye-ingest-worker celery -A ingest_worker.celery_app worker --pool=solo -Q ingest -l info -n ingest@%h
+
+# 6. Web
 cd apps/web && npm install && npm run dev
 ```
 
-Open http://localhost:3000, sign in, upload a PDF/DOCX/MD/TXT in the right-hand panel, wait for **Ready**, and ask about it — answers cite `[n]` sources you can open. `/status` shows live health of every service.
+Open http://localhost:3000 and sign in. Upload a PDF/DOCX/MD/TXT in the right-hand panel and ask about it. Each answer shows a collapsible step tree (guard → route → retrieval / tool calls → checks), cites `[n]` sources you can open, and can be stopped mid-answer. `/status` shows live health of every service.
 
 ## Tests
 
 ```bash
 uv run pytest apps/api/tests apps/ingest-worker/tests packages
-cd apps/web && npx tsc --noEmit && npm run lint
+cd apps/web && npx tsc --noEmit && npm run lint && npm test
+
+# Guard smoke eval against the real fast model (a few cents)
+uv run --package eagleeye-agents python evals/guard_smoke.py
 ```

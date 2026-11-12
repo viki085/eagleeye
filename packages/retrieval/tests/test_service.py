@@ -68,9 +68,7 @@ def _make(
 
 
 def test_merge_vector_hits_keeps_best_score() -> None:
-    merged = merge_vector_hits(
-        [VectorHit("a", 0.5), VectorHit("b", 0.9)], [VectorHit("a", 0.7)]
-    )
+    merged = merge_vector_hits([VectorHit("a", 0.5), VectorHit("b", 0.9)], [VectorHit("a", 0.7)])
     assert [(h.chunk_id, h.score) for h in merged] == [("b", 0.9), ("a", 0.7)]
 
 
@@ -107,6 +105,29 @@ async def test_scope_is_passed_to_stores() -> None:
     scope = AccessScope("u1", ("d1",))
     await _make(ent, per, []).retrieve("q", [], scope)
     assert ent.scopes[0] == scope and per.scopes[0] == scope
+
+
+async def test_scope_restriction_skips_other_store() -> None:
+    ent, per = _Store([VectorHit("e1", 0.9)]), _Store([VectorHit("p1", 0.8)])
+    scope = AccessScope("u1", scopes=("personal",))
+    result = await _make(ent, per, []).retrieve("q", [], scope)
+    assert ent.scopes == [] and [c.chunk_id for c in result.chunks] == ["p1"]
+
+
+async def test_rewrite_false_uses_query_verbatim() -> None:
+    r = _make(_Store([VectorHit("e1", 0.9)]), _Store([]), [])
+    result = await r.retrieve("exact supervisor query", [], AccessScope("u1"), rewrite=False)
+    assert result.queries == ("exact supervisor query",)
+
+
+def test_access_predicate_numbering() -> None:
+    from eagleeye_retrieval.access import access_args, access_predicate
+
+    scope = AccessScope("u1", doc_ids=("d1",), scopes=("enterprise",))
+    sql = access_predicate(3, scope)
+    assert "$3::uuid" in sql and "$4::uuid[]" in sql and "$5::text[]" in sql
+    assert access_args(scope) == ["u1", ["d1"], ["enterprise"]]
+    assert "text[]" not in access_predicate(2, AccessScope("u1"))
 
 
 def test_truncate() -> None:

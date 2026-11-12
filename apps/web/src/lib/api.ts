@@ -77,7 +77,10 @@ export interface Me {
 export interface MessagePart {
   type: string;
   text?: string;
-  items?: Citation[];
+  items?: unknown[];
+  status?: string;
+  route?: string | null;
+  degraded?: boolean;
 }
 
 export interface ChatMessage {
@@ -170,6 +173,10 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify({ text, idempotency_key: idempotencyKey, doc_ids: docIds }),
     });
+  }
+
+  cancelRun(runId: string): Promise<{ run_id: string; cancelled: boolean }> {
+    return this.request(`/v1/runs/${runId}/cancel`, { method: "POST" });
   }
 
   getMe(): Promise<Me> {

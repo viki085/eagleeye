@@ -32,7 +32,7 @@ class LiteLLMEmbedder:
         vectors: list[list[float]] = []
         for start in range(0, len(texts), EMBED_BATCH_SIZE):
             batch = texts[start : start + EMBED_BATCH_SIZE]
-            resp = await litellm.aembedding(model=self._model, input=batch)
+            resp = await litellm.aembedding(model=self._model, input=batch, timeout=30.0)
             items = sorted(
                 resp.data,
                 key=lambda d: d["index"] if isinstance(d, dict) else getattr(d, "index", 0),

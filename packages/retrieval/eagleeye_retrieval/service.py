@@ -10,7 +10,7 @@ from eagleeye_llm.gateway import ChatMessage, LLMGateway
 
 from eagleeye_retrieval import access
 from eagleeye_retrieval.keyword_search import keyword_search
-from eagleeye_retrieval.rewrite import rewrite_query
+from eagleeye_retrieval.rewrite import MAX_QUERY_CHARS, rewrite_query
 from eagleeye_retrieval.rrf import fuse
 from eagleeye_retrieval.stores.base import VectorStore
 from eagleeye_retrieval.types import AccessScope, RetrievalResult, VectorHit
@@ -57,9 +57,17 @@ class Retriever:
         self._hydrate = hydrate_fn or (lambda scored, s: access.hydrate(pool, scored, s))
 
     async def retrieve(
-        self, question: str, history: list[ChatMessage], scope: AccessScope
+        self,
+        question: str,
+        history: list[ChatMessage],
+        scope: AccessScope,
+        rewrite: bool = True,
     ) -> RetrievalResult:
-        queries = await rewrite_query(self._llm, question, history)
+        """`rewrite=False` when the caller (e.g. the supervisor) already wrote the query."""
+        if rewrite:
+            queries = await rewrite_query(self._llm, question, history)
+        else:
+            queries = [question[:MAX_QUERY_CHARS]]
         vectors = await self._embedder.embed(queries)
         per_query = await asyncio.gather(
             *(self._search_one(q, v, scope) for q, v in zip(queries, vectors, strict=True))
@@ -83,8 +91,8 @@ class Retriever:
     ) -> tuple[list[str], float]:
         """Returns (fused ranking of chunk ids for this query, best vector cosine)."""
         enterprise, personal, keyword = await asyncio.gather(
-            self._safe_vector(self._stores[0], vector, scope),
-            self._safe_vector(self._stores[1], vector, scope),
+            self._safe_vector(self._stores[0], vector, scope, "enterprise"),
+            self._safe_vector(self._stores[1], vector, scope, "personal"),
             self._safe_keyword(query, scope),
         )
         vector_hits = merge_vector_hits(enterprise, personal)
@@ -96,9 +104,11 @@ class Retriever:
         return [cid for cid, _ in fused], best
 
     async def _safe_vector(
-        self, store: VectorStore, vector: list[float], scope: AccessScope
+        self, store: VectorStore, vector: list[float], scope: AccessScope, store_scope: str
     ) -> list[VectorHit]:
         """One store being down degrades recall; it must not fail the whole answer."""
+        if not scope.includes(store_scope):
+            return []
         try:
             return await store.search(vector, scope, VECTOR_TOP_N)
         except Exception:

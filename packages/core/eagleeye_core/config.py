@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     model_fast: str = "gpt-4o-mini"
     model_capable: str = "gpt-4o"
+    model_fast_fallback: str = ""  # optional; used once if the primary fails after retries
+    model_capable_fallback: str = ""
     embed_model: str = "text-embedding-3-small"
     embed_dim: int = 1536
 
@@ -35,6 +37,13 @@ class Settings(BaseSettings):
     enterprise_upload_open: bool = True  # Phase 2: any user may upload enterprise docs
     rag_top_k: int = 5
     rag_min_score: float = 0.25  # cosine floor below which retrieval is "low relevance"
+
+    # Agent budgets (C3 §2.3), checked before every supervisor LLM call
+    agent_max_steps: int = 14
+    agent_max_tool_calls: int = 12
+    agent_max_cost_usd: float = 0.25
+    agent_max_seconds: int = 120
+    max_active_runs_per_user: int = 2
 
     clerk_secret_key: str = ""
     clerk_publishable_key: str = Field(

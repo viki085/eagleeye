@@ -1,66 +1,201 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
+from typing import Any
 
 import litellm
 
-from eagleeye_llm.gateway import ChatMessage, StreamChunk, Tier, Usage
+from eagleeye_llm.gateway import ChatMessage, StreamChunk, Tier, ToolCall, ToolSpec, Usage
 
 logger = logging.getLogger(__name__)
 
 litellm.suppress_debug_info = True
 
+NUM_RETRIES = 2
+REQUEST_TIMEOUT_S = 60.0  # per request; a hung provider call must not stall a run forever
+_unpriced_models: set[str] = set()
+
+
+def to_wire(messages: Sequence[ChatMessage]) -> list[dict[str, Any]]:
+    """Provider-neutral OpenAI-style message dicts (LiteLLM translates per provider)."""
+    wire: list[dict[str, Any]] = []
+    for m in messages:
+        msg: dict[str, Any] = {"role": m.role, "content": m.content}
+        if m.tool_calls:
+            msg["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.name, "arguments": tc.arguments_json},
+                }
+                for tc in m.tool_calls
+            ]
+        if m.tool_call_id is not None:
+            msg["tool_call_id"] = m.tool_call_id
+        wire.append(msg)
+    return wire
+
+
+def tool_schemas(tools: Sequence[ToolSpec]) -> list[dict[str, Any]]:
+    return [
+        {
+            "type": "function",
+            "function": {"name": t.name, "description": t.description, "parameters": t.parameters},
+        }
+        for t in tools
+    ]
+
+
+class ToolCallAssembler:
+    """Streamed tool calls arrive as fragments keyed by index; join them."""
+
+    def __init__(self) -> None:
+        self._parts: dict[int, dict[str, str]] = {}
+
+    def add(self, deltas: Any) -> None:
+        for d in deltas or []:
+            idx = getattr(d, "index", 0) or 0
+            part = self._parts.setdefault(idx, {"id": "", "name": "", "args": ""})
+            if getattr(d, "id", None):
+                part["id"] = d.id
+            fn = getattr(d, "function", None)
+            if fn is not None:
+                if getattr(fn, "name", None):
+                    part["name"] += fn.name
+                if getattr(fn, "arguments", None):
+                    part["args"] += fn.arguments
+
+    def calls(self) -> tuple[ToolCall, ...]:
+        return tuple(
+            ToolCall(id=p["id"] or f"call_{i}", name=p["name"], arguments_json=p["args"] or "{}")
+            for i, p in sorted(self._parts.items())
+            if p["name"]
+        )
+
 
 class LiteLLMGateway:
-    """LiteLLM adapter: provider selected purely by model id config (ADR-02/03)."""
+    """LiteLLM adapter: provider selected purely by model id config (ADR-02/03).
 
-    def __init__(self, model_fast: str, model_capable: str) -> None:
+    Each tier may have a fallback model; a call that fails on the primary after
+    retries is retried once on the fallback and its usage is marked `degraded`.
+    """
+
+    def __init__(
+        self,
+        model_fast: str,
+        model_capable: str,
+        fallback_fast: str = "",
+        fallback_capable: str = "",
+        price_reference_model: str | None = None,
+    ) -> None:
         self._models: dict[Tier, str] = {"fast": model_fast, "capable": model_capable}
+        self._fallbacks: dict[Tier, str] = {"fast": fallback_fast, "capable": fallback_capable}
+        self._price_ref = price_reference_model or model_capable
 
-    def _model(self, tier: Tier) -> str:
-        return self._models[tier]
+    def _candidates(self, tier: Tier) -> list[tuple[str, bool]]:
+        primary = [(self._models[tier], False)]
+        fallback = self._fallbacks[tier]
+        return primary + ([(fallback, True)] if fallback else [])
 
     async def stream(
-        self, tier: Tier, messages: list[ChatMessage], max_tokens: int = 2048
+        self,
+        tier: Tier,
+        messages: list[ChatMessage],
+        max_tokens: int = 2048,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        model = self._model(tier)
-        response = await litellm.acompletion(
-            model=model,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-            max_tokens=max_tokens,
-            stream=True,
-            stream_options={"include_usage": True},
-        )
-        usage = Usage()
+        candidates = self._candidates(tier)
+        for i, (model, degraded) in enumerate(candidates):
+            kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": to_wire(messages),
+                "max_tokens": max_tokens,
+                "stream": True,
+                "stream_options": {"include_usage": True},
+                "num_retries": NUM_RETRIES,
+                "timeout": REQUEST_TIMEOUT_S,
+            }
+            if tools:
+                kwargs["tools"] = tool_schemas(tools)
+            try:
+                response = await litellm.acompletion(**kwargs)
+            except Exception:
+                if i == len(candidates) - 1:
+                    raise
+                logger.warning("model %s failed; falling back", model, exc_info=True)
+                continue
+            async for chunk in self._consume(response, model, degraded):
+                yield chunk
+            return
+
+    async def _consume(
+        self, response: Any, model: str, degraded: bool
+    ) -> AsyncIterator[StreamChunk]:
+        usage = Usage(model_id=model, degraded=degraded)
+        assembler = ToolCallAssembler()
         async for chunk in response:
             chunk_usage = getattr(chunk, "usage", None)
             if chunk_usage is not None:
-                usage = _to_usage(chunk_usage, model)
-            choices = chunk.choices
-            if choices and choices[0].delta and choices[0].delta.content:
-                yield StreamChunk(text=choices[0].delta.content, model_id=model)
-        yield StreamChunk(done=True, usage=usage, model_id=model)
+                usage = self._to_usage(chunk_usage, model, degraded)
+            choices = getattr(chunk, "choices", None) or []
+            if not choices or choices[0].delta is None:
+                continue
+            delta = choices[0].delta
+            assembler.add(getattr(delta, "tool_calls", None))
+            if delta.content:
+                yield StreamChunk(text=delta.content, model_id=model)
+        yield StreamChunk(done=True, usage=usage, model_id=model, tool_calls=assembler.calls())
 
     async def complete(
-        self, tier: Tier, messages: list[ChatMessage], max_tokens: int = 1024
+        self,
+        tier: Tier,
+        messages: list[ChatMessage],
+        max_tokens: int = 1024,
+        json_mode: bool = False,
+        temperature: float | None = None,
     ) -> tuple[str, Usage]:
-        model = self._model(tier)
-        response = await litellm.acompletion(
-            model=model,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-            max_tokens=max_tokens,
-        )
-        text = response.choices[0].message.content or ""
-        return text, _to_usage(response.usage, model)
+        candidates = self._candidates(tier)
+        for i, (model, degraded) in enumerate(candidates):
+            kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": to_wire(messages),
+                "max_tokens": max_tokens,
+                "num_retries": NUM_RETRIES,
+                "timeout": REQUEST_TIMEOUT_S,
+            }
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+            if temperature is not None:
+                kwargs["temperature"] = temperature
+            try:
+                response = await litellm.acompletion(**kwargs)
+            except Exception:
+                if i == len(candidates) - 1:
+                    raise
+                logger.warning("model %s failed; falling back", model, exc_info=True)
+                continue
+            text = response.choices[0].message.content or ""
+            return text, self._to_usage(response.usage, model, degraded)
+        raise RuntimeError("no model candidates configured")  # unreachable
+
+    def _to_usage(self, raw: object, model: str, degraded: bool) -> Usage:
+        tokens_in = getattr(raw, "prompt_tokens", 0) or 0
+        tokens_out = getattr(raw, "completion_tokens", 0) or 0
+        cost = price(model, tokens_in, tokens_out, self._price_ref)
+        return Usage(tokens_in, tokens_out, round(cost, 6), model, degraded)
 
 
-def _to_usage(raw: object, model: str) -> Usage:
-    tokens_in = getattr(raw, "prompt_tokens", 0) or 0
-    tokens_out = getattr(raw, "completion_tokens", 0) or 0
-    try:
-        cost = litellm.completion_cost(
-            model=model, prompt_tokens=tokens_in, completion_tokens=tokens_out
-        )
-    except Exception:  # unknown model pricing — cost tracked as 0, logged once upstream
-        logger.debug("no pricing for model %s", model)
-        cost = 0.0
-    return Usage(tokens_in=tokens_in, tokens_out=tokens_out, cost_usd=round(cost, 6))
+def price(model: str, tokens_in: int, tokens_out: int, reference_model: str) -> float:
+    """Unknown pricing is charged at the reference (capable) model's rate: budgets stay safe."""
+    for candidate in (model, reference_model):
+        try:
+            prompt_cost, completion_cost = litellm.cost_per_token(
+                model=candidate, prompt_tokens=tokens_in, completion_tokens=tokens_out
+            )
+            return float(prompt_cost) + float(completion_cost)
+        except Exception:  # noqa: S112 - try the next pricing source
+            if candidate not in _unpriced_models:
+                _unpriced_models.add(candidate)
+                logger.warning("no pricing for model %s", candidate)
+            continue
+    logger.error("no pricing for %s or reference %s; cost budget is blind", model, reference_model)
+    return 0.0

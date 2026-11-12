@@ -9,18 +9,10 @@ import { SourceDrawer } from "@/components/chat/source-drawer";
 import { DocumentsPanel } from "@/components/documents/documents-panel";
 import { useApi } from "@/hooks/use-api";
 import { useDocuments } from "@/hooks/use-documents";
-import type { ChatSummary, Citation } from "@/lib/api";
-import { isCitation, toUiMessage, type UiMessage } from "@/lib/messages";
+import { ApiError, type ChatSummary, type Citation } from "@/lib/api";
+import { fromRun, toUiMessage, userMessage, type UiMessage } from "@/lib/messages";
+import { foldEvent, initialRun, type RunView } from "@/lib/run-fold";
 import { consumeSse } from "@/lib/sse";
-
-interface StreamState {
-  runId: string;
-  text: string;
-  status: string | null;
-  citations: readonly Citation[];
-}
-
-const STAGE_TEXT: Record<string, string> = { retrieving: "Searching documents…" };
 
 export default function ChatPage() {
   const api = useApi();
@@ -29,7 +21,7 @@ export default function ChatPage() {
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [stream, setStream] = useState<StreamState | null>(null);
+  const [stream, setStream] = useState<RunView | null>(null);
   const [openCitation, setOpenCitation] = useState<Citation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,7 +45,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, stream?.text, stream?.status]);
+  }, [messages, stream?.text, stream?.steps.length]);
 
   const loadMessages = useCallback(
     async (chatId: string): Promise<UiMessage[]> => {
@@ -98,34 +90,38 @@ export default function ChatPage() {
   const runStream = useCallback(
     async (runId: string) => {
       const body = await api.openRunStream(runId);
-      let acc = "";
-      let cites: readonly Citation[] = [];
-      setStream({ runId, text: "", status: null, citations: [] });
+      let view = initialRun(runId);
+      setStream(view);
       await consumeSse(body, (evt) => {
-        const data = evt.data as Record<string, unknown>;
-        if (evt.event === "status") {
-          const stage = typeof data.stage === "string" ? data.stage : "";
-          setStream((s) => (s ? { ...s, status: STAGE_TEXT[stage] ?? null } : s));
-        } else if (evt.event === "text.delta") {
-          acc += typeof data.text === "string" ? data.text : "";
-          setStream((s) => (s ? { ...s, text: acc } : s));
-        } else if (evt.event === "citation" && isCitation(data)) {
-          cites = [...cites, data];
-        } else if (evt.event === "chat.updated") {
-          const d = data as { chat_id: string; title: string };
+        if (evt.event === "chat.updated") {
+          const d = evt.data as { chat_id: string; title: string };
           setChats((prev) => prev.map((c) => (c.id === d.chat_id ? { ...c, title: d.title } : c)));
-        } else if (evt.event === "run.done") {
-          const done: UiMessage = { key: `run-${runId}`, role: "assistant", text: acc, citations: cites };
+          return;
+        }
+        view = foldEvent(view, evt);
+        if (evt.event === "run.done") {
+          const done = fromRun(view);
           setMessages((prev) => [...prev, done]);
           setStream(null);
         } else if (evt.event === "run.error") {
-          setError(typeof data.user_message === "string" ? data.user_message : "The run failed.");
+          setError(view.error);
           setStream(null);
+        } else {
+          setStream(view);
         }
       });
     },
     [api],
   );
+
+  const handleStop = useCallback(async () => {
+    if (stream === null) return;
+    try {
+      await api.cancelRun(stream.runId);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Couldn't stop the answer");
+    }
+  }, [api, stream]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -139,12 +135,16 @@ export default function ChatPage() {
           setActiveChatId(chatId);
           await refreshChats();
         }
-        setMessages((prev) => [
-          ...prev,
-          { key: `local-${Date.now()}`, role: "user", text, citations: [] },
-        ]);
-        const { run_id } = await api.sendMessage(chatId, text, crypto.randomUUID(), docs.selectedIds);
-        await runStream(run_id);
+        let runId: string;
+        try {
+          ({ run_id: runId } = await api.sendMessage(chatId, text, crypto.randomUUID(), docs.selectedIds));
+        } catch (e: unknown) {
+          // Rejected before a run started (409 busy, 429, 422…): nothing to recover.
+          setError(e instanceof ApiError ? e.message : "Send failed");
+          return;
+        }
+        setMessages((prev) => [...prev, userMessage(text)]);
+        await runStream(runId);
       } catch (e: unknown) {
         // Stream dropped mid-run: the run continues server-side, so recover the
         // persisted answer instead of failing the turn.
@@ -204,11 +204,22 @@ export default function ChatPage() {
                 role={m.role}
                 text={m.text}
                 citations={m.citations}
+                steps={m.steps}
+                status={m.status}
+                route={m.route}
+                degraded={m.degraded}
+                replaced={m.replaced}
                 onOpenCitation={setOpenCitation}
               />
             ))}
             {stream !== null && (
-              <MessageBubble role="assistant" text={stream.text} statusText={stream.status} streaming />
+              <MessageBubble
+                role="assistant"
+                text={stream.text}
+                steps={stream.steps}
+                route={stream.guard?.route ?? null}
+                streaming
+              />
             )}
             {error !== null && (
               <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
@@ -220,6 +231,8 @@ export default function ChatPage() {
         <Composer
           disabled={busy}
           onSend={(t) => void handleSend(t)}
+          running={stream !== null}
+          onStop={() => void handleStop()}
           contextNote={
             selectedCount > 0
               ? `${selectedCount} document${selectedCount === 1 ? "" : "s"} selected`

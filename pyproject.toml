@@ -1,8 +1,11 @@
 [tool.uv.workspace]
 members = [
+    "apps/agent-worker",
     "apps/api",
     "apps/ingest-worker",
+    "packages/agents",
     "packages/core",
+    "packages/events",
     "packages/llm",
     "packages/retrieval",
 ]

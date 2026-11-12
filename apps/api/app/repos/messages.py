@@ -42,28 +42,3 @@ async def insert_user_message(
         run_id,
         idempotency_key,
     )
-
-
-async def insert_assistant_message(
-    conn: asyncpg.Connection,
-    chat_id: str,
-    parts: list[dict],
-    run_id: str,
-    tokens_in: int,
-    tokens_out: int,
-) -> asyncpg.Record:
-    """`parts`: a text part plus optional {"type": "citations", "items": [...]}."""
-    msg_no = await next_msg_no(conn, chat_id)
-    return await conn.fetchrow(
-        """
-        INSERT INTO messages (chat_id, msg_no, role, parts, run_id, tokens_in, tokens_out)
-        VALUES ($1, $2, 'assistant', $3, $4, $5, $6)
-        RETURNING id, msg_no
-        """,
-        chat_id,
-        msg_no,
-        {"parts": parts},
-        run_id,
-        tokens_in,
-        tokens_out,
-    )

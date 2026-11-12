@@ -1,8 +1,7 @@
 import json
 
 import pytest
-
-from app.events import EventSink, read_events, stream_key
+from eagleeye_events import EventSink, read_events, stream_key
 
 
 class FakeRedis:

@@ -40,7 +40,7 @@ async def _store_and_enqueue(
     state = request.app.state
     try:
         await state.store.put(key, data, mime)
-        await state.ingest_queue.enqueue(doc_id)
+        await state.task_queue.enqueue_ingest(doc_id)
     except Exception as exc:
         logger.exception("upload %s: storing or enqueueing failed", doc_id)
         await docs_repo.mark_failed(state.pool, doc_id, UPLOAD_FAILED)

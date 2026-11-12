@@ -1,9 +1,14 @@
 import asyncpg
 
+ACTIVE = "('QUEUED', 'RUNNING')"
+RUNNING_STALE_S = 60  # no heartbeat for this long → the worker is gone
+QUEUED_STALE_S = 300  # never picked up → no worker running
+
 
 async def create_run(
     conn: asyncpg.Connection, chat_id: str, user_id: str, params: dict | None = None
 ) -> str:
+    """Raises asyncpg.UniqueViolationError if the chat already has an active run."""
     return str(
         await conn.fetchval(
             """
@@ -17,42 +22,68 @@ async def create_run(
     )
 
 
-async def get_params(pool: asyncpg.Pool, run_id: str) -> dict:
-    params = await pool.fetchval("SELECT params FROM runs WHERE id = $1", run_id)
-    return params if isinstance(params, dict) else {}
-
-
 async def get_owned_run(pool: asyncpg.Pool, run_id: str, user_id: str) -> asyncpg.Record | None:
     return await pool.fetchrow(
-        "SELECT * FROM runs WHERE id = $1 AND user_id = $2", run_id, user_id
-    )
-
-
-async def mark_running(pool: asyncpg.Pool, run_id: str, model_ids: dict) -> None:
-    await pool.execute(
-        "UPDATE runs SET status = 'RUNNING', model_ids = $2, updated_at = now() WHERE id = $1",
-        run_id,
-        model_ids,
-    )
-
-
-async def mark_finished(
-    pool: asyncpg.Pool,
-    run_id: str,
-    status: str,
-    usage: dict | None = None,
-    cost_usd: float | None = None,
-    error_code: str | None = None,
-) -> None:
-    await pool.execute(
         """
-        UPDATE runs SET status = $2, usage = $3, cost_usd = $4, error_code = $5,
-                        updated_at = now()
-        WHERE id = $1
+        SELECT id, chat_id, status, route, guard, degraded, usage, cost_usd, error_code,
+               created_at, updated_at
+        FROM runs WHERE id = $1 AND user_id = $2
         """,
         run_id,
-        status,
-        usage,
-        cost_usd,
+        user_id,
+    )
+
+
+async def list_steps(pool: asyncpg.Pool, run_id: str) -> list[asyncpg.Record]:
+    return await pool.fetch(
+        """
+        SELECT id, parent_step_id, seq, kind, name, output_summary, status, duration_ms,
+               tokens_in, tokens_out, cost_usd
+        FROM run_steps WHERE run_id = $1 ORDER BY seq
+        """,
+        run_id,
+    )
+
+
+async def fail_stale_runs(pool: asyncpg.Pool, user_id: str) -> int:
+    """Runs orphaned by a crashed/absent worker would block the chat forever (ADR-28)."""
+    result = await pool.execute(
+        f"""
+        UPDATE runs SET status = 'FAILED', error_code = 'WORKER_LOST', updated_at = now()
+        WHERE user_id = $1 AND status IN {ACTIVE} AND (
+            (status = 'RUNNING' AND coalesce(heartbeat_at, updated_at)
+                < now() - make_interval(secs => $2))
+            OR (status = 'QUEUED' AND created_at < now() - make_interval(secs => $3))
+        )
+        """,  # noqa: S608 - constant fragment, values are bound
+        user_id,
+        RUNNING_STALE_S,
+        QUEUED_STALE_S,
+    )
+    return int(result.split()[-1])
+
+
+async def count_active_for_user(pool: asyncpg.Pool, user_id: str) -> int:
+    return int(
+        await pool.fetchval(
+            f"SELECT count(*) FROM runs WHERE user_id = $1 AND status IN {ACTIVE}",  # noqa: S608
+            user_id,
+        )
+    )
+
+
+async def has_active_run(pool: asyncpg.Pool, chat_id: str) -> bool:
+    return bool(
+        await pool.fetchval(
+            f"SELECT EXISTS (SELECT 1 FROM runs WHERE chat_id = $1 AND status IN {ACTIVE})",  # noqa: S608
+            chat_id,
+        )
+    )
+
+
+async def mark_failed(pool: asyncpg.Pool, run_id: str, error_code: str) -> None:
+    await pool.execute(
+        "UPDATE runs SET status = 'FAILED', error_code = $2, updated_at = now() WHERE id = $1",
+        run_id,
         error_code,
     )

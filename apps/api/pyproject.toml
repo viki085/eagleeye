@@ -7,6 +7,7 @@ dependencies = [
     "eagleeye-core",
     "eagleeye-llm",
     "eagleeye-retrieval",
+    "eagleeye-events",
     "celery[redis]>=5.4",
     "python-multipart>=0.0.18",
     "fastapi>=0.115",
@@ -28,6 +29,7 @@ dev = [
 eagleeye-core = { workspace = true }
 eagleeye-llm = { workspace = true }
 eagleeye-retrieval = { workspace = true }
+eagleeye-events = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

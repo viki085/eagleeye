@@ -1,7 +1,8 @@
-import asyncio
 import logging
 from uuid import UUID
 
+import asyncpg
+from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -12,13 +13,13 @@ from app.repos import chats as chats_repo
 from app.repos import documents as docs_repo
 from app.repos import messages as messages_repo
 from app.repos import runs as runs_repo
-from app.services.run_executor import execute_run
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chats", tags=["chats"])
 
 MAX_MESSAGE_CHARS = 8000
 MAX_SELECTED_DOCS = 20
+STILL_ANSWERING = "Still answering the previous message in this chat."
 
 
 class RenameBody(BaseModel):
@@ -89,24 +90,32 @@ async def send_message(
                 422, "VALIDATION_ERROR", "Some selected documents are unavailable or not ready."
             )
 
-    async with pool.acquire() as conn, conn.transaction():
-        run_id = await runs_repo.create_run(conn, chat_id, user.id, {"doc_ids": doc_ids})
-        await messages_repo.insert_user_message(
-            conn, chat_id, body.text, run_id, body.idempotency_key
-        )
+    await _admit_run(pool, chat_id, user.id)
+    try:
+        async with pool.acquire() as conn, conn.transaction():
+            run_id = await runs_repo.create_run(conn, chat_id, user.id, {"doc_ids": doc_ids})
+            await messages_repo.insert_user_message(
+                conn, chat_id, body.text, run_id, body.idempotency_key
+            )
+    except asyncpg.UniqueViolationError as exc:  # raced another send on this chat
+        raise ApiException(409, "CONFLICT", STILL_ANSWERING) from exc
 
-    task = asyncio.create_task(
-        execute_run(
-            pool,
-            app.state.redis,
-            app.state.llm,
-            run_id,
-            chat_id,
-            user.id,
-            retriever=getattr(app.state, "retriever", None),
-        )
-    )
-    app.state.run_tasks[run_id] = task
-    task.add_done_callback(lambda _t: app.state.run_tasks.pop(run_id, None))
-
+    try:
+        await app.state.task_queue.enqueue_run(run_id)
+    except Exception as exc:
+        logger.exception("could not enqueue run %s", run_id)
+        await runs_repo.mark_failed(pool, run_id, "ENQUEUE_FAILED")
+        raise ApiException(502, "UPSTREAM_ERROR", "Couldn't start answering. Try again.") from exc
     return ok({"run_id": run_id})
+
+
+async def _admit_run(pool: asyncpg.Pool, chat_id: str, user_id: str) -> None:
+    """One active run per chat, a few per user (C3 §7). Orphaned runs are failed first."""
+    await runs_repo.fail_stale_runs(pool, user_id)
+    if await runs_repo.has_active_run(pool, chat_id):
+        raise ApiException(409, "CONFLICT", STILL_ANSWERING)
+    cap = get_settings().max_active_runs_per_user
+    if await runs_repo.count_active_for_user(pool, user_id) >= cap:
+        raise ApiException(
+            429, "RATE_LIMITED", "Too many answers in progress. Wait for one to finish."
+        )

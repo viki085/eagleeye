@@ -83,5 +83,22 @@ Prompts live in `packages/agents/prompts/*.md`, versioned, reviewed like code; e
 ## 7. Idempotency & concurrency
 Run keyed by `(chat_id, idempotency_key)`; only one active run per chat (409 otherwise, or queued); per-user max 2 concurrent runs. All tools used are read-only → inherently safe to retry.
 
-## 8. Open decisions
+## 8. As built — Phase 3 (local)
+
+| Area | Implemented | Deferred |
+|------|-------------|----------|
+| Execution | `apps/agent-worker` (Celery queue `agent`, thread pool → one shared loop, ADR-28); API admits, enqueues, streams | Checkpoint/resume |
+| Graph | `packages/agents`: LangGraph `guard → {blocked \| simple \| rag \| rag_auto \| supervisor ⇄ tools} → finalize` | Nested sub-agent graphs (with SQL, Phase 4) |
+| Guard | Regex layer (injection, exfiltration, denied topics, NFKC + zero-width stripping) → fast-tier JSON classifier, strict parse, 1 retry, **fail closed**; neutral refusal; blocked input stored in `security_events` | PII anonymisation |
+| Router | Pure table: selection → rag; chitchat → simple; docs+simple → rag; other+simple → rag_auto (ground only above `RAG_MIN_SCORE`); else supervisor | — |
+| Supervisor | Capable model with typed tools `search_knowledge`, `list_documents`; parallel tool calls; `<tool_data>` isolation; run-level `[n]` numbering; budgets (steps 14, tool calls 12, $0.25, 120 s); repeat → hint, 3rd repeat → stop; final no-tool answer with disclosure, status `BUDGET_EXCEEDED` | `run_sql`, `analyze_data`, `make_chart` |
+| Authorization | Tools build `AccessScope` from the run's user only; model-supplied `doc_ids` intersected with visible docs | — |
+| Checks | Citation grounding (invalid `[n]` stripped, uncited answers flagged); output filter (provider/AWS/Clerk keys, private keys, JWTs, system-prompt lines, `javascript:` links) → `text.replace` + security event | Numeric grounding, LLM judge |
+| Control | Stop = Redis flag polled by a watchdog that cancels the graph mid-call (~0.5 s); hard deadline; one active run per chat (unique index + 409); 2 per user (429); stale runs failed on next send | — |
+| Records | `run_steps`, `usage_ledger`, `security_events`; `runs.route/guard/degraded/prompt_versions`; message parts `text`, `citations`, `steps`, `run` (UI tree survives reload) | Langfuse traces |
+| Resilience | LiteLLM `num_retries=2`, 60 s request timeout, optional `MODEL_*_FALLBACK` → `degraded` | Circuit breaker, semaphores |
+
+**Guard smoke eval** (`evals/guard_smoke.py`, 40 labelled prompts, gpt-4o-mini, 2026-11-12): attacks blocked 16/16 (4 by regex, no LLM call); false positives 0/24; intent accuracy 18/21 (86 %; all misses labelled `other` → auto-RAG, harmless); LLM guard latency p50 1.14 s, p95 1.69 s.
+
+## 9. Open decisions
 None — LangGraph confirmed as agent framework (ADR-17 Accepted). Ports/adapters keep future framework changes reversible.

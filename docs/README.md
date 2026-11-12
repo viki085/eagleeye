@@ -56,7 +56,7 @@ All milestones below run on the local Docker Compose stack; AWS (Phase 2 of ADR-
 | 5 | Hardening: guardrails, load test to 2k concurrent, security review | Load-test + security sign-off |
 | 6 (Phase 2) | AWS lift: Terraform, ECS Fargate, Supabase Cloud, managed Redis/Qdrant | Cloud deploy green; parity with local demo |
 
-**Build status (2026-11-12):** milestones 0 and 1 done. Milestone 2 (RAG) is functionally complete — upload, ingest worker, dual-store hybrid retrieval, cited answers (see C4 §9 "As built"); its exit criterion (golden-set recall@5) waits on the eval harness.
+**Build status (2026-11-12):** milestones 0 and 1 done. Milestone 2 (RAG) is functionally complete — upload, ingest worker, dual-store hybrid retrieval, cited answers (see C4 §9 "As built"); its exit criterion (golden-set recall@5) waits on the eval harness. Agent orchestration (C3) is built: guard → router → supervisor with tools in a Celery agent worker (see C3 §8 "As built").
 
 ## Notes on the reference site
 

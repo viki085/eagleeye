@@ -1,5 +1,4 @@
 import pytest
-
 from eagleeye_retrieval.rrf import fuse
 
 

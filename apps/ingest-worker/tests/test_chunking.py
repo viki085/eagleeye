@@ -1,5 +1,4 @@
 import pytest
-
 from ingest_worker.chunking import MAX_CHARS, PATH_SEP, chunk
 from ingest_worker.parsing.base import ParsedElement as E
 

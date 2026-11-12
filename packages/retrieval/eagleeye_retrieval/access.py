@@ -12,14 +12,22 @@ MAX_CHUNK_CHARS = 2000
 TRUNCATION_MARKER = " …[truncated]"
 
 
-def access_predicate(user_param: int, doc_param: int | None) -> str:
-    """SQL over aliases `c` (document_chunks) and `d` (documents)."""
+def access_predicate(first_param: int, scope: AccessScope) -> str:
+    """SQL over aliases `c` (document_chunks) and `d` (documents).
+
+    Parameters are numbered from `first_param` in the order `access_args` returns them.
+    """
+    n = first_param
     sql = (
         "d.status = 'READY' AND (c.scope = 'enterprise' "
-        f"OR (c.scope = 'personal' AND c.owner_id = ${user_param}::uuid))"
+        f"OR (c.scope = 'personal' AND c.owner_id = ${n}::uuid))"
     )
-    if doc_param is not None:
-        sql += f" AND c.document_id = ANY(${doc_param}::uuid[])"
+    if scope.doc_ids:
+        n += 1
+        sql += f" AND c.document_id = ANY(${n}::uuid[])"
+    if scope.restricts_scope:
+        n += 1
+        sql += f" AND c.scope = ANY(${n}::text[])"
     return sql
 
 
@@ -27,6 +35,8 @@ def access_args(scope: AccessScope) -> list[object]:
     args: list[object] = [scope.user_id]
     if scope.doc_ids:
         args.append(list(scope.doc_ids))
+    if scope.restricts_scope:
+        args.append(list(scope.scopes))
     return args
 
 
@@ -46,13 +56,12 @@ async def hydrate(
     if not scored:
         return []
     ids = [cid for cid, _ in scored]
-    doc_param = 3 if scope.doc_ids else None
     rows = await pool.fetch(
         f"""
         SELECT c.id, c.document_id, d.title, c.scope, c.chunk_no, c.page,
                c.heading_path, c.content
         FROM document_chunks c JOIN documents d ON d.id = c.document_id
-        WHERE c.id = ANY($1::uuid[]) AND {access_predicate(2, doc_param)}
+        WHERE c.id = ANY($1::uuid[]) AND {access_predicate(2, scope)}
         """,  # noqa: S608 — predicate is built from constants, values are bound
         ids,
         *access_args(scope),

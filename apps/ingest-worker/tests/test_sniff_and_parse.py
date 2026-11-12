@@ -2,7 +2,6 @@ import importlib.util
 import pathlib
 
 import pytest
-
 from ingest_worker.errors import PermanentIngestError
 from ingest_worker.parsing.pdf import heading_level
 from ingest_worker.parsing.registry import parser_for
