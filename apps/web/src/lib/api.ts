@@ -74,6 +74,21 @@ export interface Me {
   role: string;
 }
 
+export interface DailyUsage {
+  day: string; // ISO date
+  cost_usd: number;
+  tokens: number;
+}
+
+export interface UsageSummary {
+  limit_usd: number;
+  cost_usd: number;
+  tokens_in: number;
+  tokens_out: number;
+  runs: number;
+  daily: DailyUsage[];
+}
+
 export interface MessagePart {
   type: string;
   text?: string;
@@ -177,6 +192,10 @@ export class ApiClient {
 
   cancelRun(runId: string): Promise<{ run_id: string; cancelled: boolean }> {
     return this.request(`/v1/runs/${runId}/cancel`, { method: "POST" });
+  }
+
+  getUsage(): Promise<UsageSummary> {
+    return this.request<UsageSummary>("/v1/me/usage");
   }
 
   getMe(): Promise<Me> {

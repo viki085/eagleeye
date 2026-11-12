@@ -1,7 +1,9 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
+import type { ReactNode } from "react";
 
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { ChatSummary } from "@/lib/api";
 
 interface SidebarProps {
@@ -11,14 +13,26 @@ interface SidebarProps {
   onNewChat: () => void;
   onSelect: (chatId: string) => void;
   onDelete: (chatId: string) => void;
+  footer?: ReactNode;
 }
 
-export function Sidebar({ chats, activeChatId, busy, onNewChat, onSelect, onDelete }: SidebarProps) {
+export function Sidebar({
+  chats,
+  activeChatId,
+  busy,
+  onNewChat,
+  onSelect,
+  onDelete,
+  footer,
+}: SidebarProps) {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex items-center justify-between p-3">
         <span className="text-sm font-semibold tracking-tight">EagleEye</span>
-        <UserButton />
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <UserButton />
+        </div>
       </div>
       <button
         onClick={onNewChat}
@@ -57,6 +71,7 @@ export function Sidebar({ chats, activeChatId, busy, onNewChat, onSelect, onDele
           <p className="px-2 py-4 text-xs text-neutral-400">No chats yet.</p>
         )}
       </nav>
+      {footer}
     </aside>
   );
 }

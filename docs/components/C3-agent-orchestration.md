@@ -96,9 +96,11 @@ Run keyed by `(chat_id, idempotency_key)`; only one active run per chat (409 oth
 | Checks | Citation grounding (invalid `[n]` stripped, uncited answers flagged); output filter (provider/AWS/Clerk keys, private keys, JWTs, system-prompt lines, `javascript:` links) → `text.replace` + security event | Numeric grounding, LLM judge |
 | Control | Stop = Redis flag polled by a watchdog that cancels the graph mid-call (~0.5 s); hard deadline; one active run per chat (unique index + 409); 2 per user (429); stale runs failed on next send | — |
 | Records | `run_steps`, `usage_ledger`, `security_events`; `runs.route/guard/degraded/prompt_versions`; message parts `text`, `citations`, `steps`, `run` (UI tree survives reload) | Langfuse traces |
-| Resilience | LiteLLM `num_retries=2`, 60 s request timeout, optional `MODEL_*_FALLBACK` → `degraded` | Circuit breaker, semaphores |
+| Resilience | LiteLLM `num_retries=2`, 60 s request timeout, fallbacks gpt-4o-mini / gpt-4o → `degraded` | Circuit breaker, semaphores |
+| Models (ADR-29) | fast `gpt-6-luna`, capable `gpt-6.1-terra`, `reasoning_effort=none` per tier; temperature sent only when the model accepts it | Re-benchmark luna as capable with the SQL golden set |
 
 **Guard smoke eval** (`evals/guard_smoke.py`, 40 labelled prompts, gpt-4o-mini, 2026-11-12): attacks blocked 16/16 (4 by regex, no LLM call); false positives 0/24; intent accuracy 18/21 (86 %; all misses labelled `other` → auto-RAG, harmless); LLM guard latency p50 1.14 s, p95 1.69 s.
+Re-run on **gpt-6-luna** (`reasoning_effort=none`, after ADR-29): attacks blocked 16/16; false positives 0/24; intent accuracy 20/21 (95 %); latency p50 2.16 s, p95 3.23 s in this run (1.31 s p50 in the sequential benchmark — luna's latency varies more than gpt-4o-mini's).
 
 ## 9. Open decisions
 None — LangGraph confirmed as agent framework (ADR-17 Accepted). Ports/adapters keep future framework changes reversible.

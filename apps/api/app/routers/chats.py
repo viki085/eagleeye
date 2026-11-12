@@ -13,6 +13,7 @@ from app.repos import chats as chats_repo
 from app.repos import documents as docs_repo
 from app.repos import messages as messages_repo
 from app.repos import runs as runs_repo
+from app.repos import usage as usage_repo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -114,8 +115,14 @@ async def _admit_run(pool: asyncpg.Pool, chat_id: str, user_id: str) -> None:
     await runs_repo.fail_stale_runs(pool, user_id)
     if await runs_repo.has_active_run(pool, chat_id):
         raise ApiException(409, "CONFLICT", STILL_ANSWERING)
-    cap = get_settings().max_active_runs_per_user
-    if await runs_repo.count_active_for_user(pool, user_id) >= cap:
+    settings = get_settings()
+    if await runs_repo.count_active_for_user(pool, user_id) >= settings.max_active_runs_per_user:
         raise ApiException(
             429, "RATE_LIMITED", "Too many answers in progress. Wait for one to finish."
+        )
+    if await usage_repo.total_cost(pool, user_id) >= settings.usage_limit_usd:
+        raise ApiException(
+            429,
+            "QUOTA_EXCEEDED",
+            f"You've reached your ${settings.usage_limit_usd:,.0f} usage limit.",
         )

@@ -1,9 +1,35 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Dark mode follows a `.dark` class on <html> (set before paint by the inline
+   script in layout.tsx), so the user's toggle wins over the OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Data-viz tokens (validated categorical pair + same-ramp meter track). */
+  --viz-input: #2a78d6;
+  --viz-output: #eb6834;
+  --viz-accent: #2a78d6;
+  /* Track = a faint wash of the accent, so the unfilled part recedes in both themes. */
+  --viz-track: color-mix(in oklab, var(--viz-accent) 18%, transparent);
+  --viz-muted-bar: #9ec5f4;
+  --status-warning: #fab219;
+  --status-critical: #d03b3b;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  --viz-input: #3987e5;
+  --viz-output: #d95926;
+  --viz-accent: #3987e5;
+  --viz-muted-bar: #1c5cab;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -11,13 +37,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {

@@ -86,15 +86,30 @@ class LiteLLMGateway:
         fallback_fast: str = "",
         fallback_capable: str = "",
         price_reference_model: str | None = None,
+        reasoning_fast: str = "",
+        reasoning_capable: str = "",
     ) -> None:
         self._models: dict[Tier, str] = {"fast": model_fast, "capable": model_capable}
         self._fallbacks: dict[Tier, str] = {"fast": fallback_fast, "capable": fallback_capable}
         self._price_ref = price_reference_model or model_capable
+        self._efforts: dict[Tier, str] = {"fast": reasoning_fast, "capable": reasoning_capable}
 
     def _candidates(self, tier: Tier) -> list[tuple[str, bool]]:
         primary = [(self._models[tier], False)]
         fallback = self._fallbacks[tier]
         return primary + ([(fallback, True)] if fallback else [])
+
+    def _model_params(self, tier: Tier, model: str, temperature: float | None) -> dict[str, Any]:
+        """Per-model knobs. Reasoning models (GPT-5/6, o-series) take `reasoning_effort` and
+        reject a non-default temperature unless reasoning is off; classic models ignore effort."""
+        params: dict[str, Any] = {}
+        effort = self._efforts[tier]
+        reasoning = is_reasoning_model(model)
+        if reasoning and effort:
+            params["reasoning_effort"] = effort
+        if temperature is not None and (not reasoning or effort == "none"):
+            params["temperature"] = temperature
+        return params
 
     async def stream(
         self,
@@ -113,6 +128,7 @@ class LiteLLMGateway:
                 "stream_options": {"include_usage": True},
                 "num_retries": NUM_RETRIES,
                 "timeout": REQUEST_TIMEOUT_S,
+                **self._model_params(tier, model, None),
             }
             if tools:
                 kwargs["tools"] = tool_schemas(tools)
@@ -161,11 +177,10 @@ class LiteLLMGateway:
                 "max_tokens": max_tokens,
                 "num_retries": NUM_RETRIES,
                 "timeout": REQUEST_TIMEOUT_S,
+                **self._model_params(tier, model, temperature),
             }
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
-            if temperature is not None:
-                kwargs["temperature"] = temperature
             try:
                 response = await litellm.acompletion(**kwargs)
             except Exception:
@@ -182,6 +197,13 @@ class LiteLLMGateway:
         tokens_out = getattr(raw, "completion_tokens", 0) or 0
         cost = price(model, tokens_in, tokens_out, self._price_ref)
         return Usage(tokens_in, tokens_out, round(cost, 6), model, degraded)
+
+
+def is_reasoning_model(model: str) -> bool:
+    try:
+        return bool(litellm.supports_reasoning(model=model))
+    except Exception:  # unknown model: treat as classic (no effort, temperature allowed)
+        return False
 
 
 def price(model: str, tokens_in: int, tokens_out: int, reference_model: str) -> float:

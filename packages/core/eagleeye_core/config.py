@@ -24,10 +24,18 @@ class Settings(BaseSettings):
     llm_provider: str = "openai"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    model_fast: str = "gpt-4o-mini"
-    model_capable: str = "gpt-4o"
-    model_fast_fallback: str = ""  # optional; used once if the primary fails after retries
-    model_capable_fallback: str = ""
+    # Defaults chosen by evals/model_bench.py on 2026-11-12 (ADR-29): equal-or-better quality
+    # than gpt-4o-mini / gpt-4o at ~28% / ~51% lower cost.
+    model_fast: str = "gpt-6-luna"
+    model_capable: str = "gpt-6.1-terra"
+    # Used once if the primary fails after retries; answers are flagged "degraded".
+    model_fast_fallback: str = "gpt-4o-mini"
+    model_capable_fallback: str = "gpt-4o"
+    # Reasoning models only (GPT-5/6, o-series): "none" | "minimal" | "low" | "medium" | "high".
+    # Empty = provider default. Ignored for classic models such as gpt-4o. "none" = no billed
+    # thinking tokens and lowest latency (supported by the GPT-6 luna/terra models).
+    reasoning_effort_fast: str = "none"
+    reasoning_effort_capable: str = "none"
     embed_model: str = "text-embedding-3-small"
     embed_dim: int = 1536
 
@@ -44,6 +52,7 @@ class Settings(BaseSettings):
     agent_max_cost_usd: float = 0.25
     agent_max_seconds: int = 120
     max_active_runs_per_user: int = 2
+    usage_limit_usd: float = 500.0  # lifetime LLM spend cap per user; new runs refused beyond it
 
     clerk_secret_key: str = ""
     clerk_publishable_key: str = Field(

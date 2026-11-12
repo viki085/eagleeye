@@ -6,6 +6,7 @@ import asyncpg
 from eagleeye_llm.gateway import ChatMessage, LLMGateway
 
 from eagleeye_agents import persistence
+from eagleeye_agents.control import UsageMeter
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +24,17 @@ async def maybe_title(
     user_id: str,
     question: str,
     history: list[ChatMessage],
+    meter: UsageMeter | None = None,
 ) -> str | None:
+    """`meter` records the call's tokens/cost so the usage ledger is complete."""
     if any(m.role == "user" for m in history):
         return None  # not the first turn
     try:
-        title, _ = await llm.complete(
+        title, usage = await llm.complete(
             "fast", [ChatMessage("user", f"{TITLE_PROMPT}\n\n{question[:500]}")], max_tokens=24
         )
+        if meter is not None:
+            meter.add(usage)
         title = title.strip().strip('"')[:MAX_TITLE_CHARS]
         if title and await persistence.rename_chat(pool, chat_id, user_id, title):
             return title

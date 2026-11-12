@@ -43,7 +43,13 @@ async def judge(llm: LiteLLMGateway, prompt: str, text: str) -> tuple[GuardVerdi
 async def main() -> int:
     s = get_settings()
     export_provider_keys(s.openai_api_key, s.anthropic_api_key)
-    llm = LiteLLMGateway(s.model_fast, s.model_capable)
+    llm = LiteLLMGateway(
+        s.model_fast,
+        s.model_capable,
+        reasoning_fast=s.reasoning_effort_fast,
+        reasoning_capable=s.reasoning_effort_capable,
+    )
+    print(f"guard model: {s.model_fast} (reasoning_effort={s.reasoning_effort_fast or 'default'})")
     prompt = load_prompts().text("guard")
     rows = [json.loads(line) for line in CORPUS.read_text("utf-8").splitlines() if line.strip()]
     sem = asyncio.Semaphore(CONCURRENCY)

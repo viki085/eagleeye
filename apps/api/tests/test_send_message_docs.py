@@ -13,6 +13,7 @@ from app.repos import chats as chats_repo
 from app.repos import documents as docs_repo
 from app.repos import messages as messages_repo
 from app.repos import runs as runs_repo
+from app.repos import usage as usage_repo
 from fastapi.testclient import TestClient
 
 ME = AuthedUser(str(uuid.uuid4()), "user_me", "me@example.com", None, "member")
@@ -43,6 +44,7 @@ class Env:
     unique_violation: bool = False
     redis_sets: list[str] = field(default_factory=list)
     run_status: str | None = "RUNNING"
+    spent_usd: float = 0.0
 
 
 @pytest.fixture
@@ -82,6 +84,9 @@ def env(monkeypatch: pytest.MonkeyPatch) -> Env:
     async def get_owned_run(pool, run_id, user_id):  # noqa: ANN001
         return None if e.run_status is None else {"id": run_id, "status": e.run_status}
 
+    async def total_cost(pool, user_id):  # noqa: ANN001
+        return e.spent_usd
+
     for mod, name, fn in [
         (chats_repo, "get_owned_chat", owned_chat),
         (messages_repo, "find_by_idempotency_key", no_duplicate),
@@ -93,6 +98,7 @@ def env(monkeypatch: pytest.MonkeyPatch) -> Env:
         (runs_repo, "create_run", create_run),
         (runs_repo, "mark_failed", mark_failed),
         (runs_repo, "get_owned_run", get_owned_run),
+        (usage_repo, "total_cost", total_cost),
     ]:
         monkeypatch.setattr(mod, name, fn)
 
@@ -151,6 +157,30 @@ def test_race_on_unique_index_is_409(env: Env) -> None:
 def test_per_user_cap_is_429(env: Env) -> None:
     env.active_user = 2
     assert _send(env).status_code == 429
+
+
+def test_usage_limit_reached_is_429_quota(env: Env) -> None:
+    env.spent_usd = 500.0
+    resp = _send(env)
+    assert resp.status_code == 429 and resp.json()["error"]["code"] == "QUOTA_EXCEEDED"
+    assert "$500" in resp.json()["error"]["message"] and env.queued == []
+
+
+def test_usage_endpoint_shape(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import date
+
+    async def totals(pool, user_id):  # noqa: ANN001
+        return usage_repo.UsageTotals(1.2345678, 1000, 250, 3)
+
+    async def daily(pool, user_id):  # noqa: ANN001
+        return [usage_repo.DailyUsage(date(2026, 11, 12), 0.5, 900)]
+
+    monkeypatch.setattr(usage_repo, "totals", totals)
+    monkeypatch.setattr(usage_repo, "daily", daily)
+    data = env.client.get("/v1/me/usage").json()["data"]
+    assert data["limit_usd"] == 500.0 and data["cost_usd"] == 1.234568
+    assert (data["tokens_in"], data["tokens_out"], data["runs"]) == (1000, 250, 3)
+    assert data["daily"] == [{"day": "2026-11-12", "cost_usd": 0.5, "tokens": 900}]
 
 
 def test_enqueue_failure_marks_failed_and_502(env: Env) -> None:

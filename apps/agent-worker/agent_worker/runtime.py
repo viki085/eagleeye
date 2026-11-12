@@ -58,7 +58,12 @@ async def _build_deps(s: Settings) -> RunnerDeps:
     pool = await _create_pool(s.database_url)
     redis = aioredis.from_url(s.redis_url, socket_connect_timeout=5)
     llm = LiteLLMGateway(
-        s.model_fast, s.model_capable, s.model_fast_fallback, s.model_capable_fallback
+        s.model_fast,
+        s.model_capable,
+        s.model_fast_fallback,
+        s.model_capable_fallback,
+        reasoning_fast=s.reasoning_effort_fast,
+        reasoning_capable=s.reasoning_effort_capable,
     )
     qdrant = AsyncQdrantClient(url=s.qdrant_url)
     retriever = Retriever(
@@ -77,7 +82,12 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         retriever=retriever,
         settings=agent_settings(s),
         prompts=load_prompts(),
-        model_ids={"fast": s.model_fast, "capable": s.model_capable},
+        model_ids={
+            "fast": s.model_fast,
+            "capable": s.model_capable,
+            "reasoning_fast": s.reasoning_effort_fast,
+            "reasoning_capable": s.reasoning_effort_capable,
+        },
     )
 
 

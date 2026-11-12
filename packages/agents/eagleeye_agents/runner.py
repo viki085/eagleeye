@@ -200,8 +200,11 @@ async def execute_run(
         doc_ids = [str(d) for d in (run["params"] or {}).get("doc_ids", [])]
         initial: RunState = {"question": question, "history": history, "doc_ids": doc_ids}
         outcome = await _execute_graph(ctx, initial)
+        # Title before persisting so its tokens/cost are included in the usage ledger.
+        title = await maybe_title(
+            deps.pool, deps.llm, ctx.chat_id, ctx.user_id, question, history, ctx.usage
+        )
         message_id = await _persist(deps, ctx, outcome)
-        title = await maybe_title(deps.pool, deps.llm, ctx.chat_id, ctx.user_id, question, history)
         if title is not None:
             await sink.emit(CHAT_UPDATED, {"chat_id": ctx.chat_id, "title": title})
         await sink.emit(

@@ -124,6 +124,28 @@ def test_unknown_price_uses_reference_model(monkeypatch: pytest.MonkeyPatch) -> 
     assert adapter.price("mystery", 1, 1, "gpt-4o") == 0.5
 
 
+@pytest.mark.parametrize(
+    ("model", "effort", "temperature", "expected"),
+    [
+        ("gpt-4o-mini", "none", 0, {"temperature": 0}),  # classic: effort ignored
+        ("gpt-6-luna", "none", 0, {"reasoning_effort": "none", "temperature": 0}),
+        ("gpt-6-luna", "low", 0, {"reasoning_effort": "low"}),  # temp dropped while reasoning
+        ("gpt-6-luna", "", 0, {}),
+        ("gpt-5-nano", "minimal", None, {"reasoning_effort": "minimal"}),
+    ],
+)
+def test_model_params_per_model(model: str, effort: str, temperature, expected: dict) -> None:  # noqa: ANN001
+    gw = adapter.LiteLLMGateway(model, model, reasoning_fast=effort)
+    assert gw._model_params("fast", model, temperature) == expected
+
+
+def test_fallback_to_classic_model_gets_no_reasoning_effort() -> None:
+    gw = adapter.LiteLLMGateway(
+        "gpt-6-luna", "x", fallback_fast="gpt-4o-mini", reasoning_fast="none"
+    )
+    assert gw._model_params("fast", "gpt-4o-mini", 0) == {"temperature": 0}
+
+
 def test_real_pricing_table_prices_known_model() -> None:
     """Guards against LiteLLM API drift silently zeroing every cost (found in Phase 3 E2E)."""
     assert adapter.price("gpt-4o", 1000, 500, "gpt-4o") > 0

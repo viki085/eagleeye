@@ -7,8 +7,10 @@ import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
 import { SourceDrawer } from "@/components/chat/source-drawer";
 import { DocumentsPanel } from "@/components/documents/documents-panel";
+import { UsagePanel } from "@/components/usage/usage-panel";
 import { useApi } from "@/hooks/use-api";
 import { useDocuments } from "@/hooks/use-documents";
+import { useUsage } from "@/hooks/use-usage";
 import { ApiError, type ChatSummary, type Citation } from "@/lib/api";
 import { fromRun, toUiMessage, userMessage, type UiMessage } from "@/lib/messages";
 import { foldEvent, initialRun, type RunView } from "@/lib/run-fold";
@@ -17,6 +19,8 @@ import { consumeSse } from "@/lib/sse";
 export default function ChatPage() {
   const api = useApi();
   const docs = useDocuments(api);
+  const [usageKey, setUsageKey] = useState(0);
+  const usage = useUsage(api, usageKey);
   const [me, setMe] = useState<string | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -103,9 +107,11 @@ export default function ChatPage() {
           const done = fromRun(view);
           setMessages((prev) => [...prev, done]);
           setStream(null);
+          setUsageKey((k) => k + 1);
         } else if (evt.event === "run.error") {
           setError(view.error);
           setStream(null);
+          setUsageKey((k) => k + 1);
         } else {
           setStream(view);
         }
@@ -186,6 +192,7 @@ export default function ChatPage() {
         onNewChat={handleNewChat}
         onSelect={(id) => void openChat(id)}
         onDelete={(id) => void handleDelete(id)}
+        footer={<UsagePanel state={usage} />}
       />
       <main className="flex min-w-0 flex-1 flex-col">
         <div ref={scrollRef} className="flex-1 overflow-y-auto">

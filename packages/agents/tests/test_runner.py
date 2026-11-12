@@ -114,7 +114,7 @@ async def test_successful_run_persists_parts_and_emits_done(db: DB) -> None:
     assert types == ["text", "steps", "run"]
     assert db.message_parts[0]["text"].strip() == "Hello!"
     assert db.finished["status"] == "SUCCEEDED" and db.finished["route"] == "simple"
-    assert db.steps >= 3 and db.usage_rows == 2  # guard + answer (title not metered)
+    assert db.steps >= 3 and db.usage_rows == 3  # guard + answer + title
     done = sink.of("run.done")[0]
     assert done["message_id"] == "m1" and done["cancelled"] is False
 
