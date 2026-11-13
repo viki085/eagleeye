@@ -10,6 +10,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 
 from app.auth import AuthedUser, CurrentUser
 from app.errors import ApiException
+from app.repos import admin_metrics
 from app.repos import documents as docs_repo
 from app.services import uploads
 from app.services.guards import ensure_enabled, limit_action
@@ -30,6 +31,15 @@ def _require_enterprise_manager(user: AuthedUser, action: str) -> None:
         raise ApiException(
             403, "FORBIDDEN", f"Only knowledge admins can {action} enterprise documents."
         )
+
+
+async def _audit(
+    request: Request, user: AuthedUser, category: str, doc_id: str, title: str
+) -> None:
+    """Record an enterprise-library change in security_events (title only, never content)."""
+    await admin_metrics.record_admin_action(
+        request.app.state.pool, user.id, category, {"document_id": doc_id, "title": title}
+    )
 
 
 UPLOAD_FAILED = "Upload could not be processed. Try again."
@@ -72,6 +82,8 @@ async def upload_document(
 
     doc_id = str(uuid.uuid4())
     key = uploads.object_key(scope, doc_id, ext)
+    if scope == "enterprise":  # company-wide knowledge: audited before it changes
+        await _audit(request, user, "enterprise_doc_added", doc_id, uploads.title_from(filename))
     try:
         row = await docs_repo.insert_document(
             pool,
@@ -118,6 +130,8 @@ async def delete_document(doc_id: UUID, request: Request, user: CurrentUser) -> 
         raise ApiException(403, "FORBIDDEN", "Only the uploader can delete this document.")
 
     if row["scope"] == "enterprise":
+        # audit first: if the audit write fails, nothing is deleted unrecorded
+        await _audit(request, user, "enterprise_doc_deleted", str(doc_id), row["title"])
         try:
             await state.enterprise_store.delete_document(str(doc_id))
         except Exception as exc:

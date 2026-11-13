@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { categoryBars, costByModel, timeSeries } from "./admin-charts";
-import { money, pct, seconds } from "./admin-format";
+import { fileSize, money, pct, seconds } from "./admin-format";
 
 describe("admin charts", () => {
   it("builds a single-series line without a colour encoding", () => {
@@ -18,7 +18,18 @@ describe("admin charts", () => {
     const daily = timeSeries([{ x: "2026-11-13", y: 1 }], "answers") as S;
     const hourly = timeSeries([{ x: "2026-11-13T01:00Z", y: 1 }], "answers", { hourly: true }) as S;
     expect(daily.encoding.x.axis.tickCount).toEqual({ interval: "day", step: 1 });
-    expect(hourly.encoding.x.axis.tickCount).toEqual({ interval: "hour", step: 3 });
+    expect(hourly.encoding.x.axis.tickCount).toEqual({ interval: "hours", step: 3 });
+  });
+
+  it("only uses interval names Vega knows (an unknown one crashes the chart)", async () => {
+    // @ts-expect-error vega-time (a vega dependency) ships no type declarations
+    const { utcInterval } = (await import("vega-time")) as { utcInterval: (n: string) => unknown };
+    for (const opts of [{}, { hourly: true }]) {
+      const spec = timeSeries([{ x: "2026-11-13", y: 1 }], "answers", opts) as {
+        encoding: { x: { axis: { tickCount: { interval: string } } } };
+      };
+      expect(utcInterval(spec.encoding.x.axis.tickCount.interval)).toBeDefined();
+    }
   });
 
   it("fills missing days per model so lines don't skip", () => {
@@ -61,5 +72,8 @@ describe("admin format", () => {
     expect(pct(1, 0)).toBe("—");
     expect(seconds(null)).toBe("n/a");
     expect(seconds(2.345)).toBe("2.3 s");
+    expect(fileSize(512)).toBe("512 B");
+    expect(fileSize(2048)).toBe("2 KB");
+    expect(fileSize(5 * 1024 * 1024)).toBe("5.0 MB");
   });
 });

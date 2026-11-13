@@ -1,5 +1,6 @@
 "use client";
 
+import { EnterpriseLibrary } from "@/components/admin/enterprise-library";
 import { DataTable, Panel, Pill, SectionState } from "@/components/admin/parts";
 import { useAdminData } from "@/hooks/use-admin-data";
 import { count, when } from "@/lib/admin-format";
@@ -17,8 +18,10 @@ function statusTone(status: string): "ok" | "bad" | "warn" {
 }
 
 export function ContentTab({ api }: { api: ApiClient }) {
-  const [state] = useAdminData(() => api.adminContent(), [api]);
+  const [state, reload] = useAdminData(() => api.adminContent(), [api]);
   return (
+    <div className="flex flex-col gap-3">
+      <EnterpriseLibrary api={api} onChanged={reload} />
     <SectionState state={state}>
       {(d) => (
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
@@ -69,5 +72,6 @@ export function ContentTab({ api }: { api: ApiClient }) {
         </div>
       )}
     </SectionState>
+    </div>
   );
 }

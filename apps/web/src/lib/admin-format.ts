@@ -31,6 +31,13 @@ export function when(iso: string | null | undefined): string {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
+export function fileSize(b: number | null | undefined): string {
+  if (b === null || b === undefined) return "—";
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function bucketLabel(iso: string, hourly: boolean): string {
   const d = new Date(iso);
   return hourly

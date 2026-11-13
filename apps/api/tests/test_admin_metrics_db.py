@@ -90,6 +90,21 @@ async def test_overview_matches_seeded_runs(conn: asyncpg.Connection) -> None:
     assert sum(s["runs"] for s in after["series"]) == after["runs"]
 
 
+async def test_cost_survives_chat_deletion(conn: asyncpg.Connection) -> None:
+    """Billing comes from usage_ledger: deleting a chat removes its answers, not its cost."""
+    before = await m.overview(conn, m.WINDOWS["24h"])
+    a, _b = await _seed(conn)
+    await conn.execute("DELETE FROM chats WHERE user_id = $1", a)
+    after = await m.overview(conn, m.WINDOWS["24h"])
+    assert after["runs"] - before["runs"] == 1  # only user b's answer is left
+    assert after["cost_usd"] - before["cost_usd"] == pytest.approx(0.42)
+    assert sum(s["cost_usd"] for s in after["series"]) == pytest.approx(after["cost_usd"])
+    page = await m.users(conn, m.WINDOWS["24h"], "cost", 0, 100, 500.0)
+    mine = {u["email"]: u for u in page["items"]}
+    assert mine["metrics-a@test.local"]["cost_usd"] == pytest.approx(0.12)
+    assert mine["metrics-a@test.local"]["runs"] == 0
+
+
 async def test_users_usage_and_safety(conn: asyncpg.Connection) -> None:
     a, b = await _seed(conn)
     page = await m.users(conn, m.WINDOWS["7d"], "cost", 0, 100, 500.0)

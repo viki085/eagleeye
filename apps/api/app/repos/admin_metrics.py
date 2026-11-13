@@ -53,7 +53,7 @@ async def overview(pool: asyncpg.Pool, w: Window) -> dict[str, Any]:
                count(*) FILTER (WHERE status IN ('FAILED', 'BUDGET_EXCEEDED')) AS failed,
                count(*) FILTER (WHERE status = 'CANCELLED') AS cancelled,
                count(*) FILTER (WHERE degraded) AS degraded,
-               coalesce(sum(cost_usd), 0) AS cost_usd,
+               coalesce(sum(cost_usd), 0) AS answer_cost_usd,
                percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM
                    coalesce(finished_at, updated_at) - created_at))
                    FILTER (WHERE status = ANY($2)) AS p50_duration_s,
@@ -71,18 +71,31 @@ async def overview(pool: asyncpg.Pool, w: Window) -> dict[str, Any]:
         w.span,
         list(TERMINAL),
     )
+    # cost is billing: it comes from usage_ledger, which keeps its rows when a chat (and so its
+    # runs) is deleted. Answer counts come from runs — a deleted chat's answers are gone.
+    ledger_cost = await pool.fetchval(
+        "SELECT coalesce(sum(cost_usd), 0) FROM usage_ledger"
+        " WHERE created_at >= now() - $1::interval",
+        w.span,
+    )
     series = await pool.fetch(
         """
-        SELECT b.bucket,
-               count(r.id) AS runs,
-               count(DISTINCT r.user_id) AS users,
-               coalesce(sum(r.cost_usd), 0) AS cost_usd,
-               count(r.id) FILTER (WHERE r.status IN ('FAILED', 'BUDGET_EXCEEDED')) AS failed
-          FROM generate_series(date_trunc($2::text, now() - $1::interval),
-                               date_trunc($2::text, now()), $3::interval) AS b(bucket)
-          LEFT JOIN runs r ON date_trunc($2::text, r.created_at) = b.bucket
-                          AND r.created_at >= now() - $1::interval
-         GROUP BY b.bucket ORDER BY b.bucket
+        WITH b AS (
+            SELECT generate_series(date_trunc($2::text, now() - $1::interval),
+                                   date_trunc($2::text, now()), $3::interval) AS bucket
+        ), r AS (
+            SELECT date_trunc($2::text, created_at) AS bucket, count(*) AS runs,
+                   count(DISTINCT user_id) AS users,
+                   count(*) FILTER (WHERE status IN ('FAILED', 'BUDGET_EXCEEDED')) AS failed
+              FROM runs WHERE created_at >= now() - $1::interval GROUP BY 1
+        ), l AS (
+            SELECT date_trunc($2::text, created_at) AS bucket, sum(cost_usd) AS cost_usd
+              FROM usage_ledger WHERE created_at >= now() - $1::interval GROUP BY 1
+        )
+        SELECT b.bucket, coalesce(r.runs, 0) AS runs, coalesce(r.users, 0) AS users,
+               coalesce(l.cost_usd, 0) AS cost_usd, coalesce(r.failed, 0) AS failed
+          FROM b LEFT JOIN r USING (bucket) LEFT JOIN l USING (bucket)
+         ORDER BY b.bucket
         """,
         w.span,
         w.bucket,
@@ -90,9 +103,12 @@ async def overview(pool: asyncpg.Pool, w: Window) -> dict[str, Any]:
     )
     data = dict(row)
     runs = data["runs"] or 0
-    for key in ("cost_usd", "p50_duration_s", "p95_duration_s", "p50_ttft_s", "p95_ttft_s"):
+    answer_cost = data.pop("answer_cost_usd")
+    data["cost_usd"] = _num(ledger_cost)
+    for key in ("p50_duration_s", "p95_duration_s", "p50_ttft_s", "p95_ttft_s"):
         data[key] = None if data[key] is None else _num(data[key])
-    data["cost_per_run_usd"] = _num(data["cost_usd"] / runs) if runs else 0.0
+    # per answer: what the answers still on record cost on average
+    data["cost_per_run_usd"] = _num(answer_cost / runs) if runs else 0.0
     data["series"] = [
         {**dict(s), "bucket": s["bucket"].isoformat(), "cost_usd": _num(s["cost_usd"])}
         for s in series
@@ -107,17 +123,19 @@ async def users(
     rows = await pool.fetch(
         f"""
         SELECT u.id, u.email, u.role, u.status, u.last_seen_at, u.created_at,
-               coalesce(r.runs, 0) AS runs, coalesce(r.cost_usd, 0) AS cost_usd,
-               coalesce(r.tokens, 0) AS tokens, r.last_run_at,
+               coalesce(r.runs, 0) AS runs, coalesce(p.cost_usd, 0) AS cost_usd,
+               coalesce(p.tokens, 0) AS tokens, r.last_run_at,
                coalesce(l.lifetime_cost, 0) AS lifetime_cost_usd
           FROM users u
           LEFT JOIN (
-                SELECT user_id, count(*) AS runs, sum(cost_usd) AS cost_usd,
-                       sum(coalesce((usage->>'tokens_in')::bigint, 0)
-                           + coalesce((usage->>'tokens_out')::bigint, 0)) AS tokens,
-                       max(created_at) AS last_run_at
+                SELECT user_id, count(*) AS runs, max(created_at) AS last_run_at
                   FROM runs WHERE created_at >= now() - $1::interval GROUP BY user_id
                ) r ON r.user_id = u.id
+          LEFT JOIN (  -- billing from the ledger: survives chat deletion
+                SELECT user_id, sum(cost_usd) AS cost_usd,
+                       sum(tokens_in + tokens_out) AS tokens
+                  FROM usage_ledger WHERE created_at >= now() - $1::interval GROUP BY user_id
+               ) p ON p.user_id = u.id
           LEFT JOIN (
                 SELECT user_id, sum(cost_usd) AS lifetime_cost FROM usage_ledger GROUP BY user_id
                ) l ON l.user_id = u.id

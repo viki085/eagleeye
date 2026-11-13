@@ -16,12 +16,15 @@ const ACTION_LABEL: Record<string, string> = {
   switch_off: "Turned off",
   switch_on: "Turned on",
   clear_stuck_runs: "Cleared stuck answers",
+  enterprise_doc_added: "Added enterprise document",
+  enterprise_doc_deleted: "Deleted enterprise document",
 };
 
 function actionText(a: ActionRow): string {
   const label = ACTION_LABEL[a.category] ?? a.category;
-  const detail = a.detail as { switch?: string; cleared?: number };
+  const detail = a.detail as { switch?: string; cleared?: number; title?: string };
   if (detail.switch) return `${label}: ${detail.switch}`;
+  if (detail.title) return `${label}: ${detail.title}`;
   if (detail.cleared !== undefined) return `${label} (${detail.cleared})`;
   return label;
 }

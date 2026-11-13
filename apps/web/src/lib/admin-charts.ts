@@ -32,7 +32,8 @@ export function timeSeries(
         axis: {
           format: opts.hourly ? "%H:%M" : "%d %b",
           labelAngle: 0,
-          tickCount: opts.hourly ? { interval: "hour", step: 3 } : { interval: "day", step: 1 },
+          // Vega interval names: "hours" (plural), "day"; an unknown name crashes the render
+          tickCount: opts.hourly ? { interval: "hours", step: 3 } : { interval: "day", step: 1 },
         },
       },
       y: {

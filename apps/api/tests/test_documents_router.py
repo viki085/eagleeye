@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 import pytest
 from app.auth import AuthedUser, get_current_user
 from app.main import create_app
+from app.repos import admin_metrics
 from app.repos import documents as docs_repo
 from fastapi.testclient import TestClient
 
@@ -112,13 +113,27 @@ def env(monkeypatch: pytest.MonkeyPatch) -> dict:
         "get_visible_chunk",
     ):
         monkeypatch.setattr(docs_repo, name, getattr(fake, name))
+    audit: list[tuple[str, str, dict]] = []
+
+    async def record(pool, user_id, category, detail):  # noqa: ANN001, ANN202
+        if getattr(record, "fail", False):
+            raise RuntimeError("audit down")
+        audit.append((user_id, category, detail))
+
+    monkeypatch.setattr(admin_metrics, "record_admin_action", record)
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: ME
     app.state.pool = object()
     app.state.store = FakeStore()
     app.state.task_queue = FakeQueue()
     app.state.enterprise_store = FakeVectors()
-    return {"client": TestClient(app), "docs": fake, "state": app.state}
+    return {
+        "client": TestClient(app),
+        "docs": fake,
+        "state": app.state,
+        "audit": audit,
+        "record": record,
+    }
 
 
 def _upload(
@@ -237,6 +252,27 @@ def test_knowledge_admin_manages_enterprise_docs(env: dict) -> None:
     assert resp.status_code == 200
     assert env["state"].enterprise_store.deleted == [doc_id]
     assert env["docs"].rows == {} and env["state"].store.objects == {}
+
+
+def test_enterprise_add_and_delete_are_audited(env: dict) -> None:
+    _as(env, "admin")
+    _upload(env["client"])  # personal: not an admin action
+    doc_id = _upload(env["client"], name="handbook.txt", data=b"hb", scope="enterprise").json()[
+        "data"
+    ]["id"]
+    assert env["client"].delete(f"/v1/documents/{doc_id}").status_code == 200
+    assert [(c, d["title"]) for _, c, d in env["audit"]] == [
+        ("enterprise_doc_added", "handbook"),
+        ("enterprise_doc_deleted", "handbook"),
+    ]
+
+
+def test_enterprise_delete_is_refused_when_audit_fails(env: dict) -> None:
+    _as(env, "admin")
+    doc_id = _upload(env["client"], scope="enterprise").json()["data"]["id"]
+    env["record"].fail = True
+    assert env["client"].delete(f"/v1/documents/{doc_id}").status_code == 500
+    assert doc_id in env["docs"].rows and env["state"].enterprise_store.deleted == []
 
 
 def test_invalid_uuid_is_422_envelope(env: dict) -> None:
