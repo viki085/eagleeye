@@ -1,9 +1,13 @@
-import { SignIn } from "@clerk/nextjs";
+import { Suspense } from "react";
+
+import { SignInScreen } from "@/components/auth/sign-in-screen";
+
+export const metadata = { title: "Sign in · EagleEye" };
 
 export default function SignInPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <SignIn />
-    </main>
+    <Suspense>
+      <SignInScreen />
+    </Suspense>
   );
 }

@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/status"]);
+// enterprise: no sign-up route; accounts are created by admins in the console
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/status"]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {

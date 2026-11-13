@@ -21,7 +21,7 @@ import { ApiError, type AdminRange } from "@/lib/api";
 // only a real non-admin role (or a 403) means denied.
 type Access =
   | { kind: "checking" }
-  | { kind: "admin" }
+  | { kind: "admin"; meId: string }
   | { kind: "denied" }
   | { kind: "error"; message: string };
 
@@ -60,7 +60,7 @@ function useAdminAccess(api: ReturnType<typeof useApi>, attempt: number): Access
     api
       .getMe()
       .then((me) => {
-        if (!cancelled) setAccess({ kind: me.role === "admin" ? "admin" : "denied" });
+        if (!cancelled) setAccess(me.role === "admin" ? { kind: "admin", meId: me.id } : { kind: "denied" });
       })
       .catch((e: unknown) => {
         if (cancelled) return;
@@ -130,7 +130,7 @@ export default function AdminPage() {
                 refreshedAt={refreshedAt}
               />
               {section === "overview" && <OverviewTab api={api} range={range} refreshKey={refreshKey} />}
-              {section === "users" && <UsersTab api={api} range={range} refreshKey={refreshKey} />}
+              {section === "users" && <UsersTab api={api} range={range} refreshKey={refreshKey} meId={access.meId} />}
               {section === "usage" && <UsageTab api={api} range={range} refreshKey={refreshKey} />}
               {section === "safety" && <SafetyTab api={api} range={range} refreshKey={refreshKey} />}
               {section === "content" && <ContentTab api={api} refreshKey={refreshKey} />}

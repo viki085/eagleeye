@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     max_streams_per_user: int = 4
 
     clerk_secret_key: str = ""
+    # organisation admin-added users join; empty = auto-detect (works when there is exactly one)
+    clerk_organization_id: str = ""
     clerk_publishable_key: str = Field(
         default="", validation_alias="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
     )

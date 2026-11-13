@@ -16,6 +16,20 @@ from app.repos.admin_metrics import TERMINAL, Window, _num
 from app.services.health_checks import ServiceHealth
 
 MAX_MODELS = 5  # donut slices; smaller models fold into "Other"
+# Major pipeline stages for the latency trend (sub-steps such as "find tables" are left out
+# so the chart stays readable). Order = fixed colour order in the console.
+MAJOR_STEPS = ("guard", "planning", "response", "retrieval", "sql_agent", "analysis_agent")
+_STEP_GROUP_SQL = """
+    CASE
+        WHEN s.kind = 'guard' THEN 'guard'
+        WHEN s.kind = 'llm' AND s.name = 'plan & answer' THEN 'planning'
+        WHEN s.kind = 'llm' AND s.name = 'answer' THEN 'response'
+        WHEN (s.kind = 'retrieval' AND s.name = 'search documents')
+          OR (s.kind = 'tool' AND s.name = 'search_knowledge') THEN 'retrieval'
+        WHEN s.kind = 'tool' AND s.name = 'query_database' THEN 'sql_agent'
+        WHEN s.kind = 'tool' AND s.name = 'analyze_data' THEN 'analysis_agent'
+    END
+"""
 MAX_STEPS = 10
 DATABASES = {"supabase-pg": "Primary database (Postgres)", "qdrant": "Vector database (Qdrant)"}
 
@@ -218,6 +232,62 @@ async def _slow_steps(pool: asyncpg.Pool, span: timedelta) -> list[dict[str, Any
     ]
 
 
+async def _step_trend(pool: asyncpg.Pool, w: Window) -> list[dict[str, Any]]:
+    """Mean duration per bucket for each major stage (buckets with no executions are absent)."""
+    rows = await pool.fetch(
+        f"""
+        SELECT date_trunc($2::text, r.created_at) AS bucket, {_STEP_GROUP_SQL} AS step,
+               avg(s.duration_ms) AS avg_ms, count(*) AS executions
+          FROM run_steps s JOIN runs r ON r.id = s.run_id
+         WHERE r.created_at >= now() - $1::interval AND s.duration_ms IS NOT NULL
+         GROUP BY 1, 2 HAVING {_STEP_GROUP_SQL} IS NOT NULL
+         ORDER BY 1, 2
+        """,  # noqa: S608 — constant SQL fragment, no user input
+        w.span,
+        w.bucket,
+    )
+    return [
+        {
+            "bucket": r["bucket"].isoformat(),
+            "step": r["step"],
+            "avg_ms": round(float(r["avg_ms"])),
+            "executions": r["executions"],
+        }
+        for r in rows
+    ]
+
+
+async def _step_change(pool: asyncpg.Pool, span: timedelta) -> list[dict[str, Any]]:
+    """Each major stage's mean duration this period vs the previous one."""
+    rows = await pool.fetch(
+        f"""
+        SELECT {_STEP_GROUP_SQL} AS step,
+               avg(s.duration_ms) FILTER (WHERE r.created_at >= now() - $1::interval) AS avg_ms,
+               avg(s.duration_ms) FILTER (WHERE r.created_at < now() - $1::interval) AS prev_avg_ms,
+               count(*) FILTER (WHERE r.created_at >= now() - $1::interval) AS executions
+          FROM run_steps s JOIN runs r ON r.id = s.run_id
+         WHERE r.created_at >= now() - 2 * $1::interval AND s.duration_ms IS NOT NULL
+         GROUP BY 1 HAVING {_STEP_GROUP_SQL} IS NOT NULL
+        """,  # noqa: S608 — constant SQL fragment, no user input
+        span,
+    )
+    by_step = {r["step"]: r for r in rows}
+    return [
+        {
+            "step": step,
+            "avg_ms": None
+            if by_step[step]["avg_ms"] is None
+            else round(float(by_step[step]["avg_ms"])),
+            "prev_avg_ms": None
+            if by_step[step]["prev_avg_ms"] is None
+            else round(float(by_step[step]["prev_avg_ms"])),
+            "executions": by_step[step]["executions"],
+        }
+        for step in MAJOR_STEPS
+        if step in by_step
+    ]
+
+
 async def _knowledge(pool: asyncpg.Pool) -> dict[str, Any]:
     row = await pool.fetchrow(
         """
@@ -245,5 +315,7 @@ async def overview(pool: asyncpg.Pool, w: Window) -> dict[str, Any]:
         "cost_by_model": await _cost_by_model(pool, w.span),
         "routes": await _routes(pool, w.span),
         "slow_steps": await _slow_steps(pool, w.span),
+        "step_trend": await _step_trend(pool, w),
+        "step_change": await _step_change(pool, w.span),
         "knowledge": await _knowledge(pool),
     }

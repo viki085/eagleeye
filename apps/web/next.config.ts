@@ -100,9 +100,10 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
     // no usage telemetry from an enterprise app to a third party
     NEXT_PUBLIC_CLERK_TELEMETRY_DISABLED: "1",
-    // sign-in/out stay on our own pages (under our CSP) instead of Clerk's hosted portal
+    // sign-in/out stay on our own page (under our CSP) instead of Clerk's hosted portal.
+    // No sign-up URL: accounts are provisioned by admins; unknown users are sent back here.
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/sign-in",
-    NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-up",
+    NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/sign-in",
   },
 };
 

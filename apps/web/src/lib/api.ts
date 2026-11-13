@@ -317,6 +317,8 @@ export interface AdminOverview {
   cost_by_model: AdminModelCost[];
   routes: { route: string; requests: number }[];
   slow_steps: AdminSlowStep[];
+  step_trend: { bucket: string; step: string; avg_ms: number; executions: number }[];
+  step_change: { step: string; avg_ms: number | null; prev_avg_ms: number | null; executions: number }[];
   knowledge: { ready: number; indexing: number; failed: number; chunks: number };
   live: {
     databases: AdminDatabaseHealth;
@@ -327,6 +329,8 @@ export interface AdminOverview {
 export interface AdminUserRow {
   id: string;
   email: string;
+  username: string | null;
+  display_name: string | null;
   role: string;
   status: string;
   last_seen_at: string | null;
@@ -347,6 +351,35 @@ export interface AdminUsers {
 }
 
 export type AdminUserSort = "last_seen" | "cost" | "runs" | "email";
+
+export type UserRole = "member" | "knowledge_admin" | "data_admin" | "admin";
+
+export interface NewUserInput {
+  email: string;
+  /** Optional; empty means "derive from the email" (jane.doe@… → jane_doe). */
+  username?: string;
+  first_name: string;
+  last_name: string;
+  role: UserRole;
+}
+
+export interface ProvisionedUser {
+  id: string;
+  email: string;
+  username: string | null;
+  display_name: string | null;
+  role: UserRole;
+  status: string;
+  created_at: string | null;
+  last_seen_at: string | null;
+}
+
+export interface BulkUserResult {
+  email: string;
+  ok: boolean;
+  error?: string;
+  user?: ProvisionedUser;
+}
 
 export interface AdminUsage {
   by_model: { day: string; model_id: string; cost_usd: number; tokens_in: number; tokens_out: number }[];
@@ -435,6 +468,24 @@ export class ApiClient {
 
   adminSystem(): Promise<AdminSystem> {
     return this.request<AdminSystem>("/v1/admin/system");
+  }
+
+  addUser(user: NewUserInput): Promise<ProvisionedUser> {
+    return this.request<ProvisionedUser>("/v1/admin/users", {
+      method: "POST",
+      body: JSON.stringify(user),
+    });
+  }
+
+  addUsersBulk(users: NewUserInput[]): Promise<{ results: BulkUserResult[] }> {
+    return this.request("/v1/admin/users/bulk", {
+      method: "POST",
+      body: JSON.stringify({ users }),
+    });
+  }
+
+  deleteUser(userId: string): Promise<{ id: string; deleted: boolean }> {
+    return this.request(`/v1/admin/users/${userId}`, { method: "DELETE" });
   }
 
   setKillSwitch(name: KillSwitchName, killed: boolean): Promise<{ name: string; killed: boolean }> {

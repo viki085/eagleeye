@@ -4,7 +4,6 @@ import time
 from dataclasses import dataclass
 from typing import Annotated
 
-import httpx
 import jwt
 from eagleeye_core.config import Settings, get_settings
 from fastapi import Depends, Header, HTTPException, Request
@@ -64,30 +63,6 @@ class ClerkVerifier:
         return claims
 
 
-class ClerkUserDirectory:
-    """Fetches user profile from Clerk's backend API (lazy provisioning source)."""
-
-    def __init__(self, secret_key: str) -> None:
-        self._secret_key = secret_key
-
-    async def fetch(self, clerk_user_id: str) -> tuple[str, str | None]:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(
-                f"https://api.clerk.com/v1/users/{clerk_user_id}",
-                headers={"Authorization": f"Bearer {self._secret_key}"},
-            )
-        if resp.status_code != 200:
-            logger.warning("clerk user fetch failed: %s %s", resp.status_code, clerk_user_id)
-            raise HTTPException(status_code=401, detail="Unknown user")
-        data = resp.json()
-        emails = {e["id"]: e["email_address"] for e in data.get("email_addresses", [])}
-        email = emails.get(data.get("primary_email_address_id")) or next(iter(emails.values()), "")
-        first = data.get("first_name") or ""
-        last = data.get("last_name") or ""
-        display_name = f"{first} {last}".strip() or None
-        return email, display_name
-
-
 class _TtlCache:
     def __init__(self, ttl_s: float) -> None:
         self._ttl = ttl_s
@@ -103,9 +78,19 @@ class _TtlCache:
     def put(self, key: str, value: AuthedUser) -> None:
         self._items[key] = (time.monotonic() + self._ttl, value)
 
+    def drop(self, key: str) -> None:
+        self._items.pop(key, None)
+
 
 _user_cache = _TtlCache(USER_CACHE_TTL_S)
 _verifier: ClerkVerifier | None = None
+
+NOT_PROVISIONED = "Your account hasn't been set up for EagleEye. Ask your administrator for access."
+
+
+def forget_user(clerk_user_id: str) -> None:
+    """Drop a cached identity (after a delete/role change) so it takes effect immediately."""
+    _user_cache.drop(clerk_user_id)
 
 
 def get_verifier() -> ClerkVerifier:
@@ -138,14 +123,15 @@ async def get_current_user(
             )
         return cached
 
-    from app.repos.users import get_or_create_user  # local import avoids cycle
+    from app.repos import users as users_repo  # local import avoids cycle
 
-    pool = request.app.state.pool
-    row = await get_or_create_user(
-        pool,
-        clerk_user_id,
-        fetch_profile=ClerkUserDirectory(get_settings().clerk_secret_key).fetch,
-    )
+    # enterprise: accounts exist only if an admin provisioned them; a Clerk sign-in alone
+    # (e.g. if self-signup were left on in Clerk) never creates one
+    row = await users_repo.touch_signed_in_user(request.app.state.pool, clerk_user_id)
+    if row is None:
+        raise HTTPException(status_code=403, detail=NOT_PROVISIONED)
+    if row["status"] != "active":
+        raise HTTPException(status_code=403, detail="This account has been disabled.")
     user = AuthedUser(
         id=str(row["id"]),
         clerk_user_id=clerk_user_id,
@@ -153,8 +139,6 @@ async def get_current_user(
         display_name=row["display_name"],
         role=row["role"],
     )
-    if row["status"] != "active":
-        raise HTTPException(status_code=403, detail="Account disabled")
     _user_cache.put(clerk_user_id, user)
     if redis is not None:
         await rate_limit.hit(redis, Limit("user", settings.rate_limit_general_per_min), user.id)

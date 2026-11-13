@@ -37,6 +37,20 @@ const STEPS: Record<string, string> = {
   "check:output filter": "Output filtering",
 };
 
+/** Major pipeline stages tracked in the latency trend, in the server's fixed colour order. */
+export const STEP_GROUPS: readonly { key: string; label: string }[] = [
+  { key: "guard", label: "Guardrail & intent" },
+  { key: "planning", label: "LLM planning & synthesis" },
+  { key: "response", label: "LLM response" },
+  { key: "retrieval", label: "Document retrieval" },
+  { key: "sql_agent", label: "Text-to-SQL agent" },
+  { key: "analysis_agent", label: "Analysis agent" },
+];
+
+export function stepGroupLabel(key: string): string {
+  return STEP_GROUPS.find((g) => g.key === key)?.label ?? key;
+}
+
 export function routeLabel(route: string): string {
   return ROUTES[route] ?? route;
 }

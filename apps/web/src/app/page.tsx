@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { NoAccess } from "@/components/auth/no-access";
 import { Composer } from "@/components/chat/composer";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
@@ -38,6 +39,7 @@ export default function ChatPage() {
     [api],
   );
   const [error, setError] = useState<string | null>(null);
+  const [noAccess, setNoAccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +62,11 @@ export default function ChatPage() {
           isAdmin: u.role === "admin",
         }),
       )
-      .catch(() => setMe(null));
+      .catch((e: unknown) => {
+        setMe(null);
+        // 403 here means signed in with Clerk but no (live) EagleEye account
+        if (e instanceof ApiError && e.status === 403) setNoAccess(e.message.replace(/ \(request [^)]*\)$/, ""));
+      });
   }, [api, refreshChats]);
 
   useEffect(() => {
@@ -199,6 +205,8 @@ export default function ChatPage() {
   const selectedCount = docs.selectedIds.length;
   const closeDrawer = useCallback(() => setOpenCitation(null), []);
   const closeArtifact = useCallback(() => setOpenArtifact(null), []);
+
+  if (noAccess) return <NoAccess message={noAccess} />;
 
   return (
     // relative + overflow-hidden: the shell is exactly one screen; nothing inside it (e.g. an

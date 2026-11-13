@@ -1,6 +1,7 @@
 "use client";
 
 import { ChartPanel } from "@/components/admin/parts";
+import { StepLatencyChange, StepLatencyTrend } from "@/components/admin/step-latency";
 import { donut, outcomeBars, rankedBars } from "@/lib/admin-charts";
 import { bucketLabel, count, money, ratePct } from "@/lib/admin-format";
 import { routeLabel, stepLabel } from "@/lib/admin-labels";
@@ -58,6 +59,8 @@ export function OverviewCharts({ d, hourly }: { d: AdminOverview; hourly: boolea
           { key: "share", label: "Share", numeric: true, render: (r: AdminModelCost) => ratePct(totalCost ? r.cost_usd / totalCost : null) },
         ]}
       />
+      <StepLatencyTrend d={d} hourly={hourly} />
+      <StepLatencyChange d={d} />
       <ChartPanel
         className="xl:col-span-5"
         title="Request routing distribution"

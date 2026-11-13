@@ -17,9 +17,17 @@ interface Point {
 export function timeSeries(
   points: Point[],
   yTitle: string,
-  opts: { money?: boolean; hourly?: boolean } = {},
+  opts: {
+    money?: boolean;
+    hourly?: boolean;
+    seriesOrder?: readonly string[];
+    format?: string;
+    domain?: [string, string]; // pin the x-axis to the whole period, even where data is sparse
+  } = {},
 ): Spec {
   const multi = points.some((p) => p.series !== undefined);
+  // a fixed series order keeps each entity's colour stable across periods
+  const colorScale = opts.seriesOrder ? { scale: { domain: [...opts.seriesOrder] } } : {};
   return {
     data: { values: points },
     mark: { type: "line", point: points.length <= 40, tooltip: true },
@@ -29,7 +37,7 @@ export function timeSeries(
         field: "x",
         type: "temporal",
         title: null,
-        scale: { type: "utc" },
+        scale: { type: "utc", ...(opts.domain ? { domain: opts.domain } : {}) },
         // ticks on whole buckets: one per day (or every 3 hours), never several inside one day
         axis: {
           format: opts.hourly ? "%H:%M" : "%d %b",
@@ -42,9 +50,9 @@ export function timeSeries(
         field: "y",
         type: "quantitative",
         title: yTitle,
-        ...(opts.money ? { axis: { format: "$,.2f" } } : {}),
+        ...(opts.money ? { axis: { format: "$,.2f" } } : opts.format ? { axis: { format: opts.format } } : {}),
       },
-      ...(multi ? { color: { field: "series", type: "nominal", title: null } } : {}),
+      ...(multi ? { color: { field: "series", type: "nominal", title: null, ...colorScale } } : {}),
     },
     width: "container",
     height: 200,

@@ -129,6 +129,40 @@ async def test_slow_steps_rank_by_average_not_total(conn: asyncpg.Connection) ->
     assert mine[0] == "zz_slow_but_rare"  # 900 ms avg beats 50 ms x 20 = 1 s total
 
 
+async def test_step_trend_and_change_cover_major_steps_only(conn: asyncpg.Connection) -> None:
+    a, _b = await _seed(conn)
+    run = await conn.fetchval("SELECT id FROM runs WHERE user_id = $1 LIMIT 1", a)
+    old_run = await conn.fetchval(
+        "INSERT INTO runs (chat_id, user_id, status, created_at) SELECT chat_id, user_id,"
+        " 'SUCCEEDED', now() - interval '30 hours' FROM runs WHERE id = $1 RETURNING id",
+        run,
+    )
+    steps = [
+        (run, "guard", "safety & intent", 1200),
+        (run, "tool", "query_database", 4000),
+        (run, "retrieval", "find tables", 800),  # sub-step: excluded
+        (old_run, "tool", "query_database", 2000),
+    ]
+    for seq, (rid, kind, name, ms) in enumerate(steps):
+        await conn.execute(
+            "INSERT INTO run_steps (id, run_id, seq, kind, name, status, duration_ms)"
+            " VALUES ($1, $2, $3, $4, $5, 'ok', $6)",
+            str(uuid.uuid4()),
+            rid,
+            2000 + seq,
+            kind,
+            name,
+            ms,
+        )
+    data = await ov.overview(conn, m.WINDOWS["24h"])
+    groups = {p["step"] for p in data["step_trend"]}
+    assert "sql_agent" in groups and "guard" in groups
+    assert all(g in ov.MAJOR_STEPS for g in groups)
+    change = {c["step"]: c for c in data["step_change"]}
+    assert change["sql_agent"]["prev_avg_ms"] is not None  # the 30-hour-old run
+    assert change["sql_agent"]["avg_ms"] > change["sql_agent"]["prev_avg_ms"]
+
+
 async def test_cost_survives_chat_deletion(conn: asyncpg.Connection) -> None:
     """Billing comes from usage_ledger: deleting a chat removes its answers, not its cost."""
     w = m.WINDOWS["24h"]
@@ -163,6 +197,53 @@ async def test_users_usage_and_safety(conn: asyncpg.Connection) -> None:
     assert any(e["category"] == "prompt_injection" for e in safety["events"])
     assert safety["unverified_figures"]["unverified"] >= 1
     assert any(r["error_code"] == "RUN_ERROR" for r in safety["failed_runs"])
+
+
+async def test_provision_delete_and_reactivate(conn: asyncpg.Connection) -> None:
+    from app.repos import users as u
+
+    admin_id = await conn.fetchval(
+        "INSERT INTO users (clerk_user_id, email, role) VALUES ('ck_adm_t', 'adm-t@test.local',"
+        " 'admin') RETURNING id"
+    )
+    row = await u.provision(
+        conn,
+        clerk_user_id="ck_new_t",
+        email="new-t@test.local",
+        display_name="New T",
+        role="member",
+        created_by=str(admin_id),
+    )
+    assert (await u.touch_signed_in_user(conn, "ck_new_t"))["id"] == row["id"]
+    assert await u.touch_signed_in_user(conn, "ck_nobody") is None  # never provisioned
+
+    await u.mark_deleted(conn, str(row["id"]))
+    assert await u.get_user(conn, str(row["id"])) is None
+    page = await m.users(conn, m.WINDOWS["7d"], "email", 0, 100, 500.0)
+    assert "new-t@test.local" not in {i["email"] for i in page["items"]}
+
+    found = await u.find_by_email(conn, "NEW-T@test.local")
+    assert found["status"] == "deleted"
+    again = await u.provision(
+        conn,
+        clerk_user_id="ck_new_t2",
+        email="new-t@test.local",
+        display_name=None,
+        role="admin",
+        created_by=str(admin_id),
+        reactivate_id=str(found["id"]),
+    )
+    assert again["id"] == row["id"] and again["status"] == "active" and again["role"] == "admin"
+
+
+async def test_one_live_account_per_email(conn: asyncpg.Connection) -> None:
+    await conn.execute(
+        "INSERT INTO users (clerk_user_id, email) VALUES ('ck_dup1', 'Dup@test.local')"
+    )
+    with pytest.raises(asyncpg.UniqueViolationError):
+        await conn.execute(
+            "INSERT INTO users (clerk_user_id, email) VALUES ('ck_dup2', 'dup@test.local')"
+        )
 
 
 async def test_counts_and_content_queries_run(conn: asyncpg.Connection) -> None:

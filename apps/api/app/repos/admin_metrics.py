@@ -50,7 +50,8 @@ async def users(
     order = USER_SORTS.get(sort, USER_SORTS["last_seen"])
     rows = await pool.fetch(
         f"""
-        SELECT u.id, u.email, u.role, u.status, u.last_seen_at, u.created_at,
+        SELECT u.id, u.email, u.username, u.display_name, u.role, u.status,
+               u.last_seen_at, u.created_at,
                coalesce(r.runs, 0) AS runs, coalesce(p.cost_usd, 0) AS cost_usd,
                coalesce(p.tokens, 0) AS tokens, r.last_run_at,
                coalesce(l.lifetime_cost, 0) AS lifetime_cost_usd
@@ -67,6 +68,7 @@ async def users(
           LEFT JOIN (
                 SELECT user_id, sum(cost_usd) AS lifetime_cost FROM usage_ledger GROUP BY user_id
                ) l ON l.user_id = u.id
+         WHERE u.status <> 'deleted'
          ORDER BY {order}, u.email
          LIMIT $2 OFFSET $3
         """,  # noqa: S608 — ORDER BY comes from the USER_SORTS allow-list
@@ -74,7 +76,7 @@ async def users(
         min(max(limit, 1), MAX_PAGE),
         max(offset, 0),
     )
-    total = await pool.fetchval("SELECT count(*) FROM users")
+    total = await pool.fetchval("SELECT count(*) FROM users WHERE status <> 'deleted'")
     items = []
     for r in rows:
         item = dict(r)

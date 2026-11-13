@@ -14,12 +14,24 @@ from qdrant_client import AsyncQdrantClient
 from app.db import create_pool
 from app.errors import install_error_handlers
 from app.request_context import RequestIdLogFilter, RequestIdMiddleware
-from app.routers import admin, artifacts, chats, datasets, documents, health, me, runs, sources
+from app.routers import (
+    admin,
+    admin_users,
+    artifacts,
+    chats,
+    datasets,
+    documents,
+    health,
+    me,
+    runs,
+    sources,
+)
 from app.security import (
     JsonBodyLimitMiddleware,
     SecurityHeadersMiddleware,
     UnhandledErrorMiddleware,
 )
+from app.services.clerk_admin import ClerkAdmin
 from app.services.task_queue import CeleryTaskQueue
 
 logging.basicConfig(
@@ -56,6 +68,9 @@ async def lifespan(app: FastAPI):
         settings.redis_url, socket_timeout=None, socket_connect_timeout=5
     )
     state.task_queue = CeleryTaskQueue(settings.redis_url)
+    state.clerk_admin = ClerkAdmin(  # admin user management
+        settings.clerk_secret_key, settings.clerk_organization_id
+    )
     state.store = build_object_store()
     state.qdrant = AsyncQdrantClient(url=settings.qdrant_url)
     state.enterprise_store = QdrantEnterpriseStore(
@@ -105,6 +120,7 @@ def create_app() -> FastAPI:
         artifacts.router,
         datasets.router,
         admin.router,
+        admin_users.router,
     ):
         app.include_router(router, prefix="/v1")
     return app
