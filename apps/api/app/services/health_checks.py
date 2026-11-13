@@ -96,8 +96,13 @@ async def _check_gateway() -> list[ServiceHealth]:
         return [ServiceHealth("data-gateway", "down", detail=type(exc).__name__)]
     checks = [ServiceHealth("data-gateway", "up", _ms(start))]
     for name, status in (data.get("sources") or {}).items():
-        checks.append(ServiceHealth(f"source: {name}", "up" if status == "up" else "down",
-                                    detail=None if status == "up" else str(status)))
+        checks.append(
+            ServiceHealth(
+                f"source: {name}",
+                "up" if status == "up" else "down",
+                detail=None if status == "up" else str(status),
+            )
+        )
     return checks
 
 
@@ -124,10 +129,20 @@ def _ms(start: float) -> int:
     return int((time.perf_counter() - start) * 1000)
 
 
+async def check_databases() -> list[ServiceHealth]:
+    """Primary + vector database pings only: cheap, and never goes through the data gateway
+    (which also serves SQL answers), so the console adds nothing to the answer path."""
+    return list(await asyncio.gather(_check_postgres(), _check_qdrant()))
+
+
 async def check_all() -> list[ServiceHealth]:
     core = await asyncio.gather(
-        _check_redis(), _check_qdrant(), _check_object_store(), _check_postgres(),
-        _check_gateway(), _check_sandbox(),
+        _check_redis(),
+        _check_qdrant(),
+        _check_object_store(),
+        _check_postgres(),
+        _check_gateway(),
+        _check_sandbox(),
     )
     flat: list[ServiceHealth] = []
     for item in core:

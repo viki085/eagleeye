@@ -3,8 +3,10 @@
 Views are not audited (the console refreshes often); actions are, in security_events.
 """
 
+import json
 import logging
-from typing import Annotated, Literal
+from datetime import UTC, datetime
+from typing import Annotated, Any, Literal
 
 from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
@@ -14,12 +16,15 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel
 
 from app.repos import admin_metrics as metrics
+from app.repos import admin_overview
 from app.repos import runs as runs_repo
-from app.services.health_checks import check_all
+from app.services.health_checks import check_all, check_databases
 from app.services.permissions import AdminUser
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+OVERVIEW_CACHE_S = 60
 
 RangeParam = Annotated[Literal["24h", "7d", "30d"], Query()]
 SortParam = Annotated[Literal["last_seen", "cost", "runs", "email"], Query()]
@@ -33,13 +38,45 @@ def _window(range_: str) -> metrics.Window:
     return metrics.WINDOWS[range_]
 
 
+async def _cached_overview(request: Request, range_: str) -> dict[str, Any]:
+    """Aggregates cached per range for OVERVIEW_CACHE_S: many admins refreshing cost one set of
+    queries a minute on the shared database. Redis errors fall back to a direct query."""
+    redis, key = request.app.state.redis, f"admin:overview:{range_}"
+    try:
+        hit = await redis.get(key)
+        if hit:
+            return json.loads(hit)
+    except Exception:
+        logger.warning("overview cache read failed", exc_info=True)
+    data = {
+        **await admin_overview.overview(request.app.state.pool, _window(range_)),
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+    try:
+        await redis.set(key, json.dumps(data), ex=OVERVIEW_CACHE_S)
+    except Exception:
+        logger.warning("overview cache write failed", exc_info=True)
+    return data
+
+
+async def _live(request: Request) -> dict[str, Any]:
+    """Cheap, current-state signals: two database pings and one indexed count. No call reaches
+    the agent workers or the data gateway, so the answer path is untouched."""
+    pool = request.app.state.pool
+    databases = await check_databases()
+    runs = await metrics.run_counts(pool, runs_repo.RUNNING_STALE_S, runs_repo.QUEUED_STALE_S)
+    return {"databases": admin_overview.database_health(databases), "agents": runs}
+
+
 @router.get("/overview")
 async def overview(
     request: Request,
     _admin: AdminUser,
     range: RangeParam = "7d",  # noqa: A002
 ) -> dict:
-    return ok({"range": range, **await metrics.overview(request.app.state.pool, _window(range))})
+    return ok(
+        {"range": range, **await _cached_overview(request, range), "live": await _live(request)}
+    )
 
 
 @router.get("/users")

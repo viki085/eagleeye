@@ -2,33 +2,25 @@
 
 import { ChartPanel, DataTable, Panel, SectionState } from "@/components/admin/parts";
 import { useAdminData } from "@/hooks/use-admin-data";
-import { categoryBars, costByModel } from "@/lib/admin-charts";
+import { costByModel } from "@/lib/admin-charts";
 import { count, money } from "@/lib/admin-format";
+import { stepLabel } from "@/lib/admin-labels";
 import type { AdminRange, AdminUsage, ApiClient } from "@/lib/api";
 
 type ModelRow = AdminUsage["by_model"][number];
 type UserRow = AdminUsage["top_users"][number];
-type RouteRow = AdminUsage["routes"][number];
 type ToolRow = AdminUsage["tools"][number];
 
-const ROUTE_LABEL: Record<string, string> = {
-  simple: "Chat (no sources)",
-  rag: "Documents",
-  rag_auto: "Documents (auto)",
-  sql: "Database",
-  supervisor: "Multi-step (tools)",
-  blocked: "Blocked by safety",
-  unknown: "Not recorded (older or stopped early)",
-};
-
-export function UsageTab({ api, range }: { api: ApiClient; range: AdminRange }) {
-  const [state] = useAdminData(() => api.adminUsage(range), [api, range]);
+export function UsageTab({ api, range, refreshKey }: { api: ApiClient; range: AdminRange; refreshKey: number }) {
+  const [state] = useAdminData(() => api.adminUsage(range), [api, range, refreshKey]);
   return (
     <SectionState state={state}>
       {(d) => (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
           <ChartPanel
-            title="Cost per day by model"
+            className="xl:col-span-12"
+            title="LLM cost per day by model"
+            subtitle="Billed spend from the usage ledger (UTC days)"
             spec={costByModel(d.by_model)}
             rows={d.by_model}
             columns={[
@@ -39,34 +31,22 @@ export function UsageTab({ api, range }: { api: ApiClient; range: AdminRange }) 
               { key: "cost", label: "Cost", numeric: true, render: (r: ModelRow) => money(r.cost_usd, 4) },
             ]}
           />
-          <ChartPanel
-            title="Answers by type"
-            spec={categoryBars(
-              d.routes.map((r) => ({ label: ROUTE_LABEL[r.route] ?? r.route, value: r.runs })),
-              "answers",
-            )}
-            rows={d.routes}
-            columns={[
-              { key: "route", label: "Type", render: (r: RouteRow) => ROUTE_LABEL[r.route] ?? r.route },
-              { key: "runs", label: "Answers", numeric: true, render: (r: RouteRow) => count(r.runs) },
-            ]}
-          />
-          <Panel title="Top users by cost">
+          <Panel className="xl:col-span-5" title="Top users by cost" subtitle="Ten highest-spending accounts in this period">
             <DataTable
               rows={d.top_users}
               columns={[
                 { key: "email", label: "User", render: (r: UserRow) => r.email },
-                // usage_ledger only has answers that called a model (blocked ones cost nothing)
-                { key: "runs", label: "Billed answers", numeric: true, render: (r: UserRow) => count(r.runs) },
+                // usage_ledger only has requests that called a model (blocked ones cost nothing)
+                { key: "runs", label: "Billed requests", numeric: true, render: (r: UserRow) => count(r.runs) },
                 { key: "cost", label: "Cost", numeric: true, render: (r: UserRow) => money(r.cost_usd, 4) },
               ]}
             />
           </Panel>
-          <Panel title="Tool usage">
+          <Panel className="xl:col-span-7" title="Agent tool usage" subtitle="Tool calls made by agents, most used first">
             <DataTable
               rows={d.tools}
               columns={[
-                { key: "name", label: "Step", render: (r: ToolRow) => r.name },
+                { key: "name", label: "Tool", render: (r: ToolRow) => stepLabel("tool", r.name) },
                 { key: "calls", label: "Calls", numeric: true, render: (r: ToolRow) => count(r.calls) },
                 { key: "errors", label: "Errors", numeric: true, render: (r: ToolRow) => count(r.errors) },
                 { key: "ms", label: "Avg time", numeric: true, render: (r: ToolRow) => `${count(r.avg_ms)} ms` },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { categoryBars, costByModel, timeSeries } from "./admin-charts";
-import { fileSize, money, pct, seconds } from "./admin-format";
+import { categoryBars, costByModel, donut, outcomeBars, rankedBars, timeSeries } from "./admin-charts";
+import { fileSize, money, pct, ratePct, seconds } from "./admin-format";
 
 describe("admin charts", () => {
   it("builds a single-series line without a colour encoding", () => {
@@ -62,6 +62,33 @@ describe("admin charts", () => {
   });
 });
 
+describe("overview charts", () => {
+  it("donut colours follow the model, not its rank, with Other last", () => {
+    const a = donut([{ label: "zeta", value: 9 }, { label: "alpha", value: 1 }, { label: "Other", value: 2 }], { value: "$12", caption: "total" }) as {
+      layer: { encoding?: { color?: { scale: { domain: string[] } } } }[];
+    };
+    expect(a.layer[0].encoding?.color?.scale.domain).toEqual(["alpha", "zeta", "Other"]);
+  });
+
+  it("outcome bars stack three outcomes in the fixed status colours", () => {
+    const spec = outcomeBars([{ bucket: "2026-11-13", succeeded: 5, failed: 1, other: 0 }], false) as {
+      data: { values: unknown[] };
+      encoding: { color: { scale: { range: string[] } } };
+    };
+    expect(spec.data.values).toHaveLength(3);
+    expect(spec.encoding.color.scale.range).toEqual(["#0ca30c", "#d03b3b", "#898781"]);
+  });
+
+  it("ranked bars sort high to low and print values", () => {
+    const spec = rankedBars([{ label: "fast", value: 0.1 }, { label: "slow", value: 9.9 }], { title: "avg s", format: ".1f" }) as {
+      encoding: { y: { sort: string[] } };
+      layer: { mark: { type: string } }[];
+    };
+    expect(spec.encoding.y.sort).toEqual(["slow", "fast"]);
+    expect(spec.layer.map((l) => l.mark.type)).toEqual(["bar", "text"]);
+  });
+});
+
 describe("admin format", () => {
   it("formats money, percentages and durations", () => {
     expect(money(1234.5)).toBe("$1,234.50");
@@ -72,6 +99,9 @@ describe("admin format", () => {
     expect(pct(1, 0)).toBe("—");
     expect(seconds(null)).toBe("n/a");
     expect(seconds(2.345)).toBe("2.3 s");
+    expect(ratePct(0.9512)).toBe("95%");
+    expect(ratePct(0.025)).toBe("2.5%");
+    expect(ratePct(null)).toBe("—");
     expect(fileSize(512)).toBe("512 B");
     expect(fileSize(2048)).toBe("2 KB");
     expect(fileSize(5 * 1024 * 1024)).toBe("5.0 MB");

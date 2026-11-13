@@ -21,6 +21,13 @@ export function pct(part: number, whole: number): string {
   return `${value < 10 && value > 0 ? value.toFixed(1) : Math.round(value)}%`;
 }
 
+/** A 0..1 rate as a percentage: one decimal below 10% (2.5%), whole numbers above (95%). */
+export function ratePct(rate: number | null | undefined): string {
+  if (rate === null || rate === undefined) return "—";
+  const value = rate * 100;
+  return `${value > 0 && value < 10 ? value.toFixed(1) : Math.round(value)}%`;
+}
+
 export function when(iso: string | null | undefined): string {
   if (!iso) return "never";
   const date = new Date(iso);

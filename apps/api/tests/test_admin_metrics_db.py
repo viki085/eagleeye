@@ -6,6 +6,7 @@ import uuid
 import asyncpg
 import pytest
 from app.repos import admin_metrics as m
+from app.repos import admin_overview as ov
 from eagleeye_core.config import get_settings
 
 pytestmark = pytest.mark.integration
@@ -79,26 +80,67 @@ async def _seed(c: asyncpg.Connection) -> tuple[str, str]:
 
 
 async def test_overview_matches_seeded_runs(conn: asyncpg.Connection) -> None:
-    before = await m.overview(conn, m.WINDOWS["24h"])
+    w = m.WINDOWS["24h"]
+    before = (await ov.overview(conn, w))["current"]
     await _seed(conn)
-    after = await m.overview(conn, m.WINDOWS["24h"])
-    assert after["runs"] - before["runs"] == 3
-    assert after["succeeded"] - before["succeeded"] == 2
-    assert after["failed"] - before["failed"] == 1
-    assert after["cost_usd"] - before["cost_usd"] == pytest.approx(0.42)
+    after = await ov.overview(conn, w)
+    cur = after["current"]
+    assert cur["requests"] - before["requests"] == 3
+    assert cur["succeeded"] - before["succeeded"] == 2
+    assert cur["failed"] - before["failed"] == 1
+    assert cur["cost_usd"] - before["cost_usd"] == pytest.approx(0.42)
+    assert cur["safety_events"] - before["safety_events"] == 1
     assert len(after["series"]) in (24, 25)  # hourly buckets
-    assert sum(s["runs"] for s in after["series"]) == after["runs"]
+    assert sum(s["requests"] for s in after["series"]) == cur["requests"]
+    models = {r["model_id"]: r for r in after["cost_by_model"]}
+    assert models["gpt-test"]["calls"] >= 3
+    assert any(r["route"] == "sql" for r in after["routes"])
+    assert set(after["knowledge"]) == {"ready", "indexing", "failed", "chunks"}
+
+
+async def test_previous_period_is_separate(conn: asyncpg.Connection) -> None:
+    w = m.WINDOWS["24h"]
+    before = (await ov.overview(conn, w))["previous"]
+    a, _b = await _seed(conn)
+    await conn.execute(
+        "UPDATE runs SET created_at = created_at - interval '1 day' WHERE user_id = $1", a
+    )
+    prev = (await ov.overview(conn, w))["previous"]
+    assert prev["requests"] - before["requests"] == 2  # user a's two runs moved back a day
+
+
+async def test_slow_steps_rank_by_average_not_total(conn: asyncpg.Connection) -> None:
+    a, _b = await _seed(conn)
+    run = await conn.fetchval("SELECT id FROM runs WHERE user_id = $1 LIMIT 1", a)
+    steps = [("tool", "zz_fast_but_frequent", 50)] * 20 + [("llm", "zz_slow_but_rare", 900)]
+    for seq, (kind, name, ms) in enumerate(steps):
+        await conn.execute(
+            "INSERT INTO run_steps (id, run_id, seq, kind, name, status, duration_ms)"
+            " VALUES ($1, $2, $3, $4, $5, 'ok', $6)",
+            str(uuid.uuid4()),
+            run,
+            1000 + seq,
+            kind,
+            name,
+            ms,
+        )
+    ranked = [s["name"] for s in (await ov.overview(conn, m.WINDOWS["24h"]))["slow_steps"]]
+    mine = [n for n in ranked if n.startswith("zz_")]
+    assert mine[0] == "zz_slow_but_rare"  # 900 ms avg beats 50 ms x 20 = 1 s total
 
 
 async def test_cost_survives_chat_deletion(conn: asyncpg.Connection) -> None:
     """Billing comes from usage_ledger: deleting a chat removes its answers, not its cost."""
-    before = await m.overview(conn, m.WINDOWS["24h"])
+    w = m.WINDOWS["24h"]
+    before = (await ov.overview(conn, w))["current"]
     a, _b = await _seed(conn)
     await conn.execute("DELETE FROM chats WHERE user_id = $1", a)
-    after = await m.overview(conn, m.WINDOWS["24h"])
-    assert after["runs"] - before["runs"] == 1  # only user b's answer is left
-    assert after["cost_usd"] - before["cost_usd"] == pytest.approx(0.42)
-    assert sum(s["cost_usd"] for s in after["series"]) == pytest.approx(after["cost_usd"])
+    after = await ov.overview(conn, w)
+    assert after["current"]["requests"] - before["requests"] == 1  # only user b's is left
+    assert after["current"]["cost_usd"] - before["cost_usd"] == pytest.approx(0.42)
+    assert sum(s["cost_usd"] for s in after["series"]) == pytest.approx(
+        after["current"]["cost_usd"]
+    )
     page = await m.users(conn, m.WINDOWS["24h"], "cost", 0, 100, 500.0)
     mine = {u["email"]: u for u in page["items"]}
     assert mine["metrics-a@test.local"]["cost_usd"] == pytest.approx(0.12)

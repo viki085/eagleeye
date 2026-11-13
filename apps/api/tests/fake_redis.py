@@ -31,9 +31,14 @@ class FakeRedis:
         self._check()
         return sum(1 for k in keys if k in self.data)
 
-    async def set(self, key: str, value: str) -> None:
+    async def set(self, key: str, value: str, ex: int | None = None) -> None:
         self._check()
         self.data[key] = value
+
+    async def get(self, key: str) -> str | None:
+        self._check()
+        value = self.data.get(key)
+        return None if value is None else str(value)
 
     async def mget(self, keys: list[str]) -> list:
         self._check()

@@ -17,8 +17,8 @@ function statusTone(status: string): "ok" | "bad" | "warn" {
   return "warn";
 }
 
-export function ContentTab({ api }: { api: ApiClient }) {
-  const [state, reload] = useAdminData(() => api.adminContent(), [api]);
+export function ContentTab({ api, refreshKey }: { api: ApiClient; refreshKey: number }) {
+  const [state, reload] = useAdminData(() => api.adminContent(), [api, refreshKey]);
   return (
     <div className="flex flex-col gap-3">
       <EnterpriseLibrary api={api} onChanged={reload} />

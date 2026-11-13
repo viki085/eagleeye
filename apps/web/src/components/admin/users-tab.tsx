@@ -11,7 +11,7 @@ const PAGE = 50;
 const SORTS: { value: AdminUserSort; label: string }[] = [
   { value: "last_seen", label: "Last seen" },
   { value: "cost", label: "Cost" },
-  { value: "runs", label: "Answers" },
+  { value: "runs", label: "Requests" },
   { value: "email", label: "Email" },
 ];
 
@@ -28,7 +28,7 @@ const COLUMNS: Column<AdminUserRow>[] = [
     render: (u) => <Pill tone={u.status === "active" ? "ok" : "bad"}>{u.status}</Pill>,
   },
   { key: "seen", label: "Last seen", render: (u) => when(u.last_seen_at) },
-  { key: "runs", label: "Answers", numeric: true, render: (u) => count(u.runs) },
+  { key: "runs", label: "Requests", numeric: true, render: (u) => count(u.runs) },
   { key: "tokens", label: "Tokens", numeric: true, render: (u) => count(u.tokens) },
   { key: "cost", label: "Cost (period)", numeric: true, render: (u) => money(u.cost_usd, 4) },
   {
@@ -39,10 +39,13 @@ const COLUMNS: Column<AdminUserRow>[] = [
   },
 ];
 
-export function UsersTab({ api, range }: { api: ApiClient; range: AdminRange }) {
+export function UsersTab({ api, range, refreshKey }: { api: ApiClient; range: AdminRange; refreshKey: number }) {
   const [sort, setSort] = useState<AdminUserSort>("last_seen");
   const [offset, setOffset] = useState(0);
-  const [state] = useAdminData(() => api.adminUsers(range, sort, offset), [api, range, sort, offset]);
+  const [state] = useAdminData(
+    () => api.adminUsers(range, sort, offset),
+    [api, range, sort, offset, refreshKey],
+  );
   return (
     <SectionState state={state}>
       {(d) => (
@@ -71,7 +74,7 @@ export function UsersTab({ api, range }: { api: ApiClient; range: AdminRange }) 
           <DataTable rows={d.items} columns={COLUMNS} empty="No users yet." />
           <footer className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
             <span>
-              Answers, tokens and cost cover the selected period; the usage limit
+              Requests, tokens and cost cover the selected period; the usage limit
               ({money(d.usage_limit_usd, 0)}) is lifetime. Chat content is never shown here.
             </span>
             <span className="flex gap-1.5">

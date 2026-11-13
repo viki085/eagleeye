@@ -18,6 +18,17 @@ export const CATEGORICAL_DARK = [
   "#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767",
 ] as const;
 
+/**
+ * Status palette (fixed, never themed): reserved for state, never reused as a series colour,
+ * and always paired with a label or legend so colour is not the only cue.
+ */
+export const STATUS = {
+  good: "#0ca30c",
+  warning: "#fab219",
+  critical: "#d03b3b",
+  neutral: "#898781",
+} as const;
+
 interface Ink {
   primary: string;
   secondary: string;
@@ -85,6 +96,9 @@ export function chartConfig(dark: boolean): Record<string, unknown> {
     area: { color: first },
     line: { color: first, strokeWidth: 2 },
     point: { color: first, size: 64, filled: true },
+    // text marks (value labels, donut centre) wear text ink, never a series colour
+    text: { color: ink.primary, font: FONT },
+    arc: { stroke: dark ? "#1a1a19" : "#ffffff", strokeWidth: 2 },
     scale: { bandPaddingInner: 0.25 },
   };
 }

@@ -53,10 +53,13 @@ function contentSecurityPolicy(): string {
     "default-src": ["'self'"],
     // 'unsafe-inline': Next.js bootstrap + the pre-paint theme script. 'unsafe-eval' only in
     // dev (hot reload) — production never evals (Vega runs with its AST interpreter).
+    // cdn.protect.clerk.com: Clerk's bot protection, loaded by clerk-js on sign-in pages
     "script-src": ["'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : []), clerk,
-      "https://challenges.cloudflare.com"],
+      "https://challenges.cloudflare.com", "https://cdn.protect.clerk.com"],
     // Clerk telemetry is switched off (env below), so clerk-telemetry.com is not allowed
-    "connect-src": ["'self'", api, clerk, portal, ...(dev ? ["ws://localhost:3000"] : [])],
+    // *.protect.clerk.com: the bot-protection script's probes (also on port 8443)
+    "connect-src": ["'self'", api, clerk, portal, "https://*.protect.clerk.com:*",
+      ...(dev ? ["ws://localhost:3000"] : [])],
     "img-src": ["'self'", "data:", "blob:", "https://img.clerk.com"],
     "style-src": ["'self'", "'unsafe-inline'"],
     "font-src": ["'self'", "data:"],

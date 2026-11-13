@@ -29,8 +29,8 @@ function actionText(a: ActionRow): string {
   return label;
 }
 
-export function SafetyTab({ api, range }: { api: ApiClient; range: AdminRange }) {
-  const [state] = useAdminData(() => api.adminSafety(range), [api, range]);
+export function SafetyTab({ api, range, refreshKey }: { api: ApiClient; range: AdminRange; refreshKey: number }) {
+  const [state] = useAdminData(() => api.adminSafety(range), [api, range, refreshKey]);
   return (
     <SectionState state={state}>
       {(d) => {

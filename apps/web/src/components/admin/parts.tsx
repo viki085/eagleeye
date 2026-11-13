@@ -2,29 +2,35 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
+import { CARD } from "@/components/admin/kpi";
 import { VegaView } from "@/components/charts/vega-view";
 import type { Loadable } from "@/hooks/use-admin-data";
 import type { Spec } from "@/lib/admin-charts";
 
 export function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{value}</p>
-      {hint && <p className="mt-0.5 text-[11px] text-neutral-500">{hint}</p>}
+    <div className={`${CARD} p-4`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">{label}</p>
+      <p className="mt-2 text-[26px] font-semibold leading-none tracking-tight text-neutral-900 dark:text-neutral-50">{value}</p>
+      {hint && <p className="mt-1.5 text-[11px] text-neutral-500">{hint}</p>}
     </div>
   );
 }
 
-export function Panel({ title, children, actions }: {
+export function Panel({ title, subtitle, children, actions, className = "" }: {
   title: string;
+  subtitle?: string;
   children: ReactNode;
   actions?: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-      <header className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{title}</h3>
+    <section className={`${CARD} min-w-0 p-4 ${className}`}>
+      <header className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">{title}</h3>
+          {subtitle && <p className="mt-0.5 text-xs text-neutral-500">{subtitle}</p>}
+        </div>
         {actions}
       </header>
       {children}
@@ -48,10 +54,10 @@ export function DataTable<T>({ rows, columns, empty = "Nothing here yet." }: {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs">
-        <thead className="text-[11px] text-neutral-500">
-          <tr>
+        <thead className="text-[10px] uppercase tracking-[0.06em] text-neutral-500">
+          <tr className="border-b border-black/[0.08] dark:border-white/10">
             {columns.map((c) => (
-              <th key={c.key} className={`px-2 py-1.5 font-medium ${c.numeric ? "text-right" : ""}`}>
+              <th key={c.key} className={`px-2 py-2 font-semibold ${c.numeric ? "text-right" : ""}`}>
                 {c.label}
               </th>
             ))}
@@ -59,7 +65,7 @@ export function DataTable<T>({ rows, columns, empty = "Nothing here yet." }: {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="border-t border-neutral-100 dark:border-neutral-800">
+            <tr key={i} className="border-t border-black/[0.05] hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.03]">
               {columns.map((c) => (
                 <td
                   key={c.key}
@@ -77,25 +83,39 @@ export function DataTable<T>({ rows, columns, empty = "Nothing here yet." }: {
 }
 
 /** A chart with a "Table" toggle: the data is always available without the chart. */
-export function ChartPanel<T>({ title, spec, rows, columns }: {
+export function ChartPanel<T>({ title, subtitle, spec, rows, columns, className }: {
   title: string;
+  subtitle?: string;
   spec: Spec;
   rows: readonly T[];
   columns: readonly Column<T>[];
+  className?: string;
 }) {
   const [table, setTable] = useState(false);
   const stableSpec = useMemo(() => spec, [JSON.stringify(spec)]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Panel
       title={title}
+      subtitle={subtitle}
+      className={className}
       actions={
-        <button
-          type="button"
-          onClick={() => setTable(!table)}
-          className="rounded border border-neutral-300 px-1.5 py-0.5 text-[11px] text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-        >
-          {table ? "Chart" : "Table"}
-        </button>
+        <div role="group" aria-label={`${title} view`} className="flex shrink-0 rounded-md border border-black/10 p-0.5 text-[11px] dark:border-white/10">
+          {(["Chart", "Table"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={(v === "Table") === table}
+              onClick={() => setTable(v === "Table")}
+              className={`rounded px-2 py-0.5 ${
+                (v === "Table") === table
+                  ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                  : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       }
     >
       {rows.length === 0 ? (
@@ -113,7 +133,15 @@ export function SectionState<T>({ state, children }: {
   state: Loadable<T>;
   children: (data: T) => ReactNode;
 }) {
-  if (state.kind === "loading") return <p className="text-sm text-neutral-400">Loading…</p>;
+  if (state.kind === "loading") {
+    return (
+      <div role="status" aria-label="Loading" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={`${CARD} h-28 animate-pulse bg-black/[0.03] dark:bg-white/[0.04]`} />
+        ))}
+      </div>
+    );
+  }
   if (state.kind === "forbidden") return <NotAuthorised />;
   if (state.kind === "error") {
     return <p className="text-sm text-red-600 dark:text-red-400">{state.message}</p>;

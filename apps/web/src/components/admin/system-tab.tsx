@@ -70,8 +70,8 @@ function Switches({ data, onAsk }: { data: AdminSystem; onAsk: (p: Pending) => v
   );
 }
 
-export function SystemTab({ api }: { api: ApiClient }) {
-  const [state, reload] = useAdminData(() => api.adminSystem(), [api], REFRESH_MS);
+export function SystemTab({ api, refreshKey }: { api: ApiClient; refreshKey: number }) {
+  const [state, reload] = useAdminData(() => api.adminSystem(), [api, refreshKey], REFRESH_MS);
   const [pending, setPending] = useState<Pending>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);

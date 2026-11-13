@@ -3,7 +3,8 @@ import uuid
 import pytest
 from app.auth import AuthedUser, get_current_user
 from app.main import create_app
-from app.repos import admin_metrics, users
+from app.repos import admin_metrics, admin_overview, users
+from app.services.health_checks import ServiceHealth
 from fake_redis import FakeRedis
 from fastapi.testclient import TestClient
 
@@ -38,19 +39,26 @@ def env(monkeypatch: pytest.MonkeyPatch) -> dict:
     app.state.pool = pool
     app.state.redis = FakeRedis()
 
+    overview_calls: list[str] = []
+
     async def fake_overview(p, w):  # noqa: ANN001, ANN202
-        return {"runs": 3}
+        overview_calls.append(str(w.span))
+        return {"current": {"requests": 3}}
 
     async def fake_counts(p, a, b):  # noqa: ANN001, ANN202
-        return {"active": 0, "stuck": 0}
+        return {"active": 2, "stuck": 0}
 
     async def fake_checks():  # noqa: ANN202
         return []
 
-    monkeypatch.setattr(admin_metrics, "overview", fake_overview)
+    async def fake_databases():  # noqa: ANN202
+        return [ServiceHealth("supabase-pg", "up", 7), ServiceHealth("qdrant", "up", 20)]
+
+    monkeypatch.setattr(admin_overview, "overview", fake_overview)
     monkeypatch.setattr(admin_metrics, "run_counts", fake_counts)
     monkeypatch.setattr("app.routers.admin.check_all", fake_checks)
-    return {"app": app, "pool": pool, "client": TestClient(app)}
+    monkeypatch.setattr("app.routers.admin.check_databases", fake_databases)
+    return {"app": app, "pool": pool, "client": TestClient(app), "overview_calls": overview_calls}
 
 
 def _as(env: dict, user: AuthedUser) -> TestClient:
@@ -81,10 +89,23 @@ def test_member_cannot_flip_switches_or_clear_runs(env: dict) -> None:
     assert "kill:sql" not in env["app"].state.redis.data
 
 
-def test_admin_sees_overview(env: dict) -> None:
+def test_admin_sees_overview_with_live_status(env: dict) -> None:
     resp = _as(env, ADMIN).get("/v1/admin/overview?range=24h")
-    assert resp.status_code == 200 and resp.json()["data"] == {"range": "24h", "runs": 3}
+    data = resp.json()["data"]
+    assert resp.status_code == 200 and data["range"] == "24h"
+    assert data["current"] == {"requests": 3} and data["generated_at"]
+    assert data["live"]["agents"] == {"active": 2, "stuck": 0}
+    assert data["live"]["databases"]["status"] == "healthy"
     assert _as(env, ADMIN).get("/v1/admin/overview?range=1y").status_code == 422
+
+
+def test_overview_aggregates_are_cached_per_range(env: dict) -> None:
+    client = _as(env, ADMIN)
+    for _ in range(3):
+        client.get("/v1/admin/overview?range=7d")
+    client.get("/v1/admin/overview?range=24h")
+    assert len(env["overview_calls"]) == 2  # one query per range, then served from cache
+    assert "admin:overview:7d" in env["app"].state.redis.data
 
 
 def test_demoted_admin_loses_access_immediately(env: dict) -> None:

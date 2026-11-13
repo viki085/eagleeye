@@ -257,27 +257,71 @@ export type AdminRange = "24h" | "7d" | "30d";
 
 export interface AdminSeriesPoint {
   bucket: string;
-  runs: number;
+  requests: number;
   users: number;
-  cost_usd: number;
   failed: number;
+  succeeded: number;
+  avg_duration_s: number | null;
+  cost_usd: number;
+  safety_events: number;
 }
 
-export interface AdminOverview {
-  range: AdminRange;
+export interface AdminPeriod {
   active_users: number;
-  runs: number;
+  requests: number;
   succeeded: number;
   failed: number;
   cancelled: number;
   degraded: number;
-  cost_usd: number;
-  cost_per_run_usd: number;
-  p50_duration_s: number | null;
+  success_rate: number | null;
+  failure_rate: number | null;
+  avg_duration_s: number | null;
   p95_duration_s: number | null;
-  p50_ttft_s: number | null;
-  p95_ttft_s: number | null;
+  avg_ttft_s: number | null;
+  cost_usd: number;
+  cost_per_request_usd: number | null;
+  safety_events: number;
+}
+
+export interface AdminModelCost {
+  model_id: string;
+  cost_usd: number;
+  tokens: number;
+  calls: number;
+}
+
+export interface AdminSlowStep {
+  kind: string;
+  name: string;
+  executions: number;
+  avg_ms: number;
+  p95_ms: number;
+  errors: number;
+}
+
+export interface AdminDatabaseHealth {
+  status: "healthy" | "degraded" | "down";
+  up: number;
+  total: number;
+  primary_latency_ms: number | null;
+  items: { name: string; status: string; latency_ms: number | null }[];
+}
+
+export interface AdminOverview {
+  range: AdminRange;
+  generated_at: string;
+  current: AdminPeriod;
+  previous: AdminPeriod;
+  total_users: number;
   series: AdminSeriesPoint[];
+  cost_by_model: AdminModelCost[];
+  routes: { route: string; requests: number }[];
+  slow_steps: AdminSlowStep[];
+  knowledge: { ready: number; indexing: number; failed: number; chunks: number };
+  live: {
+    databases: AdminDatabaseHealth;
+    agents: { active: number; stuck: number };
+  };
 }
 
 export interface AdminUserRow {
