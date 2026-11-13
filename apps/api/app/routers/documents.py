@@ -12,11 +12,11 @@ from app.auth import AuthedUser, CurrentUser
 from app.errors import ApiException
 from app.repos import documents as docs_repo
 from app.services import uploads
+from app.services.permissions import can_manage_enterprise
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-ENTERPRISE_UPLOAD_ROLES = {"knowledge_admin", "admin"}
 PRIVATE_FIELDS = {"s3_key", "sha256"}
 
 
@@ -24,10 +24,9 @@ def _public(row: asyncpg.Record) -> dict:
     return {k: v for k, v in dict(row).items() if k not in PRIVATE_FIELDS}
 
 
-def _require_enterprise_upload(user: AuthedUser) -> None:
-    if get_settings().enterprise_upload_open or user.role in ENTERPRISE_UPLOAD_ROLES:
-        return
-    raise ApiException(403, "FORBIDDEN", "Only knowledge admins can add enterprise documents.")
+def _require_enterprise_manager(user: AuthedUser, action: str) -> None:
+    if not can_manage_enterprise(user):
+        raise ApiException(403, "FORBIDDEN", f"Only knowledge admins can {action} enterprise documents.")
 
 
 UPLOAD_FAILED = "Upload could not be processed. Try again."
@@ -55,7 +54,7 @@ async def upload_document(
     scope: Literal["personal", "enterprise"] = Form("personal"),
 ) -> dict:
     if scope == "enterprise":
-        _require_enterprise_upload(user)
+        _require_enterprise_manager(user, "add")
     filename = uploads.safe_filename(file.filename)
     ext, mime = uploads.require_supported(filename)
     payload = await uploads.read_limited(file, get_settings().max_upload_mb * 1024 * 1024)
@@ -101,7 +100,9 @@ async def delete_document(doc_id: UUID, request: Request, user: CurrentUser) -> 
     row = await docs_repo.get_visible(state.pool, str(doc_id), user.id)
     if row is None:
         raise ApiException(404, "NOT_FOUND", "Document not found.")
-    if str(row["uploaded_by"]) != user.id:
+    if row["scope"] == "enterprise":
+        _require_enterprise_manager(user, "delete")
+    elif str(row["uploaded_by"]) != user.id:
         raise ApiException(403, "FORBIDDEN", "Only the uploader can delete this document.")
 
     if row["scope"] == "enterprise":

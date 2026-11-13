@@ -47,9 +47,6 @@ export function DocumentRow({ doc, selected, canDelete, onToggle, onDelete }: Do
             <span className={`rounded px-1.5 py-0.5 font-medium ${statusClass(doc.status)}`}>
               {STAGE_LABEL[doc.status]}
             </span>
-            <span className="rounded bg-neutral-200 px-1.5 py-0.5 capitalize text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-              {doc.scope}
-            </span>
             {ready && doc.chunk_count !== null && (
               <span className="text-neutral-400">
                 {doc.page_count ? `${doc.page_count} p · ` : ""}

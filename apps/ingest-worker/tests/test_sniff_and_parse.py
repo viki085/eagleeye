@@ -3,6 +3,7 @@ import pathlib
 
 import pytest
 from ingest_worker.errors import PermanentIngestError
+from ingest_worker.parsing.base import ParsedDocument, ParsedElement, clean_text, sanitize
 from ingest_worker.parsing.pdf import heading_level
 from ingest_worker.parsing.registry import parser_for
 from ingest_worker.sniff import sniff
@@ -65,6 +66,21 @@ def test_pdf_pages_and_headings() -> None:
     assert doc.page_count == 2
     assert ("RETURNS POLICY", 1, 1) in [(e.text, e.heading_level, e.page) for e in doc.elements]
     assert any(e.page == 2 and "refund window" in e.text for e in doc.elements)
+
+
+def test_clean_text_removes_nul_controls_and_lone_surrogates() -> None:
+    # regression: a PDF's extracted text held \x00, which Postgres text columns reject
+    assert clean_text("Gover\x00nance\x07 and\tsecurity\n") == "Governance and\tsecurity\n"
+    assert clean_text("bad \ud800 char") == "bad ? char"
+    clean_text("x\ud83d").encode("utf-8")  # storable
+
+
+def test_sanitize_drops_blocks_that_become_empty() -> None:
+    doc = ParsedDocument(
+        (ParsedElement("\x00\x00", page=1), ParsedElement("Real\x00 text", page=1)), page_count=1
+    )
+    assert sanitize(doc).elements == (ParsedElement("Real text", page=1),)
+    assert sanitize(doc).page_count == 1
 
 
 def test_scanned_pdf_fails_permanently() -> None:

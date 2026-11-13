@@ -99,7 +99,9 @@ export function ChartCard({ chart }: ChartCardProps) {
 
   return (
     <figure
-      className="mt-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"
+      // `relative`: the sr-only summary is position:absolute; without a positioned parent it
+      // escapes the chat's scroll area and stretches the whole page (blank space on scroll)
+      className="relative mt-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"
       aria-label={`Chart: ${chart.title}. ${chart.summary}`}
     >
       <figcaption className="mb-1 flex flex-wrap items-baseline justify-between gap-2">

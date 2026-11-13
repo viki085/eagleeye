@@ -1,34 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import type { ApiClient, DataSource } from "@/lib/api";
+import { EmptyNote } from "@/components/documents/panel-section";
+import type { DataSource } from "@/lib/api";
 
 interface SourcesListProps {
-  api: ApiClient;
+  sources: readonly DataSource[] | null;
 }
 
 /** What data the user can ask about (granted tables only). */
-export function SourcesList({ api }: SourcesListProps) {
-  const [sources, setSources] = useState<DataSource[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .listSources()
-      .then((s) => !cancelled && setSources(s))
-      .catch(() => !cancelled && setSources([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [api]);
-
-  if (sources === null || sources.length === 0) return null;
+export function SourcesList({ sources }: SourcesListProps) {
+  if (sources === null) return <EmptyNote>Loading…</EmptyNote>;
+  if (sources.length === 0) {
+    return <EmptyNote>No databases are available to you.</EmptyNote>;
+  }
   return (
-    <section aria-label="Data sources" className="border-t border-neutral-200 px-3 py-3 dark:border-neutral-800">
-      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Data sources</h2>
+    <div className="flex flex-col px-2">
       {sources.map((s) => (
-        <details key={s.id} className="mt-2 text-xs">
+        <details key={s.id} className="py-1 text-xs" open={sources.length === 1}>
           <summary className="cursor-pointer text-neutral-800 dark:text-neutral-200">
             <span className="font-medium">{s.name}</span>
             <span className="ml-1 text-neutral-400">· {s.tables.length} tables</span>
@@ -51,6 +39,6 @@ export function SourcesList({ api }: SourcesListProps) {
           )}
         </details>
       ))}
-    </section>
+    </div>
   );
 }

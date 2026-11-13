@@ -140,11 +140,31 @@ def test_oversize_is_413(env: dict, monkeypatch: pytest.MonkeyPatch) -> None:
     assert resp.status_code == 413
 
 
-def test_enterprise_upload_closed_requires_admin(env: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_member_cannot_upload_enterprise_by_default(env: dict) -> None:
+    resp = _upload(env["client"], scope="enterprise")
+    assert resp.status_code == 403 and "knowledge admins" in resp.json()["error"]["message"]
+    assert env["docs"].rows == {} and env["state"].store.objects == {}
+
+
+def test_open_override_lets_members_upload_enterprise(
+    env: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from eagleeye_core.config import get_settings
 
-    monkeypatch.setattr(get_settings(), "enterprise_upload_open", False)
-    assert _upload(env["client"], scope="enterprise").status_code == 403
+    monkeypatch.setattr(get_settings(), "enterprise_upload_open", True)
+    assert _upload(env["client"], scope="enterprise").status_code == 201
+
+
+def _as(env: dict, role: str) -> None:
+    env["client"].app.dependency_overrides[get_current_user] = lambda: AuthedUser(
+        ME.id, ME.clerk_user_id, ME.email, ME.display_name, role
+    )
+
+
+def test_me_reports_enterprise_permission(env: dict) -> None:
+    assert env["client"].get("/v1/me").json()["data"]["can_manage_enterprise"] is False
+    _as(env, "knowledge_admin")
+    assert env["client"].get("/v1/me").json()["data"]["can_manage_enterprise"] is True
 
 
 def test_storage_failure_marks_failed_and_502(env: dict) -> None:
@@ -162,14 +182,17 @@ def test_other_users_personal_doc_is_404(env: dict) -> None:
     assert env["client"].delete(f"/v1/documents/{doc_id}").status_code == 404
 
 
-def test_enterprise_doc_delete_by_non_uploader_is_403(env: dict) -> None:
+@pytest.mark.parametrize("uploaded_by", [OTHER_ID, ME.id])
+def test_member_cannot_delete_enterprise_docs_even_their_own(env: dict, uploaded_by: str) -> None:
     doc_id = str(uuid.uuid4())
     env["docs"].rows[doc_id] = {"id": doc_id, "scope": "enterprise", "owner_id": None,
-                                "uploaded_by": OTHER_ID, "s3_key": "k", "sha256": "s"}
+                                "uploaded_by": uploaded_by, "s3_key": "k", "sha256": "s"}
     assert env["client"].delete(f"/v1/documents/{doc_id}").status_code == 403
+    assert doc_id in env["docs"].rows
 
 
-def test_delete_own_enterprise_doc_cleans_everything(env: dict) -> None:
+def test_knowledge_admin_manages_enterprise_docs(env: dict) -> None:
+    _as(env, "knowledge_admin")
     doc_id = _upload(env["client"], scope="enterprise").json()["data"]["id"]
     resp = env["client"].delete(f"/v1/documents/{doc_id}")
     assert resp.status_code == 200

@@ -4,6 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import type { ReactNode } from "react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { usePanelOpen } from "@/hooks/use-panel-open";
 import type { ChatSummary } from "@/lib/api";
 
 interface SidebarProps {
@@ -16,6 +17,40 @@ interface SidebarProps {
   footer?: ReactNode;
 }
 
+const RAIL_BUTTON =
+  "flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-800 disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-200";
+
+/** Collapsed: a slim rail that keeps expand, new chat, theme and account one click away. */
+function CollapsedRail({ busy, onNewChat, onExpand }: {
+  busy: boolean;
+  onNewChat: () => void;
+  onExpand: () => void;
+}) {
+  return (
+    <aside
+      aria-label="Chats (collapsed)"
+      className="flex h-full w-12 shrink-0 flex-col items-center gap-2 border-r border-neutral-200 bg-neutral-50 py-3 dark:border-neutral-800 dark:bg-neutral-900"
+    >
+      <button onClick={onExpand} aria-label="Expand chats panel" title="Expand" className={RAIL_BUTTON}>
+        »
+      </button>
+      <button
+        onClick={onNewChat}
+        disabled={busy}
+        aria-label="New chat"
+        title="New chat"
+        className={`${RAIL_BUTTON} text-lg`}
+      >
+        +
+      </button>
+      <div className="mt-auto flex flex-col items-center gap-2">
+        <ThemeToggle />
+        <UserButton />
+      </div>
+    </aside>
+  );
+}
+
 export function Sidebar({
   chats,
   activeChatId,
@@ -25,6 +60,10 @@ export function Sidebar({
   onDelete,
   footer,
 }: SidebarProps) {
+  const [open, setOpen] = usePanelOpen("chats");
+  if (!open) {
+    return <CollapsedRail busy={busy} onNewChat={onNewChat} onExpand={() => setOpen(true)} />;
+  }
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex items-center justify-between p-3">
@@ -32,6 +71,14 @@ export function Sidebar({
         <div className="flex items-center gap-1">
           <ThemeToggle />
           <UserButton />
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Collapse chats panel"
+            title="Collapse"
+            className="rounded px-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+          >
+            ‹
+          </button>
         </div>
       </div>
       <button

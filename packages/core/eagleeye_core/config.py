@@ -43,7 +43,8 @@ class Settings(BaseSettings):
     docs_bucket: str = "eagleeye-local-docs"
     max_upload_mb: int = 25
     qdrant_collection: str = "enterprise_chunks"
-    enterprise_upload_open: bool = True  # Phase 2: any user may upload enterprise docs
+    # true → every user may add/delete enterprise docs; false → knowledge_admin/admin only
+    enterprise_upload_open: bool = False
     rag_top_k: int = 5
     rag_min_score: float = 0.25  # cosine floor below which retrieval is "low relevance"
 

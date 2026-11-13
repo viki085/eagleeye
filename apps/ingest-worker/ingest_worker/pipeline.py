@@ -15,6 +15,7 @@ from qdrant_client import AsyncQdrantClient
 from ingest_worker import repo
 from ingest_worker.chunking import PATH_SEP, Chunk, chunk
 from ingest_worker.errors import PermanentIngestError, TransientIngestError
+from ingest_worker.parsing.base import sanitize
 from ingest_worker.parsing.registry import parser_for
 from ingest_worker.sniff import sniff
 
@@ -58,8 +59,12 @@ async def _upsert(
 ) -> None:
     doc_id = str(doc["id"])
     personal = doc["scope"] == "personal"
-    async with deps.conn.transaction():
-        ids = await repo.replace_chunks(deps.conn, doc, chunks, vectors if personal else None)
+    try:
+        async with deps.conn.transaction():
+            ids = await repo.replace_chunks(deps.conn, doc, chunks, vectors if personal else None)
+    except asyncpg.DataError as exc:  # bad data never succeeds on retry
+        logger.warning("document %s: chunks rejected by the database: %s", doc["id"], exc)
+        raise PermanentIngestError("The document contains text that can't be stored.") from exc
     if personal:
         return
     points = [
@@ -85,7 +90,7 @@ async def process(document_id: str, deps: PipelineDeps) -> None:
         kind = sniff(doc["filename"], data)
 
         await repo.set_status(deps.conn, document_id, "PARSING")
-        parsed = parser_for(kind).parse(data)
+        parsed = sanitize(parser_for(kind).parse(data))
         await repo.set_page_count(deps.conn, document_id, parsed.page_count)
 
         await repo.set_status(deps.conn, document_id, "CHUNKING")

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 
 from app.auth import CurrentUser
 from app.repos import usage as usage_repo
+from app.services.permissions import can_manage_enterprise
 
 router = APIRouter(tags=["me"])
 
@@ -16,6 +17,8 @@ async def me(user: CurrentUser) -> dict:
             "email": user.email,
             "display_name": user.display_name,
             "role": user.role,
+            # the UI hides enterprise upload/delete when false; the API enforces it regardless
+            "can_manage_enterprise": can_manage_enterprise(user),
         }
     )
 

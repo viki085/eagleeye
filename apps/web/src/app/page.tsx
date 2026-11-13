@@ -7,7 +7,7 @@ import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
 import { SourceDrawer } from "@/components/chat/source-drawer";
 import { ArtifactModal } from "@/components/data/artifact-modal";
-import { DocumentsPanel } from "@/components/documents/documents-panel";
+import { DocumentsPanel, type CurrentUser } from "@/components/documents/documents-panel";
 import { UsagePanel } from "@/components/usage/usage-panel";
 import { useApi } from "@/hooks/use-api";
 import { useDocuments } from "@/hooks/use-documents";
@@ -22,7 +22,7 @@ export default function ChatPage() {
   const docs = useDocuments(api);
   const [usageKey, setUsageKey] = useState(0);
   const usage = useUsage(api, usageKey);
-  const [me, setMe] = useState<string | null>(null);
+  const [me, setMe] = useState<CurrentUser | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -53,7 +53,7 @@ export default function ChatPage() {
     void refreshChats();
     api
       .getMe()
-      .then((u) => setMe(u.id))
+      .then((u) => setMe({ id: u.id, canManageEnterprise: u.can_manage_enterprise === true }))
       .catch(() => setMe(null));
   }, [api, refreshChats]);
 
@@ -195,7 +195,9 @@ export default function ChatPage() {
   const closeArtifact = useCallback(() => setOpenArtifact(null), []);
 
   return (
-    <div className="flex h-screen">
+    // relative + overflow-hidden: the shell is exactly one screen; nothing inside it (e.g. an
+    // absolutely positioned element) can stretch the page and make the whole layout scroll
+    <div className="relative flex h-screen overflow-hidden">
       <Sidebar
         chats={chats}
         activeChatId={activeChatId}
@@ -267,7 +269,7 @@ export default function ChatPage() {
           }
         />
       </main>
-      <DocumentsPanel state={docs} currentUserId={me} api={api} />
+      <DocumentsPanel state={docs} currentUser={me} api={api} />
       <SourceDrawer api={api} citation={openCitation} onClose={closeDrawer} />
       <ArtifactModal
         api={api}

@@ -72,6 +72,8 @@ export interface Me {
   email: string;
   display_name: string | null;
   role: string;
+  /** May add/delete enterprise documents (the API enforces this regardless of the UI). */
+  can_manage_enterprise: boolean;
 }
 
 export interface ArtifactColumn {
