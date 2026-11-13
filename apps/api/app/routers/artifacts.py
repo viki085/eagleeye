@@ -66,7 +66,8 @@ async def get_artifact(
         {
             "id": str(row["id"]),
             "title": row["title"],
-            "sql": refs.get("sql", ""),
+            "sql": refs.get("sql", "") or refs.get("code", ""),
+            "mode": refs.get("mode", "sql"),
             "columns": page.columns,
             "rows": page.rows,
             "offset": offset,

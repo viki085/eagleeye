@@ -2,9 +2,12 @@ import asyncio
 import logging
 import uuid
 
+from eagleeye_core.queues import PROFILE_DATASET_TASK
+
 from ingest_worker.celery_app import INGEST_TASK, app
 from ingest_worker.errors import IngestError
 from ingest_worker.pipeline import mark_failed, run_pipeline
+from ingest_worker.tabular import mark_dataset_failed, run_dataset_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -30,3 +33,22 @@ def ingest_document(self, document_id: str) -> None:  # noqa: ANN001 — celery 
         logger.exception("ingest %s failed after %d retries", document_id, retries)
         message = exc.user_message if isinstance(exc, IngestError) else GENERIC_FAILURE
         asyncio.run(mark_failed(document_id, message))
+
+
+@app.task(name=PROFILE_DATASET_TASK, bind=True, max_retries=MAX_RETRIES)
+def profile_dataset(self, dataset_id: str) -> None:  # noqa: ANN001 — celery binds self
+    try:
+        uuid.UUID(dataset_id)
+    except (ValueError, TypeError):
+        logger.error("rejecting dataset task with invalid id %r", dataset_id)
+        return
+    try:
+        asyncio.run(run_dataset_pipeline(dataset_id))
+    except Exception as exc:
+        retries = self.request.retries
+        if retries < MAX_RETRIES:
+            logger.warning("dataset %s transient failure (try %d): %s", dataset_id, retries, exc)
+            raise self.retry(exc=exc, countdown=BASE_BACKOFF_S * 2**retries) from exc
+        logger.exception("dataset %s failed after %d retries", dataset_id, retries)
+        message = exc.user_message if isinstance(exc, IngestError) else GENERIC_FAILURE
+        asyncio.run(mark_dataset_failed(dataset_id, message))

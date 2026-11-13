@@ -1,16 +1,14 @@
 """Query results → Parquet in the object store + `artifacts` row (C5 §5)."""
 
 import io
-import uuid
 
 import asyncpg
 import pyarrow as pa
 import pyarrow.parquet as pq
 from eagleeye_core.storage import ObjectStore
+from eagleeye_datasets.artifacts import save_table_artifact
 
 from gateway.executor import QueryResult, jsonable
-
-PARQUET_MIME = "application/vnd.apache.parquet"
 
 
 def to_parquet(result: QueryResult) -> bytes:
@@ -26,10 +24,6 @@ def to_parquet(result: QueryResult) -> bytes:
     return buf.getvalue()
 
 
-def artifact_key(user_id: str, artifact_id: str) -> str:
-    return f"artifacts/{user_id}/{artifact_id}.parquet"
-
-
 async def save_artifact(
     store: ObjectStore,
     pool: asyncpg.Pool,
@@ -41,24 +35,15 @@ async def save_artifact(
     sql: str,
     source_id: str,
 ) -> str:
-    artifact_id = str(uuid.uuid4())
-    key = artifact_key(user_id, artifact_id)
-    await store.put(key, to_parquet(result), PARQUET_MIME)
-    await pool.execute(
-        """
-        INSERT INTO artifacts (id, run_id, user_id, type, title, s3_key, columns, row_count,
-                               truncated, source_refs)
-        VALUES ($1, $2, $3, 'table', $4, $5, $6, $7, $8, $9)
-        """,
-        artifact_id,
-        run_id,
-        user_id,
-        title[:200] or "Query result",
-        key,
-        # plain objects: the pool's jsonb codec encodes them (json.dumps here double-encodes)
-        [{"name": n, "type": t} for n, t in result.columns],
-        len(result.rows),
-        result.truncated,
-        {"sql": sql, "source_id": source_id},
+    return await save_table_artifact(
+        store,
+        pool,
+        user_id=user_id,
+        run_id=run_id,
+        title=title or "Query result",
+        parquet=to_parquet(result),
+        columns=[{"name": n, "type": t} for n, t in result.columns],
+        row_count=len(result.rows),
+        truncated=result.truncated,
+        source_refs={"sql": sql, "source_id": source_id},
     )
-    return artifact_id

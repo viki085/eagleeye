@@ -64,6 +64,18 @@ class Settings(BaseSettings):
     sql_max_concurrency: int = 4  # per source, in the gateway
     usage_limit_usd: float = 500.0  # lifetime LLM spend cap per user; new runs refused beyond it
 
+    # Phase 5: data files, analysis sandbox, charts (C6). The sandbox is a Docker container
+    # with no network; if Docker or the image is missing, analysis tools are not offered.
+    enable_analysis: bool = True
+    enable_python_analysis: bool = True  # false → DuckDB SQL only
+    sandbox_image: str = "eagleeye-sandbox:1"
+    sandbox_mem_mb: int = 1024
+    sandbox_timeout_s: int = 60
+    sandbox_runs_per_hour: int = 60  # per user
+    agent_max_seconds_analysis: int = 240  # run deadline when analysis tools are available
+    dataset_max_rows: int = 2_000_000
+    dataset_max_columns: int = 200
+
     clerk_secret_key: str = ""
     clerk_publishable_key: str = Field(
         default="", validation_alias="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"

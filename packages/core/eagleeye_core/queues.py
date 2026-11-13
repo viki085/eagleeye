@@ -5,6 +5,7 @@ Producers never import worker code; they send by name.
 
 INGEST_QUEUE = "ingest"
 INGEST_TASK = "ingest.ingest_document"
+PROFILE_DATASET_TASK = "ingest.profile_dataset"  # same `ingest` queue
 
 AGENT_QUEUE = "agent"
 AGENT_TASK = "agent.execute_run"

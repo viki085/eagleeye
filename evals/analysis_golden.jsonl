@@ -1,0 +1,16 @@
+{"id": "a01", "question": "What is the average monthly target?", "inputs": ["targets"], "ref": "avg_target"}
+{"id": "a02", "question": "What is the total target for the first half of 2026 (January to June)?", "inputs": ["targets"], "ref": "h1_target"}
+{"id": "a03", "question": "Join revenue with targets by month and list the months where revenue was below target, with the gap (revenue minus target).", "inputs": ["revenue", "targets"], "ref": "below_target"}
+{"id": "a04", "question": "Across the months that have both revenue and a target, what is the total gap (total revenue minus total target)?", "inputs": ["revenue", "targets"], "ref": "total_gap"}
+{"id": "a05", "question": "Which month had the largest shortfall against target, and by how much?", "inputs": ["revenue", "targets"], "ref": "largest_shortfall"}
+{"id": "a06", "question": "What was revenue as a fraction of target in October 2026?", "inputs": ["revenue", "targets"], "ref": "october_ratio"}
+{"id": "a07", "question": "How many target months have no revenue recorded?", "inputs": ["revenue", "targets"], "ref": "unmatched_months"}
+{"id": "a08", "question": "Compute the 2026 target per sales rep for each region. Which region has the highest?", "inputs": ["region_targets"], "ref": "target_per_rep"}
+{"id": "a09", "question": "What is the Pearson correlation between the regional target and the number of sales reps?", "inputs": ["region_targets"], "ref": "target_rep_corr"}
+{"id": "a10", "question": "What is the total net headcount change (hires minus leavers) per region across all quarters?", "inputs": ["headcount"], "ref": "net_hires"}
+{"id": "a11", "question": "Which quarter had the most hires in total, and how many?", "inputs": ["headcount"], "ref": "top_quarter"}
+{"id": "a12", "question": "Is the difference in mean order value between web and store orders statistically significant? Use Welch's t-test and report the p-value.", "inputs": ["orders"], "ref": "welch_p"}
+{"id": "a13", "question": "What is the median order value per channel?", "inputs": ["orders"], "ref": "median_by_channel"}
+{"id": "a14", "question": "What share of orders have an order value above 2000?", "inputs": ["orders"], "ref": "share_above_2000"}
+{"id": "a15", "question": "Fit a linear trend to monthly revenue using the month number (January = 1). What is the slope in EUR per month?", "inputs": ["revenue"], "ref": "revenue_slope"}
+{"id": "u01", "question": "What is the customer churn rate per region?", "inputs": ["region_targets"], "expect_status": "no_access"}

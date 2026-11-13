@@ -10,6 +10,7 @@ dependencies = [
     "eagleeye-events",
     "eagleeye-agents",
     "eagleeye-catalog",
+    "eagleeye-sandbox",
     "celery[redis]>=5.4",
     "asyncpg>=0.30",
     "qdrant-client>=1.13,<1.14",
@@ -22,6 +23,7 @@ eagleeye-retrieval = { workspace = true }
 eagleeye-events = { workspace = true }
 eagleeye-agents = { workspace = true }
 eagleeye-catalog = { workspace = true }
+eagleeye-sandbox = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

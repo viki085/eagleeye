@@ -19,6 +19,15 @@ _WORD_DATE = re.compile(
     rf"\b(?:{_MONTH}\s+{_DAY}(?:,?\s+\d{{4}})?|{_DAY}\s+(?:of\s+)?{_MONTH}(?:,?\s+\d{{4}})?)\b",
     re.IGNORECASE,
 )
+# Conventional statistical constants are not data: "95% confidence interval", "at the 0.05
+# level", "α = 0.05", "p < 0.05" (the p-VALUE itself is still checked when written p = 0.444).
+_STAT_CONSTANT = re.compile(
+    r"\b(?:90|95|99)(?:\.0)?\s*%\s*(?:confidence|CI\b|credible)"
+    r"|(?:α|alpha|significance(?:\s+level)?)\s*(?:=|of|at)?\s*0?\.(?:10|05|01|001)\b"
+    r"|\b(?:at|below|under)\s+(?:the\s+)?0?\.(?:10|05|01|001)\s+(?:level|threshold|cut-?off)"
+    r"|\bp\s*[<>≤≥]\s*0?\.(?:10|05|01|001)\b",
+    re.IGNORECASE,
+)
 _NUMBER = re.compile(
     r"(?<![\w.])([-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*"
     r"(%|percent\b|k\b|m\b|bn\b|b\b|thousand\b|million\b|billion\b)?",
@@ -40,6 +49,7 @@ class Figure:
 
 def extract_figures(text: str) -> list[Figure]:
     clean = _WORD_DATE.sub(" ", _DATE.sub(" ", _CITATION.sub(" ", text)))
+    clean = _STAT_CONSTANT.sub(" ", clean)
     figures: list[Figure] = []
     for match in _NUMBER.finditer(clean):
         raw, unit = match.group(1), (match.group(2) or "").lower()
@@ -84,9 +94,11 @@ def _matches(f: Figure, evidence: list[float]) -> bool:
     candidates = [value, value / 100] if f.percent else [value]
     for e in evidence:
         for c in candidates:
-            target = e
-            tol = max(rounding if c is value else rounding / 100, abs(target) * RELATIVE_TOLERANCE)
-            if abs(c - target) <= tol:
+            # magnitudes, not signs: "below target by €90,380.83" and "−€90,380.83" both
+            # quote a gap of -90380.83; the check guards against invented figures
+            target = abs(e)
+            tol = max(rounding if c is value else rounding / 100, target * RELATIVE_TOLERANCE)
+            if abs(abs(c) - target) <= tol:
                 return True
     return False
 

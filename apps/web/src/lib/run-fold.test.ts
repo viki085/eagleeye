@@ -85,6 +85,34 @@ describe("foldEvent", () => {
     expect(view.warnings).toEqual(["unverified_numbers"]);
   });
 
+  it("collects charts and ignores malformed ones", () => {
+    const chart = {
+      chart_id: "c1", title: "Revenue", summary: "Highest: 130.", source_id: "a1",
+      spec: { mark: { type: "line" }, data: { values: [{ x: 1, y: 2 }] } },
+    };
+    const view = foldAll("r", [
+      { event: "chart", data: chart },
+      { event: "chart", data: { chart_id: "c2", title: "x", spec: [1, 2] } },
+      { event: "chart", data: { chart_id: "c3", title: "x" } },
+      { event: "chart", data: null },
+    ]);
+    expect(view.charts.map((c) => c.chart_id)).toEqual(["c1"]);
+    expect(view.charts[0].spec).toEqual(chart.spec);
+  });
+
+  it("keeps the analysis code mode on artifacts", () => {
+    const view = foldAll("r", [
+      {
+        event: "artifact",
+        data: {
+          artifact_id: "a2", type: "table", title: "Gap", sql: "SELECT 1", source: "analysis",
+          columns: [], row_count: 0, truncated: false, preview: [], assumptions: "", mode: "duckdb",
+        },
+      },
+    ]);
+    expect(view.artifacts[0].mode).toBe("duckdb");
+  });
+
   it("never mutates the previous view", () => {
     const before = initialRun("r");
     const after = foldEvent(before, { event: "text.delta", data: { text: "x" } });

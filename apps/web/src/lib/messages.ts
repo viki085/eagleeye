@@ -1,5 +1,5 @@
-import type { ArtifactView, ChatMessage, Citation } from "@/lib/api";
-import type { RunView, StepStatus, StepView } from "@/lib/run-fold";
+import type { ArtifactView, ChartView, ChatMessage, Citation } from "@/lib/api";
+import { isChart, type RunView, type StepStatus, type StepView } from "@/lib/run-fold";
 
 export interface UiMessage {
   key: string;
@@ -7,6 +7,7 @@ export interface UiMessage {
   text: string;
   citations: readonly Citation[];
   artifacts: readonly ArtifactView[];
+  charts: readonly ChartView[];
   steps: readonly StepView[];
   status: string | null;
   route: string | null;
@@ -47,6 +48,7 @@ export function userMessage(text: string): UiMessage {
     text,
     citations: [],
     artifacts: [],
+    charts: [],
     steps: [],
     status: null,
     route: null,
@@ -63,6 +65,7 @@ export function fromRun(view: RunView): UiMessage {
     text: view.text,
     citations: view.citations,
     artifacts: view.artifacts,
+    charts: view.charts,
     steps: view.steps,
     status: view.status,
     route: view.guard?.route ?? null,
@@ -86,6 +89,9 @@ export function toUiMessage(m: ChatMessage): UiMessage {
       .join(""),
     citations: itemsOf("citations") as Citation[],
     artifacts: itemsOf("artifacts") as ArtifactView[],
+    charts: itemsOf("charts").filter(
+      (c): c is ChartView => typeof c === "object" && c !== null && isChart(c as Record<string, unknown>),
+    ),
     steps: (itemsOf("steps") as PersistedStep[]).map(toStep),
     status: typeof run?.status === "string" ? run.status : null,
     route: typeof run?.route === "string" ? run.route : null,

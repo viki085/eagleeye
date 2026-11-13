@@ -10,6 +10,9 @@ dependencies = [
     "eagleeye-events",
     "eagleeye-sqlsafe",
     "eagleeye-catalog",
+    "eagleeye-datasets",
+    "eagleeye-sandbox",
+    "eagleeye-charts",
     "asyncpg>=0.30",
     "httpx>=0.28",
     "langgraph>=0.2.60",
@@ -30,6 +33,9 @@ eagleeye-retrieval = { workspace = true }
 eagleeye-events = { workspace = true }
 eagleeye-sqlsafe = { workspace = true }
 eagleeye-catalog = { workspace = true }
+eagleeye-datasets = { workspace = true }
+eagleeye-sandbox = { workspace = true }
+eagleeye-charts = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

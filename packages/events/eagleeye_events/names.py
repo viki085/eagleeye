@@ -7,7 +7,9 @@ STEP_FINISHED = "step.finished"  # {step_id, status, output_summary, duration_ms
 TEXT_DELTA = "text.delta"  # {text}
 TEXT_REPLACE = "text.replace"  # {text} — output filter replaced the answer
 CITATION = "citation"  # {n, document_id, chunk_id, title, page, heading_path, scope, snippet}
-ARTIFACT = "artifact"  # {artifact_id, type, title, sql, columns, row_count, truncated, preview}
+# {artifact_id, type, title, sql, mode, columns, row_count, truncated, preview}
+ARTIFACT = "artifact"
+CHART = "chart"  # {chart_id, title, spec (Vega-Lite, data inline), summary, source_id}
 CHAT_UPDATED = "chat.updated"  # {chat_id, title}
 RUN_DONE = "run.done"  # {message_id, status, degraded, cancelled, usage}
 RUN_ERROR = "run.error"  # {code, user_message}

@@ -13,7 +13,7 @@ from qdrant_client import AsyncQdrantClient
 
 from app.db import create_pool
 from app.errors import install_error_handlers
-from app.routers import artifacts, chats, documents, health, me, runs, sources
+from app.routers import artifacts, chats, datasets, documents, health, me, runs, sources
 from app.services.task_queue import CeleryTaskQueue
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -77,7 +77,7 @@ def create_app() -> FastAPI:
     install_error_handlers(app)
     for router in (
         health.router, me.router, chats.router, runs.router, documents.router,
-        sources.router, artifacts.router,
+        sources.router, artifacts.router, datasets.router,
     ):
         app.include_router(router, prefix="/v1")
     return app

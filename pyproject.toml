@@ -6,10 +6,13 @@ members = [
     "apps/ingest-worker",
     "packages/agents",
     "packages/catalog",
+    "packages/charts",
     "packages/core",
+    "packages/datasets",
     "packages/events",
     "packages/llm",
     "packages/retrieval",
+    "packages/sandbox",
     "packages/sqlsafe",
 ]
 
@@ -25,3 +28,6 @@ ignore = ["S101"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "--import-mode=importlib"
+markers = [
+    "integration: needs live local services (Docker sandbox image, warehouse); skipped when absent",
+]

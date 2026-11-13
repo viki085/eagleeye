@@ -39,7 +39,11 @@ def _after_supervisor(state: RunState) -> str:
 
 
 def build_graph(ctx: RunContext, registry: ToolRegistry | None = None) -> Any:
-    tools = registry or default_registry(include_sql=ctx.sql_available)
+    tools = registry or default_registry(
+        include_sql=ctx.sql_available,
+        include_data=ctx.workspace is not None,
+        include_analysis=ctx.analysis_available,
+    )
     g = StateGraph(RunState)
     g.add_node("guard", make_guard_node(ctx))
     g.add_node("simple", make_simple_node(ctx))

@@ -91,6 +91,80 @@ export interface ArtifactView {
   truncated: boolean;
   preview: unknown[][];
   assumptions: string;
+  /** Code shown in the card: warehouse SQL, DuckDB SQL or Python (older parts: absent = sql). */
+  mode?: "sql" | "duckdb" | "python";
+}
+
+/** A chart under an answer: Vega-Lite spec built server-side from the data (no colours). */
+export interface ChartView {
+  chart_id: string;
+  title: string;
+  spec: Record<string, unknown>;
+  summary: string;
+  source_id: string;
+}
+
+export type DatasetStatus = "UPLOADED" | "PROFILING" | "READY" | "FAILED";
+
+export interface DatasetSummary {
+  id: string;
+  title: string;
+  filename: string;
+  sheet: string;
+  origin: string;
+  status: DatasetStatus;
+  error: string | null;
+  row_count: number;
+  column_count: number;
+  columns: ArtifactColumn[];
+  size_bytes: number;
+  summary: string;
+  created_at: string | null;
+}
+
+export interface ProfileTopValue {
+  value: unknown;
+  count: number;
+}
+
+export interface ProfileColumn {
+  name: string;
+  original: string;
+  type: string;
+  kind: "numeric" | "temporal" | "boolean" | "text";
+  null_pct: number;
+  distinct: number;
+  min?: unknown;
+  max?: unknown;
+  mean?: number | null;
+  median?: number | null;
+  std?: number | null;
+  outliers?: number;
+  top?: ProfileTopValue[];
+  flags: string[];
+}
+
+export interface DatasetProfile {
+  row_count: number;
+  column_count: number;
+  duplicate_rows: number;
+  columns: ProfileColumn[];
+  correlations: { a: string; b: string; r: number }[];
+  warnings: string[];
+  sample: { columns: string[]; rows: unknown[][] };
+}
+
+export interface DatasetDetail extends DatasetSummary {
+  profile: Partial<DatasetProfile>;
+  column_map: Record<string, string>;
+}
+
+/** File extensions routed to the data-file pipeline instead of document ingestion. */
+export const DATA_FILE_EXTENSIONS = [".csv", ".tsv", ".xlsx"] as const;
+
+export function isDataFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return DATA_FILE_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
 export interface ArtifactPage {
@@ -285,6 +359,24 @@ export class ApiClient {
 
   deleteDocument(docId: string): Promise<{ id: string }> {
     return this.request(`/v1/documents/${docId}`, { method: "DELETE" });
+  }
+
+  listDatasets(): Promise<DatasetSummary[]> {
+    return this.request<DatasetSummary[]>("/v1/datasets");
+  }
+
+  getDataset(datasetId: string): Promise<DatasetDetail> {
+    return this.request<DatasetDetail>(`/v1/datasets/${datasetId}`);
+  }
+
+  uploadDataset(file: File): Promise<DatasetSummary> {
+    const form = new FormData();
+    form.append("file", file);
+    return this.request<DatasetSummary>("/v1/datasets", { method: "POST", body: form });
+  }
+
+  deleteDataset(datasetId: string): Promise<{ id: string }> {
+    return this.request(`/v1/datasets/${datasetId}`, { method: "DELETE" });
   }
 
   getChunk(docId: string, chunkId: string): Promise<ChunkDetail> {

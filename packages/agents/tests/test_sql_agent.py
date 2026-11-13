@@ -190,6 +190,11 @@ def test_router_sql_route_requires_availability() -> None:
         ("Delivered 13th of Nov and 28 Sept 2026.", [], []),
         ("Since Oct. 30th: 40 orders.", [40.0], []),
         ("May 2026 revenue was 9,999.", [1234.5], ["9,999"]),  # month word alone ≠ date
+        ("Feb missed by −€90,380.83.", [-90380.83], []),  # typographic minus, signed evidence
+        ("Below target by €90,380.83.", [-90380.83], []),
+        ("p = 0.444; 95% confidence interval −70.51 to 30.89.", [0.444, -70.51, 30.89], []),
+        ("Not significant at the 0.05 level (p < 0.05 fails).", [], []),
+        ("p = 0.031, significant at α = 0.05.", [0.444], ["0.031"]),  # the p-value IS checked
     ],
 )
 def test_unverified_figures(answer: str, evidence: list[float], unverified: list[str]) -> None:

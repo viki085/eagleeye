@@ -5,8 +5,9 @@ import remarkGfm from "remark-gfm";
 
 import { CitationChips } from "@/components/chat/citation-chips";
 import { StepTree } from "@/components/chat/step-tree";
+import { ChartCard } from "@/components/charts/chart-card";
 import { ArtifactList } from "@/components/data/artifact-list";
-import type { ArtifactView, Citation } from "@/lib/api";
+import type { ArtifactView, ChartView, Citation } from "@/lib/api";
 import type { StepView } from "@/lib/run-fold";
 
 interface MessageBubbleProps {
@@ -15,6 +16,7 @@ interface MessageBubbleProps {
   streaming?: boolean;
   citations?: readonly Citation[];
   artifacts?: readonly ArtifactView[];
+  charts?: readonly ChartView[];
   steps?: readonly StepView[];
   status?: string | null;
   route?: string | null;
@@ -44,7 +46,7 @@ function Notices({
     <>
       {warnings.includes("unverified_numbers") && (
         <Notice tone="warn">
-          Some figures in this answer couldn&apos;t be matched to the query results — check them against the table.
+          Some figures in this answer couldn&apos;t be matched to the results — check them against the table.
         </Notice>
       )}
       {status === "BUDGET_EXCEEDED" && (
@@ -63,6 +65,7 @@ export function MessageBubble({
   streaming = false,
   citations = [],
   artifacts = [],
+  charts = [],
   steps = [],
   status = null,
   route = null,
@@ -95,6 +98,9 @@ export function MessageBubble({
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           {streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-neutral-400" />}
         </div>
+        {charts.map((c) => (
+          <ChartCard key={c.chart_id} chart={c} />
+        ))}
         <ArtifactList
           artifacts={artifacts}
           onView={(x) => onViewArtifact?.(x)}

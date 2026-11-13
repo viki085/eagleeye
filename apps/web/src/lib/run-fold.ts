@@ -2,7 +2,7 @@
  * Pure fold of SSE run events into a view (LLD §2.3). The worker persists the same
  * shape (text, citations, steps, run status), so live and reloaded messages match.
  */
-import type { ArtifactView, Citation } from "./api";
+import type { ArtifactView, ChartView, Citation } from "./api";
 
 export type StepStatus = "running" | "ok" | "error" | "skipped";
 
@@ -29,6 +29,7 @@ export interface RunView {
   steps: readonly StepView[];
   citations: readonly Citation[];
   artifacts: readonly ArtifactView[];
+  charts: readonly ChartView[];
   warnings: readonly string[];
   guard: GuardView | null;
   done: boolean;
@@ -56,6 +57,7 @@ export function initialRun(runId: string): RunView {
     steps: [],
     citations: [],
     artifacts: [],
+    charts: [],
     warnings: [],
     guard: null,
     done: false,
@@ -77,6 +79,16 @@ function isArtifact(d: Data): boolean {
     Array.isArray(d.columns) &&
     Array.isArray(d.preview) &&
     typeof d.row_count === "number"
+  );
+}
+
+export function isChart(d: Data): boolean {
+  return (
+    typeof d.chart_id === "string" &&
+    typeof d.title === "string" &&
+    typeof d.spec === "object" &&
+    d.spec !== null &&
+    !Array.isArray(d.spec)
   );
 }
 
@@ -129,6 +141,8 @@ export function foldEvent(view: RunView, evt: RunEvent): RunView {
       return isArtifact(d)
         ? { ...view, artifacts: [...view.artifacts, d as unknown as ArtifactView] }
         : view;
+    case "chart":
+      return isChart(d) ? { ...view, charts: [...view.charts, d as unknown as ChartView] } : view;
     case "run.done":
       return {
         ...view,

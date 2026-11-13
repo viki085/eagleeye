@@ -76,5 +76,43 @@ Heavy tasks emit `progress` events; if > 60 s the UI shows a "still working" ste
 ## 8. Testing
 Profile correctness vs pandas reference on fixture CSVs (dirty headers, mixed types, BOM, 1M rows); sandbox escape corpus (network, file, process, resource exhaustion); chart spec validation fuzz; golden EDA questions ("which region has the highest churn?") with numeric tolerance; cross-source join tests with key mismatches.
 
+## As built (Phase 5, 2026-11-13)
+
+How the design above was implemented, and where it differs (ADR-31):
+
+- **Datasets** (`packages/datasets`, ingest task `profile_dataset`): CSV/TSV are read with DuckDB's sniffer (BOM and cp1252 handled); XLSX is read values-only with openpyxl (formulas and macros are never evaluated), one dataset per non-empty sheet up to 5, with a zip-bomb guard. Headers become safe snake_case names, with a map back to the originals. Data is stored as zstd Parquet under `datasets/{owner}/{id}/` in the documents bucket. Limits: the existing 25 MB upload cap, 2M rows, 200 columns.
+- **Profile** (DuckDB):
+  - Per column: type, null %, distinct count, min/max/mean/median/std/quantiles, IQR outliers, top values, date range.
+  - Flags: duplicates, constant / ID-like / mostly empty / mixed types, and personal data (detected by header name or by email/phone-shaped values).
+  - Correlations with |r| ≥ 0.3, data-quality warnings, and a 20-row sample with personal data masked.
+  - The fast model adds a two-sentence summary. "Run EDA" is answered from the profile, with no sandbox run.
+- **Sandbox** (`infra/sandbox`, `packages/sandbox`): one `docker run` per execution with no network, a read-only root, all capabilities dropped, a limit of 64 processes, 1 GB memory and no swap, 1 CPU, a non-root user and a 60 s hard timeout. Inputs are mounted read-only and there is one writable output folder.
+  - **SQL mode:** DuckDB with `enable_external_access=false` and `lock_configuration=true`.
+  - **Python mode:** `datasets[...]`, `save_table` (≤ 3 tables) and `save_stat`.
+  - Results are capped at 100,000 rows and 20 MB. Every run is logged to `sandbox_runs`, with a limit of 60 per user per hour.
+- **Static checks** (convenience only): SQL goes through `sqlsafe` with a DuckDB policy built from the input schemas, plus a denylist of file and system functions. Python goes through an AST allow-list (allowed modules only; no `open`/`eval`/`exec`/dunders).
+- **Analysis agent:** the `analyze_data` tool, nested like the SQL agent, with ≤ 4 generations, ≤ 3 executions and ≤ 3 Python runs per answer. Inputs are owner-checked in code. The model sees schema, profile digest and a masked 5-row sample. Results become `table` artifacts (`mode` `duckdb`/`python`, code shown in the collapsed card), and their values join the figures-check evidence.
+- **Other tools:** `list_datasets`, `get_dataset_profile`, and `make_chart` (offered whenever SQL or data files are available). `query_database` results now carry their id, so the supervisor can pass them on.
+- **Charts** (`packages/charts`):
+  - Supported types: bar, line, area, scatter and histogram. `y` may list up to 4 measures in the same unit, drawn as grouped bars or separate lines (never stacked).
+  - Data handling: top 20 categories plus "Other", ≤ 8 series (scatter colouring ≤ 3), LTTB downsampling to 2,000 points. Text months ("2026-01") and numeric text are understood. A single-valued colour column is dropped.
+  - Specs contain no colours, expressions, transforms or URLs. The summary sentence is computed in code.
+  - Frontend: vega-embed with `ast: true` (no eval), lazy-loaded. The dataviz reference palette is validated against the app's surfaces and re-themes on the light/dark toggle. PNG/SVG export.
+- **Figures check additions:** gaps are compared by magnitude (a "−" sign is not a mismatch). Conventional statistical constants (95% confidence, the 0.05 level) are ignored. The p-value itself is still checked.
+
+**Evaluation** (`evals/analysis_eval.py`, 15 numeric cases over the fixtures plus 1 that must be declined, run 2026-11-13):
+
+| Model | Numeric accuracy | Declines | Mode (SQL / Python) | p50 | Cost (16 cases) |
+|---|---|---|---|---|---|
+| gpt-6-luna | 15/15 | 1/1 | 14 / 1 | 2.7 s | $0.0034 |
+| gpt-6.1-terra | 15/15 | 1/1 | 14 / 1 | 3.3 s | $0.043 |
+
+End to end (browser), the database-plus-file comparison took 13–26 s and 2–4 sandbox runs.
+
+**Known gaps:**
+- Prompt rules (fetch then analyse, no arithmetic in the answer, missing is not zero, summary statistics for tests) fixed every failure seen, but the supervisor sometimes still runs an extra analysis to count rows.
+- Wrong-but-valid analysis is not caught by any check; only the shown code, assumptions and figures check mitigate it.
+- The golden set runs the analysis sub-agent directly. End-to-end supervisor behaviour is only exercised by hand.
+
 ## 9. Open questions
 Max realistic CSV size? Need for Excel with multiple sheets/pivots? Should enterprise-curated datasets (not DB) exist? Preferred chart style guide / brand colours? Ever need forecasting (Prophet/ARIMA) in v1?

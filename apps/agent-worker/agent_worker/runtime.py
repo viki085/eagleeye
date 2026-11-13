@@ -11,9 +11,11 @@ import asyncio
 import json
 import threading
 from concurrent.futures import Future
+from typing import Any
 
 import asyncpg
 import redis.asyncio as aioredis
+from eagleeye_agents.analysis.workspace import PgDataWorkspace
 from eagleeye_agents.budgets import BudgetLimits
 from eagleeye_agents.context import AgentSettings
 from eagleeye_agents.prompts.loader import load_prompts
@@ -23,11 +25,13 @@ from eagleeye_catalog.repo import CatalogRepo
 from eagleeye_catalog.service import CatalogService
 from eagleeye_core.config import Settings, get_settings
 from eagleeye_core.service_auth import resolve_secret
+from eagleeye_core.storage import S3ObjectStore, build_object_store
 from eagleeye_llm.embeddings import LiteLLMEmbedder
 from eagleeye_llm.litellm_adapter import LiteLLMGateway
 from eagleeye_retrieval.service import Retriever
 from eagleeye_retrieval.stores.pgvector_store import PgVectorPersonalStore
 from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore
+from eagleeye_sandbox.docker_executor import DockerExecutor
 from qdrant_client import AsyncQdrantClient
 
 POOL_MAX_SIZE = 10
@@ -55,7 +59,21 @@ def agent_settings(s: Settings) -> AgentSettings:
             max_seconds=float(s.agent_max_seconds),
         ),
         rag_min_score=s.rag_min_score,
+        analysis_max_seconds=float(s.agent_max_seconds_analysis),
     )
+
+
+def _analysis(s: Settings, pool: asyncpg.Pool) -> tuple[PgDataWorkspace | None, Any]:
+    """Data files need only the object stores; analysis also needs the Docker sandbox, which
+    is probed per run (so starting Docker later turns analysis on without a restart)."""
+    if not s.enable_analysis:
+        return None, None
+    artifacts = S3ObjectStore(
+        s.s3_endpoint_url, s.s3_access_key, s.s3_secret_key, s.artifacts_bucket
+    )
+    workspace = PgDataWorkspace(pool, build_object_store(), artifacts)
+    executor = DockerExecutor(s.sandbox_image, s.sandbox_mem_mb, s.sandbox_timeout_s)
+    return workspace, executor
 
 
 async def _build_deps(s: Settings) -> RunnerDeps:
@@ -76,6 +94,7 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         # The worker never holds warehouse credentials: it signs tokens and calls the gateway.
         gateway = HttpGateway(s.gateway_url, resolve_secret(s.gateway_hmac_secret, s.app_env))
         catalog = CatalogService(CatalogRepo(pool), embedder)
+    workspace, executor = _analysis(s, pool)
     retriever = Retriever(
         pool=pool,
         llm=llm,
@@ -100,6 +119,10 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         },
         gateway=gateway,
         catalog=catalog,
+        workspace=workspace,
+        executor=executor,
+        python_analysis=s.enable_python_analysis,
+        sandbox_runs_per_hour=s.sandbox_runs_per_hour,
     )
 
 

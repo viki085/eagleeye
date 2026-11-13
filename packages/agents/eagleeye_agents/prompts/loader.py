@@ -14,6 +14,7 @@ PROMPT_NAMES = (
     "unavailable",
     "sql_generate",
     "sql_answer",
+    "analysis_generate",
 )
 
 

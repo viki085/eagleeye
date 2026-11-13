@@ -15,12 +15,15 @@ apps/data-gateway   Internal SQL executor: re-validates, runs read-only, writes 
 packages/core       Shared config, envelope, ObjectStore port, queue names, service auth (HMAC)
 packages/sqlsafe    Deterministic SQL validator (sqlglot AST): one SELECT, granted tables, PII, limit
 packages/catalog    Semantic catalog: introspection + YAML seed + LLM descriptions + embeddings
+packages/datasets   Data files: CSV/XLSX → Parquet, DuckDB profile, shared table-artifact store
+packages/sandbox    Analysis sandbox: static checks + Docker executor for model-written SQL/Python
+packages/charts     Chart intent → Vega-Lite spec, data aggregated in code
 packages/llm        LLMGateway (tools, fallback) + Embedder ports, LiteLLM adapters
 packages/events     Run event vocabulary + Redis Stream sink/reader
 packages/retrieval  Hybrid retrieval: Qdrant + pgvector + tsvector, RRF, access filter
 packages/agents     Agent graph: guard → router → simple | RAG | supervisor ⇄ tools → checks
-infra/              docker-compose.yml (local stack) + warehouse/ (demo enterprise DB seed)
-evals/              Guard smoke eval, SQL golden set + execution-accuracy harness
+infra/              docker-compose.yml (local stack) + warehouse/ (demo DB seed) + sandbox/ (image)
+evals/              Guard smoke eval, SQL + analysis golden sets and harnesses, fixtures/
 docs/               Design pack (HLD, LLD, components, ADRs)
 ```
 
@@ -32,7 +35,9 @@ Prereqs: Docker Desktop, Node 20+, [uv](https://docs.astral.sh/uv/), a Clerk app
 cp .env.example .env   # fill NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY, OPENAI_API_KEY
 
 # 1. Infra services (Redis, Qdrant, SeaweedFS object store, demo warehouse on :5433)
+#    + the analysis sandbox image (once; rebuild after changing infra/sandbox)
 docker compose -f infra/docker-compose.yml up -d
+docker build -t eagleeye-sandbox:1 infra/sandbox
 
 # 2. Supabase local (Postgres + pgvector) and migrations
 npm install          # installs supabase CLI (dev dep)
@@ -57,12 +62,14 @@ uv run --package eagleeye-data-gateway uvicorn gateway.main:app --app-dir apps/d
 cd apps/web && npm install && npm run dev
 ```
 
-Open http://localhost:3000 and sign in. Upload a PDF/DOCX/MD/TXT in the right-hand panel and ask about it, or ask a business question ("top 5 product categories by revenue last quarter") — the answer shows the SQL, a result table (View all / CSV) and an explanation written from the result. Data access follows your role (`users.role`): `member` sees `sales.*` without personal data; `data_admin`/`admin` also see customer emails/phones. Set `ENABLE_SQL=false` to turn data querying off. Each answer shows a collapsible step tree (guard → route → retrieval / tool calls → checks), cites `[n]` sources you can open, and can be stopped mid-answer. `/status` shows live health of every service.
+Open http://localhost:3000 and sign in. Upload a PDF/DOCX/MD/TXT in the right-hand panel and ask about it, or ask a business question ("top 5 product categories by revenue last quarter") — the answer shows the SQL, a result table (View all / CSV) and an explanation written from the result. Data access follows your role (`users.role`): `member` sees `sales.*` without personal data; `data_admin`/`admin` also see customer emails/phones. Set `ENABLE_SQL=false` to turn data querying off.
+
+Upload a CSV or Excel file (e.g. `evals/fixtures/targets.csv`) to get an automatic profile (the "Profile" button in **Data files**), then ask analysis questions — "Compare monthly 2026 net revenue from the database with my targets file and flag the months below target, with a chart". Analysis code (DuckDB SQL or Python) runs in a Docker container with no network; the step tree shows it, charts are drawn from the result table, and the code sits in the collapsed result card. Without Docker or the image, data files and charts still work and the assistant says analysis is unavailable. Each answer shows a collapsible step tree (guard → route → retrieval / tool calls → checks), cites `[n]` sources you can open, and can be stopped mid-answer. `/status` shows live health of every service.
 
 ## Tests
 
 ```bash
-uv run pytest -m "not integration"   # integration tests need the warehouse container
+uv run pytest -m "not integration"   # integration tests need the warehouse + sandbox image
 cd apps/web && npx tsc --noEmit && npm run lint && npm test
 
 # Guard smoke eval against the real fast model (a few cents)
@@ -70,4 +77,7 @@ uv run --package eagleeye-agents python evals/guard_smoke.py
 
 # SQL golden set: execution accuracy, refusals, cost, latency per model (~$0.07 for terra)
 uv run --package eagleeye-agent-worker python evals/sql_eval.py gpt-6.1-terra gpt-6-luna
+
+# Analysis golden set: numeric accuracy over the fixtures, in the real sandbox (~$0.05 for terra)
+uv run --package eagleeye-agent-worker --with scipy --with pandas python evals/analysis_eval.py gpt-6-luna
 ```

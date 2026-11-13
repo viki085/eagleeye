@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from eagleeye_agents.checks.numbers import numbers_in
 from eagleeye_agents.sql.agent import run_sql_agent
 from eagleeye_agents.sql.preview import format_result
-from eagleeye_agents.sql.types import SqlOutcome
+from eagleeye_agents.sql.types import ArtifactRef, SqlOutcome
 from eagleeye_agents.tools.base import ToolResult
 
 if TYPE_CHECKING:
@@ -30,14 +30,18 @@ class QueryArgs(BaseModel):
     )
 
 
+async def emit_artifact(ctx: "RunContext", artifact: ArtifactRef) -> None:
+    ctx.artifacts.append(artifact)
+    await ctx.sink.emit(ARTIFACT, artifact.to_dict())
+
+
 async def register_artifact(ctx: "RunContext", outcome: SqlOutcome) -> None:
     """Make a successful result visible to the UI and to the final checks."""
     if outcome.artifact is None:
         return
-    ctx.artifacts.append(outcome.artifact)
     ctx.numeric_evidence.extend(numbers_in(v for row in outcome.llm_preview for v in row))
     ctx.numeric_evidence.append(float(outcome.artifact.row_count))
-    await ctx.sink.emit(ARTIFACT, outcome.artifact.to_dict())
+    await emit_artifact(ctx, outcome.artifact)
 
 
 def outcome_text(outcome: SqlOutcome) -> str:
@@ -47,9 +51,11 @@ def outcome_text(outcome: SqlOutcome) -> str:
         )
         return f"{prefix}: {outcome.message}"
     a = outcome.artifact
-    return format_result(
+    text = format_result(
         a.sql, a.assumptions, a.columns, outcome.llm_preview, a.row_count, a.truncated
     )
+    # the id lets the supervisor pass this result to analyze_data / make_chart
+    return f"Result id: {a.artifact_id} — '{a.title}'\n{text}"
 
 
 class QueryDatabaseTool:

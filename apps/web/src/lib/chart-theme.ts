@@ -1,0 +1,90 @@
+/**
+ * Vega-Lite config for EagleEye charts. Specs from the server carry no colours; all styling
+ * comes from here so light/dark stay consistent with the rest of the UI.
+ *
+ * Categorical slots: the dataviz reference palette, in its fixed CVD-safe order, validated
+ * (scripts/validate_palette.js) against the app surfaces #ffffff (light) and #0a0a0a (dark):
+ * light worst adjacent CVD ΔE 9.1 / normal 19.6; dark 8.4 / 19.3. Three light slots sit
+ * below 3:1 on white, so every chart ships with its result table (the relief rule).
+ * Hues are assigned in order, never cycled; the server folds series beyond 8 into "Other"
+ * and caps scatter colouring at 3 series.
+ */
+
+export const CATEGORICAL_LIGHT = [
+  "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948",
+] as const;
+
+export const CATEGORICAL_DARK = [
+  "#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767",
+] as const;
+
+interface Ink {
+  primary: string;
+  secondary: string;
+  muted: string;
+  grid: string;
+  axis: string;
+}
+
+const INK_LIGHT: Ink = {
+  primary: "#0b0b0b",
+  secondary: "#52514e",
+  muted: "#898781",
+  grid: "#e1e0d9",
+  axis: "#c3c2b7",
+};
+
+const INK_DARK: Ink = {
+  primary: "#f0efec",
+  secondary: "#c3c2b7",
+  muted: "#898781",
+  grid: "#2c2c2a",
+  axis: "#383835",
+};
+
+const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
+export function chartConfig(dark: boolean): Record<string, unknown> {
+  const ink = dark ? INK_DARK : INK_LIGHT;
+  const palette = [...(dark ? CATEGORICAL_DARK : CATEGORICAL_LIGHT)];
+  const first = palette[0];
+  return {
+    background: "transparent",
+    font: FONT,
+    padding: 4,
+    autosize: { type: "fit-x", contains: "padding" },
+    view: { stroke: null },
+    range: { category: palette },
+    axis: {
+      labelColor: ink.muted,
+      titleColor: ink.secondary,
+      labelFontSize: 11,
+      titleFontSize: 11,
+      titleFontWeight: 500,
+      gridColor: ink.grid,
+      gridWidth: 1,
+      domainColor: ink.axis,
+      tickColor: ink.axis,
+      labelLimit: 160,
+    },
+    axisX: { grid: false },
+    axisY: { domain: false, ticks: false },
+    axisBand: { grid: false },
+    legend: {
+      labelColor: ink.secondary,
+      titleColor: ink.secondary,
+      labelFontSize: 11,
+      titleFontSize: 11,
+      orient: "top",
+      symbolType: "circle",
+    },
+    title: { color: ink.primary, fontSize: 13, fontWeight: 600, anchor: "start" },
+    // thin marks: 2px lines, ≥8px markers, rounded bar ends, a gap between adjacent bars
+    bar: { color: first, cornerRadiusEnd: 3, continuousBandSize: 14 },
+    rect: { color: first },
+    area: { color: first },
+    line: { color: first, strokeWidth: 2 },
+    point: { color: first, size: 64, filled: true },
+    scale: { bandPaddingInner: 0.25 },
+  };
+}

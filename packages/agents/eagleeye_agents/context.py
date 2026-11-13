@@ -48,6 +48,7 @@ class AgentSettings:
     rag_min_score: float = 0.25
     denied_topics: tuple[str, ...] = ()
     answer_max_tokens: int = 2048
+    analysis_max_seconds: float = 240.0  # run deadline when analysis tools are offered
 
 
 @dataclass
@@ -74,6 +75,14 @@ class RunContext:
     artifacts: list[Any] = field(default_factory=list)  # sql.types.ArtifactRef, in run order
     warnings: list[str] = field(default_factory=list)  # e.g. "unverified_numbers"
     numeric_evidence: list[float] = field(default_factory=list)  # numbers the model was shown
+    # Phase 5 (data files, analysis sandbox, charts)
+    workspace: Any = None  # analysis.workspace.DataWorkspace (owner-scoped data access)
+    executor: Any = None  # eagleeye_sandbox.types.AnalysisExecutor
+    analysis_available: bool = False  # sandbox reachable → analyze_data offered
+    python_analysis: bool = True
+    sandbox_runs_per_hour: int = 60
+    python_runs: int = 0
+    charts: list[dict[str, Any]] = field(default_factory=list)  # chart event payloads, in order
     budget: BudgetTracker = field(init=False)
 
     def __post_init__(self) -> None:

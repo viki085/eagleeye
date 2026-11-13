@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 
+import { DatasetList } from "@/components/data/dataset-list";
+import { ProfileModal } from "@/components/data/profile-modal";
 import { SourcesList } from "@/components/data/sources-list";
 import { DocumentRow } from "@/components/documents/document-row";
 import { UploadButton } from "@/components/documents/upload-button";
+import { useDatasets } from "@/hooks/use-datasets";
 import type { DocumentsState } from "@/hooks/use-documents";
-import type { ApiClient } from "@/lib/api";
+import { isDataFile, type ApiClient, type DatasetSummary } from "@/lib/api";
 
 interface DocumentsPanelProps {
   state: DocumentsState;
@@ -16,7 +19,15 @@ interface DocumentsPanelProps {
 
 export function DocumentsPanel({ state, currentUserId, api }: DocumentsPanelProps) {
   const [open, setOpen] = useState(true);
-  const { documents, selectedIds, uploading, error } = state;
+  const [profiled, setProfiled] = useState<DatasetSummary | null>(null);
+  const data = useDatasets(api);
+  const { documents, selectedIds } = state;
+  const uploading = state.uploading || data.uploading;
+  const error = state.error ?? data.error;
+  const clearError = () => {
+    state.clearError();
+    data.clearError();
+  };
 
   if (!open) {
     return (
@@ -42,11 +53,14 @@ export function DocumentsPanel({ state, currentUserId, api }: DocumentsPanelProp
         </button>
       </div>
       <div className="px-3 pb-3">
-        <UploadButton uploading={uploading} onUpload={(f, s) => void state.upload(f, s)} />
+        <UploadButton
+          uploading={uploading}
+          onUpload={(f, s) => void (isDataFile(f.name) ? data.upload(f) : state.upload(f, s))}
+        />
         {error !== null && (
           <div className="mt-2 flex items-start justify-between gap-2 rounded-md border border-red-300 bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
             <span>{error}</span>
-            <button onClick={state.clearError} aria-label="Dismiss error">
+            <button onClick={clearError} aria-label="Dismiss error">
               ×
             </button>
           </div>
@@ -72,7 +86,15 @@ export function DocumentsPanel({ state, currentUserId, api }: DocumentsPanelProp
           <p className="px-2 py-4 text-xs text-neutral-400">No documents yet.</p>
         )}
       </ul>
-      <SourcesList api={api} />
+      <div className="max-h-[40%] overflow-y-auto">
+        <DatasetList
+          datasets={data.datasets}
+          onProfile={setProfiled}
+          onDelete={(d) => void data.remove(d.id)}
+        />
+        <SourcesList api={api} />
+      </div>
+      <ProfileModal api={api} dataset={profiled} onClose={() => setProfiled(null)} />
     </aside>
   );
 }

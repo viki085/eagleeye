@@ -34,6 +34,7 @@ class ArtifactRef:
     truncated: bool
     preview: tuple[tuple[Any, ...], ...]  # first UI_PREVIEW_ROWS rows (user is authorised)
     assumptions: str = ""
+    mode: str = "sql"  # code shown in the card: sql (warehouse) | duckdb | python
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

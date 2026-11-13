@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 import type { DocumentScope } from "@/lib/api";
 
-const ACCEPT = ".pdf,.docx,.txt,.md";
+const ACCEPT = ".pdf,.docx,.txt,.md,.csv,.tsv,.xlsx";
 
 interface UploadButtonProps {
   uploading: boolean;
@@ -43,7 +43,7 @@ export function UploadButton({ uploading, onUpload }: UploadButtonProps) {
         disabled={uploading}
         className="rounded-lg border border-dashed border-neutral-400 px-3 py-2 text-sm font-medium hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
       >
-        {uploading ? "Uploading…" : "+ Upload document"}
+        {uploading ? "Uploading…" : "+ Upload document or data"}
       </button>
       <input
         ref={inputRef}
@@ -59,6 +59,8 @@ export function UploadButton({ uploading, onUpload }: UploadButtonProps) {
       />
       <p className="text-[11px] text-neutral-400">
         PDF, Word, Markdown or text · {scope === "personal" ? "only you can see it" : "visible to everyone"}
+        <br />
+        CSV or Excel → data files for analysis (always private)
       </p>
     </div>
   );

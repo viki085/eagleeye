@@ -9,6 +9,8 @@ dependencies = [
     "eagleeye-retrieval",
     "eagleeye-events",
     "eagleeye-catalog",
+    "eagleeye-datasets",
+    "eagleeye-sandbox",
     "pyarrow>=17.0",
     "celery[redis]>=5.4",
     "python-multipart>=0.0.18",
@@ -33,6 +35,8 @@ eagleeye-llm = { workspace = true }
 eagleeye-retrieval = { workspace = true }
 eagleeye-events = { workspace = true }
 eagleeye-catalog = { workspace = true }
+eagleeye-datasets = { workspace = true }
+eagleeye-sandbox = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

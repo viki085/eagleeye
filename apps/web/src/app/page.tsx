@@ -228,6 +228,7 @@ export default function ChatPage() {
                 degraded={m.degraded}
                 replaced={m.replaced}
                 artifacts={m.artifacts}
+                charts={m.charts}
                 warnings={m.warnings}
                 onOpenCitation={setOpenCitation}
                 onViewArtifact={setOpenArtifact}
@@ -240,6 +241,7 @@ export default function ChatPage() {
                 text={stream.text}
                 steps={stream.steps}
                 artifacts={stream.artifacts}
+                charts={stream.charts}
                 route={stream.guard?.route ?? null}
                 onViewArtifact={setOpenArtifact}
                 onDownloadArtifact={downloadArtifact}

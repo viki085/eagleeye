@@ -101,6 +101,25 @@ async def _check_gateway() -> list[ServiceHealth]:
     return checks
 
 
+async def _check_sandbox() -> list[ServiceHealth]:
+    """Docker reachable and the analysis image built (C6 §4)."""
+    from eagleeye_sandbox.docker_executor import DockerExecutor
+
+    settings = get_settings()
+    if not settings.enable_analysis:
+        return []
+    start = time.perf_counter()
+    if await DockerExecutor(settings.sandbox_image).available():
+        return [ServiceHealth("analysis-sandbox", "up", _ms(start))]
+    return [
+        ServiceHealth(
+            "analysis-sandbox",
+            "down",
+            detail=f"Docker or image {settings.sandbox_image} unavailable",
+        )
+    ]
+
+
 def _ms(start: float) -> int:
     return int((time.perf_counter() - start) * 1000)
 
@@ -108,7 +127,7 @@ def _ms(start: float) -> int:
 async def check_all() -> list[ServiceHealth]:
     core = await asyncio.gather(
         _check_redis(), _check_qdrant(), _check_object_store(), _check_postgres(),
-        _check_gateway(),
+        _check_gateway(), _check_sandbox(),
     )
     flat: list[ServiceHealth] = []
     for item in core:

@@ -10,6 +10,8 @@ interface ArtifactCardProps {
   onDownload: (artifact: ArtifactView) => void;
 }
 
+const CODE_LABEL = { sql: "SQL", duckdb: "DuckDB SQL", python: "Python" } as const;
+
 const BUTTON =
   "rounded-md border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800";
 
@@ -56,7 +58,7 @@ export function ArtifactCard({ artifact, onViewAll, onDownload }: ArtifactCardPr
             <span className="font-medium">Assumptions:</span> {artifact.assumptions}
           </p>
         )}
-        <SqlBlock sql={artifact.sql} />
+        <SqlBlock sql={artifact.sql} label={CODE_LABEL[artifact.mode ?? "sql"]} />
       </div>
     </details>
   );

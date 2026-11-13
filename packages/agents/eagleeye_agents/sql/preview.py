@@ -4,25 +4,15 @@ The user sees real values in the UI (the gateway only returned what their grant 
 the LLM provider never needs personal data to describe an aggregate.
 """
 
-import re
 from collections.abc import Iterable, Sequence
 from typing import Any
 
+from eagleeye_core.pii import MASK, looks_like_phone, looks_personal
+
+__all__ = ["MASK", "format_result", "looks_like_phone", "masked_preview"]
+
 LLM_PREVIEW_ROWS = 50
 MAX_CELL_CHARS = 80
-MASK = "***"
-_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[a-z]{2,}", re.IGNORECASE)
-_PHONE_CHARS = re.compile(r"^\+?[\d\s().-]+$")
-_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
-MIN_PHONE_DIGITS = 9
-
-
-def looks_like_phone(text: str) -> bool:
-    """Phone-shaped: only phone characters and ≥ 9 digits — but never an ISO date/time."""
-    s = text.strip()
-    if _ISO_DATE.match(s) or not _PHONE_CHARS.match(s):
-        return False
-    return sum(ch.isdigit() for ch in s) >= MIN_PHONE_DIGITS
 
 
 def _mask_cell(value: Any, pii_column: bool) -> Any:
@@ -31,7 +21,7 @@ def _mask_cell(value: Any, pii_column: bool) -> Any:
     if pii_column:
         return MASK
     if isinstance(value, str):
-        if _EMAIL.search(value) or looks_like_phone(value):
+        if looks_personal(value):
             return MASK
         return value if len(value) <= MAX_CELL_CHARS else value[: MAX_CELL_CHARS - 1] + "…"
     return value

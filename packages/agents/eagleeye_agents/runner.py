@@ -5,7 +5,7 @@ import logging
 import time
 from collections.abc import Callable
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import asyncpg
@@ -15,6 +15,7 @@ from eagleeye_events.names import CHAT_UPDATED, RUN_DONE, RUN_ERROR, RUN_STARTED
 from eagleeye_llm.gateway import LLMGateway
 
 from eagleeye_agents import persistence
+from eagleeye_agents.budgets import BudgetTracker
 from eagleeye_agents.context import AgentSettings, RetrieverPort, RunContext
 from eagleeye_agents.control import CancelToken
 from eagleeye_agents.errors import RunCancelledError
@@ -43,6 +44,10 @@ class RunnerDeps:
     model_ids: dict[str, str]
     gateway: Any = None  # sql.gateway_client.GatewayPort (None = SQL disabled)
     catalog: Any = None  # eagleeye_catalog.service.CatalogService
+    workspace: Any = None  # analysis.workspace.DataWorkspace (None = data files disabled)
+    executor: Any = None  # eagleeye_sandbox AnalysisExecutor (None = analysis disabled)
+    python_analysis: bool = True
+    sandbox_runs_per_hour: int = 60
 
 
 @dataclass(frozen=True)
@@ -65,6 +70,8 @@ def _parts(ctx: RunContext, outcome: Outcome) -> list[dict]:
     parts: list[dict] = [{"type": "text", "text": ctx.text.value}]
     if outcome.citations:
         parts.append({"type": "citations", "items": outcome.citations})
+    if ctx.charts:
+        parts.append({"type": "charts", "items": list(ctx.charts)})
     if ctx.artifacts:
         parts.append({"type": "artifacts", "items": [a.to_dict() for a in ctx.artifacts]})
     parts.append({"type": "steps", "items": [r.compact() for r in ctx.steps.records]})
@@ -165,7 +172,28 @@ def _build_context(deps: RunnerDeps, run: asyncpg.Record, sink: EventSink) -> Ru
         settings=deps.settings,
         gateway=deps.gateway,
         catalog=deps.catalog,
+        workspace=deps.workspace,
+        python_analysis=deps.python_analysis,
+        sandbox_runs_per_hour=deps.sandbox_runs_per_hour,
     )
+
+
+async def _enable_analysis(deps: RunnerDeps, ctx: RunContext) -> None:
+    """analyze_data only when the sandbox is reachable; such runs get the longer deadline."""
+    if deps.executor is None or deps.workspace is None:
+        return
+    try:
+        available = await deps.executor.available()
+    except Exception:
+        logger.warning("sandbox check failed; analysis disabled for %s", ctx.run_id, exc_info=True)
+        available = False
+    if not available:
+        return
+    ctx.executor = deps.executor
+    ctx.analysis_available = True
+    limits = replace(ctx.settings.limits, max_seconds=ctx.settings.analysis_max_seconds)
+    ctx.settings = replace(ctx.settings, limits=limits)
+    ctx.budget = BudgetTracker(limits)
 
 
 async def _enable_sql(deps: RunnerDeps, ctx: RunContext) -> None:
@@ -217,6 +245,7 @@ async def execute_run(
     try:
         await sink.emit(RUN_STARTED, {"run_id": run_id})
         await _enable_sql(deps, ctx)
+        await _enable_analysis(deps, ctx)
         question, history = await persistence.load_conversation(deps.pool, ctx.chat_id, run_id)
         doc_ids = [str(d) for d in (run["params"] or {}).get("doc_ids", [])]
         initial: RunState = {"question": question, "history": history, "doc_ids": doc_ids}

@@ -4,10 +4,11 @@ import { useState } from "react";
 
 interface SqlBlockProps {
   sql: string;
+  label?: string;
 }
 
-/** Collapsible, copyable SQL — what actually ran (regenerated and validated server-side). */
-export function SqlBlock({ sql }: SqlBlockProps) {
+/** Collapsible, copyable code — what actually ran (validated server-side). */
+export function SqlBlock({ sql, label = "SQL" }: SqlBlockProps) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -23,7 +24,7 @@ export function SqlBlock({ sql }: SqlBlockProps) {
       <summary className="flex cursor-pointer list-none items-center justify-between px-2.5 py-1.5 text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200">
         <span>
           <span className="mr-1 inline-block transition-transform group-open:rotate-90">▸</span>
-          SQL
+          {label}
         </span>
         <button
           type="button"

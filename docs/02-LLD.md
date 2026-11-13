@@ -53,8 +53,11 @@ Envelope for all JSON: `{ "success": bool, "data": T|null, "error": {code,messag
 | GET | `/v1/documents?scope=mine\|enterprise` | List with status |
 | GET/DELETE | `/v1/documents/{id}` | Detail (chunks preview) / delete (cascade chunks, S3) |
 | GET | `/v1/documents/{id}/chunks/{cid}` | Citation target (original text, page, bbox) |
-| GET | `/v1/datasets` | CSV/tabular datasets (user + enterprise) with profile |
-| GET | `/v1/datasets/{id}/profile` | EDA profile JSON |
+| POST | `/v1/datasets` | Upload a data file (`.csv`/`.tsv`/`.xlsx`, ≤ 25 MB; 415 other types, 409 duplicate) → enqueues `ingest.profile_dataset` |
+| GET | `/v1/datasets` | The caller's data files with status, row/column counts (Phase 5: personal only) |
+| GET | `/v1/datasets/{id}` | One data file with its EDA `profile` and `column_map` (owner-only, else 404) |
+| GET | `/v1/datasets/{id}/rows?offset=&limit=` | Paged rows (≤ 200; 409 while processing) |
+| DELETE | `/v1/datasets/{id}` | Delete row + Parquet (+ original when no sibling sheet uses it) |
 | GET | `/v1/sources` | Data sources the caller's role can use: granted tables with descriptions, `can_see_pii` |
 | GET | `/v1/artifacts/{id}?offset=&limit=` | Owner-only table artifact: columns, page of rows (≤ 200), `row_count`, `truncated`, `sql` (404 for others) |
 | GET | `/v1/artifacts/{id}/csv` | Owner-only CSV download (≤ 10,000 rows; cells starting `= + - @` prefixed with `'`) |
@@ -75,7 +78,8 @@ text.delta       {text}
 text.replace     {text}                       # output filter / citation cleanup replaced the answer
 citation         {n, document_id, chunk_id, title, page, heading_path, scope, snippet}
 chat.updated     {chat_id, title}
-artifact         {artifact_id, type: table, title, sql, columns, row_count, truncated, preview}  # Phase 4 (charts: Phase 5)
+artifact         {artifact_id, type: table, title, sql, mode: sql|duckdb|python, columns, row_count, truncated, preview}
+chart            {chart_id, title, spec (Vega-Lite, data inline, no colours), summary, source_id}  # Phase 5; part "charts"
 run.done         {message_id, status, degraded, cancelled, usage{in,out,cost}, warnings[]}  # e.g. "unverified_numbers"
 run.error        {code, user_message}         # after 200, errors are events
 ```
@@ -127,6 +131,8 @@ Chunks routed to: Qdrant (scope=enterprise) or Supabase pgvector (scope=personal
 Internal-only FastAPI service (not exposed through Nginx). `POST /execute {source_id, sql, user_ctx(signed), limits}` → re-validates SQL (never trusts caller), applies row-level grants, executes with read-only credentials, `statement_timeout`, `LIMIT` cap, streams results to Parquet in SeaweedFS/S3, returns schema + sample + row count. Auth: service-to-service via shared internal HMAC secret + short-lived signed context token (HMAC + exp, 30 s). Phase 2 replaces with SigV4 or service mesh mTLS.
 
 ## 6. Sandbox (see C6)
+**As built (Phase 5):** no analysis worker. The agent worker runs each task through `AnalysisExecutor` → `DockerExecutor` (`packages/sandbox`), one `docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 64 --memory 1g --memory-swap 1g --cpus 1` per execution, image `eagleeye-sandbox:1` (`infra/sandbox`). Supervisor tools: `list_datasets`, `get_dataset_profile`, `analyze_data(question, inputs[])` (nested analysis sub-agent), `make_chart(source_id, type, x, y|[y…], color?, aggregate?, sort?, top_n?, title)`. Message parts gain `{"type": "charts", "items": [...]}`.
+
 **Phase 1 (local):** Docker subprocess spawned by analysis-worker (`subprocess.run`, `--network none`, isolated temp directory bind-mount). Image: `python:3.12-slim` + DuckDB + pandas + numpy + scipy + scikit-learn-light. Limits: configurable via env (`SANDBOX_MEM_MB`, `SANDBOX_TIMEOUT_S`); output ≤ 20 MB inline else SeaweedFS.
 
 **Phase 2 (cloud):** Lambda container (same Python image). No VPC egress; IAM role scoped to `s3://…/sessions/{session_id}/*` via per-invocation STS session policy. Limits: 10 GB mem, 120–300 s, output ≤ 20 MB inline else S3.
