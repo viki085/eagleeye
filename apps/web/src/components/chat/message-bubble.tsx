@@ -5,7 +5,7 @@ import remarkGfm from "remark-gfm";
 
 import { CitationChips } from "@/components/chat/citation-chips";
 import { StepTree } from "@/components/chat/step-tree";
-import { ArtifactCard } from "@/components/data/artifact-card";
+import { ArtifactList } from "@/components/data/artifact-list";
 import type { ArtifactView, Citation } from "@/lib/api";
 import type { StepView } from "@/lib/run-fold";
 
@@ -95,14 +95,11 @@ export function MessageBubble({
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           {streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-neutral-400" />}
         </div>
-        {artifacts.map((a) => (
-          <ArtifactCard
-            key={a.artifact_id}
-            artifact={a}
-            onViewAll={(x) => onViewArtifact?.(x)}
-            onDownload={(x) => onDownloadArtifact?.(x)}
-          />
-        ))}
+        <ArtifactList
+          artifacts={artifacts}
+          onView={(x) => onViewArtifact?.(x)}
+          onDownload={(x) => onDownloadArtifact?.(x)}
+        />
         {onOpenCitation && <CitationChips citations={citations} onOpen={onOpenCitation} />}
         {!streaming && (
           <Notices status={status} degraded={degraded} replaced={replaced} warnings={warnings} />

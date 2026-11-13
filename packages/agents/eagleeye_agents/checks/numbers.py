@@ -8,6 +8,17 @@ from dataclasses import dataclass
 
 _CITATION = re.compile(r"\[\d{1,3}(?:\s*,\s*\d{1,3})*\]")
 _DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?\b")
+_MONTH = (
+    r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?"
+    r"|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
+)
+_DAY = r"\d{1,2}(?:st|nd|rd|th)?"
+# "November 13, 2026", "Nov 13th", "13 November 2026", "13th of Nov" — the day of a written
+# date is not a figure (regression: "November 13" was flagged as an unverified number)
+_WORD_DATE = re.compile(
+    rf"\b(?:{_MONTH}\s+{_DAY}(?:,?\s+\d{{4}})?|{_DAY}\s+(?:of\s+)?{_MONTH}(?:,?\s+\d{{4}})?)\b",
+    re.IGNORECASE,
+)
 _NUMBER = re.compile(
     r"(?<![\w.])([-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*"
     r"(%|percent\b|k\b|m\b|bn\b|b\b|thousand\b|million\b|billion\b)?",
@@ -28,7 +39,7 @@ class Figure:
 
 
 def extract_figures(text: str) -> list[Figure]:
-    clean = _DATE.sub(" ", _CITATION.sub(" ", text))
+    clean = _WORD_DATE.sub(" ", _DATE.sub(" ", _CITATION.sub(" ", text)))
     figures: list[Figure] = []
     for match in _NUMBER.finditer(clean):
         raw, unit = match.group(1), (match.group(2) or "").lower()

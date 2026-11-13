@@ -186,6 +186,10 @@ def test_router_sql_route_requires_availability() -> None:
         ("Top 5 categories in 2025.", [], []),
         ("Revenue was 9,999.", [1234.5], ["9,999"]),
         ("Shipped on 2026-01-02 with 3 parcels.", [], []),
+        ("As of November 13, 2026, 40 orders qualify.", [40.0], []),
+        ("Delivered 13th of Nov and 28 Sept 2026.", [], []),
+        ("Since Oct. 30th: 40 orders.", [40.0], []),
+        ("May 2026 revenue was 9,999.", [1234.5], ["9,999"]),  # month word alone ≠ date
     ],
 )
 def test_unverified_figures(answer: str, evidence: list[float], unverified: list[str]) -> None:
