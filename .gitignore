@@ -38,3 +38,6 @@ Thumbs.db
 tmp/
 Section 12 Complete Agent Design and Interview Playbook.pdf
 .playwright-mcp/
+
+# runtime logs from scripts/start-eagleeye.ps1
+logs/
