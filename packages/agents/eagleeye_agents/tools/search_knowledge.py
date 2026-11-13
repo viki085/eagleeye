@@ -39,7 +39,7 @@ class SearchKnowledgeTool:
     args_model = SearchArgs
     timeout_s = 20.0
 
-    async def run(self, args: BaseModel, ctx: "RunContext") -> ToolResult:
+    async def run(self, args: BaseModel, ctx: "RunContext", step_id: str = "") -> ToolResult:
         if not isinstance(args, SearchArgs):
             raise TypeError("search_knowledge expects SearchArgs")
         doc_ids: tuple[str, ...] | None = None

@@ -5,7 +5,16 @@ from dataclasses import dataclass
 from functools import lru_cache
 from importlib import resources
 
-PROMPT_NAMES = ("guard", "simple", "rag", "supervisor", "refusal", "unavailable")
+PROMPT_NAMES = (
+    "guard",
+    "simple",
+    "rag",
+    "supervisor",
+    "refusal",
+    "unavailable",
+    "sql_generate",
+    "sql_answer",
+)
 
 
 @dataclass(frozen=True)

@@ -2,12 +2,15 @@
 members = [
     "apps/agent-worker",
     "apps/api",
+    "apps/data-gateway",
     "apps/ingest-worker",
     "packages/agents",
+    "packages/catalog",
     "packages/core",
     "packages/events",
     "packages/llm",
     "packages/retrieval",
+    "packages/sqlsafe",
 ]
 
 [tool.ruff]

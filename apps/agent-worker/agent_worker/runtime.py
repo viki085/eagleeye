@@ -18,7 +18,11 @@ from eagleeye_agents.budgets import BudgetLimits
 from eagleeye_agents.context import AgentSettings
 from eagleeye_agents.prompts.loader import load_prompts
 from eagleeye_agents.runner import RunnerDeps, execute_run
+from eagleeye_agents.sql.gateway_client import HttpGateway
+from eagleeye_catalog.repo import CatalogRepo
+from eagleeye_catalog.service import CatalogService
 from eagleeye_core.config import Settings, get_settings
+from eagleeye_core.service_auth import resolve_secret
 from eagleeye_llm.embeddings import LiteLLMEmbedder
 from eagleeye_llm.litellm_adapter import LiteLLMGateway
 from eagleeye_retrieval.service import Retriever
@@ -66,10 +70,16 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         reasoning_capable=s.reasoning_effort_capable,
     )
     qdrant = AsyncQdrantClient(url=s.qdrant_url)
+    embedder = LiteLLMEmbedder(s.embed_model, s.embed_dim)
+    gateway, catalog = None, None
+    if s.enable_sql:
+        # The worker never holds warehouse credentials: it signs tokens and calls the gateway.
+        gateway = HttpGateway(s.gateway_url, resolve_secret(s.gateway_hmac_secret, s.app_env))
+        catalog = CatalogService(CatalogRepo(pool), embedder)
     retriever = Retriever(
         pool=pool,
         llm=llm,
-        embedder=LiteLLMEmbedder(s.embed_model, s.embed_dim),
+        embedder=embedder,
         enterprise_store=QdrantEnterpriseStore(qdrant, s.qdrant_collection, s.embed_dim),
         personal_store=PgVectorPersonalStore(pool),
         top_k=s.rag_top_k,
@@ -88,6 +98,8 @@ async def _build_deps(s: Settings) -> RunnerDeps:
             "reasoning_fast": s.reasoning_effort_fast,
             "reasoning_capable": s.reasoning_effort_capable,
         },
+        gateway=gateway,
+        catalog=catalog,
     )
 
 

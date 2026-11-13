@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 
+import { SourcesList } from "@/components/data/sources-list";
 import { DocumentRow } from "@/components/documents/document-row";
 import { UploadButton } from "@/components/documents/upload-button";
 import type { DocumentsState } from "@/hooks/use-documents";
+import type { ApiClient } from "@/lib/api";
 
 interface DocumentsPanelProps {
   state: DocumentsState;
   currentUserId: string | null;
+  api: ApiClient;
 }
 
-export function DocumentsPanel({ state, currentUserId }: DocumentsPanelProps) {
+export function DocumentsPanel({ state, currentUserId, api }: DocumentsPanelProps) {
   const [open, setOpen] = useState(true);
   const { documents, selectedIds, uploading, error } = state;
 
@@ -69,6 +72,7 @@ export function DocumentsPanel({ state, currentUserId }: DocumentsPanelProps) {
           <p className="px-2 py-4 text-xs text-neutral-400">No documents yet.</p>
         )}
       </ul>
+      <SourcesList api={api} />
     </aside>
   );
 }

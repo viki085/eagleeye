@@ -70,6 +70,21 @@ describe("foldEvent", () => {
     expect(view).toEqual(initialRun("r"));
   });
 
+  it("collects artifacts and run warnings", () => {
+    const artifact = {
+      artifact_id: "a1", type: "table", title: "Orders", sql: "SELECT 1", source: "acme",
+      columns: [{ name: "n", type: "int8" }], row_count: 1, truncated: false, preview: [[1]],
+      assumptions: "",
+    };
+    const view = foldAll("r", [
+      { event: "artifact", data: artifact },
+      { event: "artifact", data: { artifact_id: "bad" } },
+      { event: "run.done", data: { status: "SUCCEEDED", warnings: ["unverified_numbers", 3] } },
+    ]);
+    expect(view.artifacts.map((a) => a.artifact_id)).toEqual(["a1"]);
+    expect(view.warnings).toEqual(["unverified_numbers"]);
+  });
+
   it("never mutates the previous view", () => {
     const before = initialRun("r");
     const after = foldEvent(before, { event: "text.delta", data: { text: "x" } });

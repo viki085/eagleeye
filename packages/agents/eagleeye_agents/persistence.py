@@ -36,6 +36,13 @@ async def claim_run(
     return result.endswith("1")
 
 
+async def load_user_role(pool: asyncpg.Pool, user_id: str) -> str:
+    role = await pool.fetchval(
+        "SELECT role FROM users WHERE id = $1 AND status = 'active'", user_id
+    )
+    return str(role) if role else "member"
+
+
 async def heartbeat(pool: asyncpg.Pool, run_id: str) -> None:
     await pool.execute(
         "UPDATE runs SET heartbeat_at = now() WHERE id = $1 AND status = 'RUNNING'", run_id

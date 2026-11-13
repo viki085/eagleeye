@@ -80,13 +80,37 @@ async def _check_postgres() -> ServiceHealth:
             await conn.close()
 
 
+async def _check_gateway() -> list[ServiceHealth]:
+    """The gateway reports itself and pings each data source (the API holds no DB creds)."""
+    settings = get_settings()
+    if not settings.enable_sql:
+        return []
+    start = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=CHECK_TIMEOUT_S + 2) as client:
+            resp = await client.get(f"{settings.gateway_url}/health")
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as exc:
+        logger.warning("data gateway health check failed: %s", exc)
+        return [ServiceHealth("data-gateway", "down", detail=type(exc).__name__)]
+    checks = [ServiceHealth("data-gateway", "up", _ms(start))]
+    for name, status in (data.get("sources") or {}).items():
+        checks.append(ServiceHealth(f"source: {name}", "up" if status == "up" else "down",
+                                    detail=None if status == "up" else str(status)))
+    return checks
+
+
 def _ms(start: float) -> int:
     return int((time.perf_counter() - start) * 1000)
 
 
 async def check_all() -> list[ServiceHealth]:
-    return list(
-        await asyncio.gather(
-            _check_redis(), _check_qdrant(), _check_object_store(), _check_postgres()
-        )
+    core = await asyncio.gather(
+        _check_redis(), _check_qdrant(), _check_object_store(), _check_postgres(),
+        _check_gateway(),
     )
+    flat: list[ServiceHealth] = []
+    for item in core:
+        flat.extend(item if isinstance(item, list) else [item])
+    return flat

@@ -1,0 +1,173 @@
+# Curated catalog for the demo warehouse (C5 §2). Onboarding merges this with live
+# introspection: introspection supplies types/keys/row counts, this supplies meaning.
+# Tables not listed here are imported DISABLED until a data admin enables them.
+
+source:
+  name: acme_warehouse
+  description: Acme retail sales warehouse — customers, orders, products, shipments and returns (Nov 2024 – Oct 2026).
+  engine: postgres
+  dsn_env: WAREHOUSE_DSN
+  schemas: [sales, hr]
+  max_rows: 10000
+  timeout_s: 15
+
+grants:
+  member: {tables: null, pii: false}
+  knowledge_admin: {tables: null, pii: false}
+  data_admin: {tables: null, pii: true}
+  admin: {tables: null, pii: true}
+
+tables:
+  sales.regions:
+    enabled: true
+    sensitivity: public
+    description: Sales regions. Every customer belongs to exactly one region.
+    columns:
+      region_id: Region identifier.
+      name: Region name, e.g. 'North America', 'EMEA', 'UK & Ireland', 'Nordics', 'APAC'.
+      country: Headquarters country of the region.
+
+  sales.customers:
+    enabled: true
+    sensitivity: internal
+    description: One row per customer account. Segment is consumer, smb (small/medium business) or enterprise.
+    columns:
+      customer_id: Customer identifier.
+      name: Customer display name.
+      email: {description: Customer email address., pii: true}
+      phone: {description: Customer phone number., pii: true}
+      region_id: Region the customer belongs to.
+      segment: "Customer segment: 'consumer', 'smb' or 'enterprise'."
+      signup_date: Date the customer account was created.
+
+  sales.products:
+    enabled: true
+    sensitivity: public
+    description: Product catalogue with list prices. Category groups products, e.g. Laptops, Headphones.
+    columns:
+      product_id: Product identifier.
+      name: Product name.
+      category: "Product category: Laptops, Tablets, Headphones, Monitors, Accessories, Smart Home, Cameras, Printers."
+      unit_price: Current list price in EUR.
+
+  sales.orders:
+    enabled: true
+    sensitivity: internal
+    description: One row per customer order. Only status = 'completed' orders count as revenue.
+    columns:
+      order_id: Order identifier.
+      customer_id: Customer who placed the order.
+      order_date: Date the order was placed (2024-11-01 to 2026-10-31).
+      status: "Order status: 'completed', 'cancelled', 'refunded' or 'processing'."
+      channel: "Sales channel: 'web', 'store' or 'partner'."
+
+  sales.order_items:
+    enabled: true
+    sensitivity: internal
+    description: Line items of an order. Revenue of a line = quantity * unit_price (price paid, EUR).
+    columns:
+      order_id: Order the line belongs to.
+      product_id: Product sold.
+      quantity: Units sold on this line.
+      unit_price: Price per unit actually paid, in EUR.
+
+  sales.shipments:
+    enabled: true
+    sensitivity: internal
+    description: One shipment per completed or refunded order. On time = delivered within promised_days of shipping.
+    columns:
+      shipment_id: Shipment identifier.
+      order_id: Order shipped.
+      method: "Shipping method: 'standard' or 'express'."
+      promised_days: Days promised for delivery (express 1, standard 5).
+      shipped_at: Timestamp the parcel left the warehouse.
+      delivered_at: Timestamp the parcel was delivered (null if not yet delivered).
+
+  sales.returns:
+    enabled: true
+    sensitivity: internal
+    description: Returned order lines with the refund paid.
+    columns:
+      return_id: Return identifier.
+      order_id: Order the returned line came from.
+      product_id: Product returned.
+      reason: "Return reason: 'Defective', 'Changed mind', 'Wrong item', 'Arrived late', 'Not as described'."
+      refund_amount: Amount refunded in EUR.
+      returned_at: Date the return was received.
+
+  hr.salaries:
+    enabled: false
+    sensitivity: restricted
+    description: Employee salaries (restricted; not available to the assistant).
+
+metrics:
+  - name: net revenue
+    description: Revenue from completed orders, in EUR.
+    definition_sql: >-
+      SUM(oi.quantity * oi.unit_price) FROM sales.order_items oi
+      JOIN sales.orders o ON o.order_id = oi.order_id WHERE o.status = 'completed'
+  - name: average order value
+    description: Average revenue per completed order, in EUR.
+    definition_sql: >-
+      SUM(oi.quantity * oi.unit_price) / COUNT(DISTINCT o.order_id) over completed orders
+  - name: return rate
+    description: Share of completed-or-refunded order lines that were returned.
+    definition_sql: >-
+      COUNT(r.return_id)::numeric / COUNT(oi.*) joining order_items to returns on (order_id, product_id)
+  - name: on-time delivery rate
+    description: Share of delivered shipments that arrived within promised_days of shipping.
+    definition_sql: >-
+      AVG(CASE WHEN s.delivered_at <= s.shipped_at + s.promised_days * INTERVAL '1 day' THEN 1.0 ELSE 0 END)
+      FROM sales.shipments s WHERE s.delivered_at IS NOT NULL
+  - name: active customers
+    description: Customers with at least one completed order in the period.
+    definition_sql: COUNT(DISTINCT o.customer_id) FROM sales.orders o WHERE o.status = 'completed'
+
+examples:
+  - question: What was net revenue by month in 2025?
+    sql: |
+      SELECT date_trunc('month', o.order_date) AS month,
+             SUM(oi.quantity * oi.unit_price) AS net_revenue
+      FROM sales.orders o
+      JOIN sales.order_items oi ON oi.order_id = o.order_id
+      WHERE o.status = 'completed'
+        AND o.order_date >= DATE '2025-01-01' AND o.order_date < DATE '2026-01-01'
+      GROUP BY 1
+      ORDER BY 1
+  - question: Which 5 product categories had the most revenue?
+    sql: |
+      SELECT p.category, SUM(oi.quantity * oi.unit_price) AS net_revenue
+      FROM sales.order_items oi
+      JOIN sales.orders o ON o.order_id = oi.order_id
+      JOIN sales.products p ON p.product_id = oi.product_id
+      WHERE o.status = 'completed'
+      GROUP BY p.category
+      ORDER BY net_revenue DESC
+      LIMIT 5
+  - question: How many orders were placed per sales channel?
+    sql: |
+      SELECT o.channel, COUNT(*) AS orders
+      FROM sales.orders o
+      GROUP BY o.channel
+      ORDER BY orders DESC
+  - question: What is the on-time delivery rate by shipping method?
+    sql: |
+      SELECT s.method,
+             AVG(CASE WHEN s.delivered_at <= s.shipped_at + s.promised_days * INTERVAL '1 day'
+                      THEN 1.0 ELSE 0 END) AS on_time_rate
+      FROM sales.shipments s
+      WHERE s.delivered_at IS NOT NULL
+      GROUP BY s.method
+  - question: What are the most common return reasons?
+    sql: |
+      SELECT r.reason, COUNT(*) AS returns, SUM(r.refund_amount) AS refunded
+      FROM sales.returns r
+      GROUP BY r.reason
+      ORDER BY returns DESC
+  - question: How many customers does each region have, by segment?
+    sql: |
+      SELECT rg.name AS region, c.segment, COUNT(*) AS customers
+      FROM sales.customers c
+      JOIN sales.regions rg ON rg.region_id = c.region_id
+      GROUP BY rg.name, c.segment
+      ORDER BY rg.name, customers DESC

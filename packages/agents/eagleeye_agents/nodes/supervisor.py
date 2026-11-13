@@ -63,7 +63,7 @@ def wrap_tool_output(name: str, content: str) -> str:
 
 
 async def _invoke(
-    ctx: RunContext, registry: ToolRegistry, call: ToolCall
+    ctx: RunContext, registry: ToolRegistry, call: ToolCall, step_id: str
 ) -> tuple[ToolResult, str]:
     tool = registry.get(call.name)
     if tool is None:
@@ -79,7 +79,7 @@ async def _invoke(
     if verdict == LoopVerdict.REPEAT:
         return ToolResult(True, REPEAT_HINT, "repeated call"), verdict
     try:
-        return await asyncio.wait_for(tool.run(args, ctx), tool.timeout_s), verdict
+        return await asyncio.wait_for(tool.run(args, ctx, step_id), tool.timeout_s), verdict
     except TimeoutError:
         return error_result("timeout", f"{call.name} timed out"), verdict
     except Exception:
@@ -92,7 +92,7 @@ async def _run_call(
 ) -> tuple[ChatMessage, str]:
     async with ctx.steps.step("tool", call.name, call.arguments_json, parent) as step:
         if allowed:
-            result, verdict = await _invoke(ctx, registry, call)
+            result, verdict = await _invoke(ctx, registry, call, step.id)
         else:
             result, verdict = error_result("budget", "skipped: tool-call limit reached"), "ok"
             step.status = "skipped"

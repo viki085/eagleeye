@@ -66,6 +66,14 @@ class RunContext:
     text: TextChannel
     sources: SourceRegistry = field(default_factory=SourceRegistry)
     usage: UsageMeter = field(default_factory=UsageMeter)
+    # Phase 4 (text-to-SQL). `user_role` comes from the users table, never from model output.
+    gateway: Any = None  # sql.gateway_client.GatewayPort
+    catalog: Any = None  # eagleeye_catalog.service.CatalogService
+    user_role: str = "member"
+    sql_available: bool = False
+    artifacts: list[Any] = field(default_factory=list)  # sql.types.ArtifactRef, in run order
+    warnings: list[str] = field(default_factory=list)  # e.g. "unverified_numbers"
+    numeric_evidence: list[float] = field(default_factory=list)  # numbers the model was shown
     budget: BudgetTracker = field(init=False)
 
     def __post_init__(self) -> None:

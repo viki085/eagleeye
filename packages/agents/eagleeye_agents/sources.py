@@ -93,6 +93,9 @@ class SourceRegistry:
     def __len__(self) -> int:
         return len(self._chunks)
 
+    def texts(self) -> list[str]:
+        return [c.content for c in self._chunks.values()]
+
     def citations_for(self, answer: str) -> list[Citation]:
         out: list[Citation] = []
         for n in cited_numbers(answer, self.numbers):

@@ -58,7 +58,7 @@ def make_guard_node(ctx: RunContext) -> Node:
         question = state["question"]
         async with ctx.steps.step("guard", "safety & intent", question) as step:
             verdict, step.usage = await _verdict(ctx, state)
-            route = choose_route(verdict, bool(state.get("doc_ids")))
+            route = choose_route(verdict, bool(state.get("doc_ids")), ctx.sql_available)
             step.status = "error" if verdict.source == "error" else "ok"
             step.output_summary = f"{verdict.safe} · {verdict.intent} · {route}"
         await ctx.sink.emit(

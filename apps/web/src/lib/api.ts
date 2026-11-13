@@ -74,6 +74,50 @@ export interface Me {
   role: string;
 }
 
+export interface ArtifactColumn {
+  name: string;
+  type: string;
+}
+
+/** A query result shown under an answer (live `artifact` event or persisted part). */
+export interface ArtifactView {
+  artifact_id: string;
+  type: string;
+  title: string;
+  sql: string;
+  source: string;
+  columns: ArtifactColumn[];
+  row_count: number;
+  truncated: boolean;
+  preview: unknown[][];
+  assumptions: string;
+}
+
+export interface ArtifactPage {
+  id: string;
+  title: string;
+  sql: string;
+  columns: string[];
+  rows: unknown[][];
+  offset: number;
+  total: number;
+  truncated: boolean;
+}
+
+export interface DataSourceTable {
+  name: string;
+  description: string;
+  row_estimate: number | null;
+}
+
+export interface DataSource {
+  id: string;
+  name: string;
+  description: string;
+  can_see_pii: boolean;
+  tables: DataSourceTable[];
+}
+
 export interface DailyUsage {
   day: string; // ISO date
   cost_usd: number;
@@ -96,6 +140,7 @@ export interface MessagePart {
   status?: string;
   route?: string | null;
   degraded?: boolean;
+  warnings?: string[];
 }
 
 export interface ChatMessage {
@@ -192,6 +237,31 @@ export class ApiClient {
 
   cancelRun(runId: string): Promise<{ run_id: string; cancelled: boolean }> {
     return this.request(`/v1/runs/${runId}/cancel`, { method: "POST" });
+  }
+
+  listSources(): Promise<DataSource[]> {
+    return this.request<DataSource[]>("/v1/sources");
+  }
+
+  getArtifact(artifactId: string, offset: number, limit: number): Promise<ArtifactPage> {
+    return this.request<ArtifactPage>(
+      `/v1/artifacts/${artifactId}?offset=${offset}&limit=${limit}`,
+    );
+  }
+
+  /** Authenticated CSV download (a plain link can't carry the bearer token). */
+  async downloadArtifactCsv(artifactId: string, filename: string): Promise<void> {
+    const token = await this.getToken();
+    const resp = await fetch(`${API_URL}/v1/artifacts/${artifactId}/csv`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) throw new ApiError(`Download failed (${resp.status})`, resp.status);
+    const url = URL.createObjectURL(await resp.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename.replace(/[^A-Za-z0-9._-]+/g, "_") || "result"}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   getUsage(): Promise<UsageSummary> {

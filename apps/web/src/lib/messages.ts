@@ -1,4 +1,4 @@
-import type { ChatMessage, Citation } from "@/lib/api";
+import type { ArtifactView, ChatMessage, Citation } from "@/lib/api";
 import type { RunView, StepStatus, StepView } from "@/lib/run-fold";
 
 export interface UiMessage {
@@ -6,11 +6,13 @@ export interface UiMessage {
   role: "user" | "assistant";
   text: string;
   citations: readonly Citation[];
+  artifacts: readonly ArtifactView[];
   steps: readonly StepView[];
   status: string | null;
   route: string | null;
   degraded: boolean;
   replaced: boolean;
+  warnings: readonly string[];
 }
 
 interface PersistedStep {
@@ -44,11 +46,13 @@ export function userMessage(text: string): UiMessage {
     role: "user",
     text,
     citations: [],
+    artifacts: [],
     steps: [],
     status: null,
     route: null,
     degraded: false,
     replaced: false,
+    warnings: [],
   };
 }
 
@@ -58,17 +62,21 @@ export function fromRun(view: RunView): UiMessage {
     role: "assistant",
     text: view.text,
     citations: view.citations,
+    artifacts: view.artifacts,
     steps: view.steps,
     status: view.status,
     route: view.guard?.route ?? null,
     degraded: view.degraded,
     replaced: view.replaced,
+    warnings: view.warnings,
   };
 }
 
 export function toUiMessage(m: ChatMessage): UiMessage {
   const parts = m.parts.parts;
   const run = parts.find((p) => p.type === "run");
+  const itemsOf = (type: string): unknown[] =>
+    parts.filter((p) => p.type === type).flatMap((p) => p.items ?? []);
   return {
     key: m.id,
     role: m.role,
@@ -76,14 +84,13 @@ export function toUiMessage(m: ChatMessage): UiMessage {
       .filter((p) => p.type === "text")
       .map((p) => p.text ?? "")
       .join(""),
-    citations: parts.filter((p) => p.type === "citations").flatMap((p) => (p.items ?? []) as Citation[]),
-    steps: parts
-      .filter((p) => p.type === "steps")
-      .flatMap((p) => (p.items ?? []) as PersistedStep[])
-      .map(toStep),
+    citations: itemsOf("citations") as Citation[],
+    artifacts: itemsOf("artifacts") as ArtifactView[],
+    steps: (itemsOf("steps") as PersistedStep[]).map(toStep),
     status: typeof run?.status === "string" ? run.status : null,
     route: typeof run?.route === "string" ? run.route : null,
     degraded: run?.degraded === true,
     replaced: false,
+    warnings: Array.isArray(run?.warnings) ? run.warnings : [],
   };
 }

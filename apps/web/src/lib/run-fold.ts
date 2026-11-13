@@ -2,7 +2,7 @@
  * Pure fold of SSE run events into a view (LLD §2.3). The worker persists the same
  * shape (text, citations, steps, run status), so live and reloaded messages match.
  */
-import type { Citation } from "./api";
+import type { ArtifactView, Citation } from "./api";
 
 export type StepStatus = "running" | "ok" | "error" | "skipped";
 
@@ -28,6 +28,8 @@ export interface RunView {
   text: string;
   steps: readonly StepView[];
   citations: readonly Citation[];
+  artifacts: readonly ArtifactView[];
+  warnings: readonly string[];
   guard: GuardView | null;
   done: boolean;
   status: string | null;
@@ -53,6 +55,8 @@ export function initialRun(runId: string): RunView {
     text: "",
     steps: [],
     citations: [],
+    artifacts: [],
+    warnings: [],
     guard: null,
     done: false,
     status: null,
@@ -65,6 +69,15 @@ export function initialRun(runId: string): RunView {
 
 function isCitation(d: Data): boolean {
   return typeof d.n === "number" && typeof d.chunk_id === "string" && typeof d.document_id === "string";
+}
+
+function isArtifact(d: Data): boolean {
+  return (
+    typeof d.artifact_id === "string" &&
+    Array.isArray(d.columns) &&
+    Array.isArray(d.preview) &&
+    typeof d.row_count === "number"
+  );
 }
 
 function toStatus(v: unknown): StepStatus {
@@ -112,6 +125,10 @@ export function foldEvent(view: RunView, evt: RunEvent): RunView {
       return { ...view, text: str(d.text), replaced: true };
     case "citation":
       return isCitation(d) ? { ...view, citations: [...view.citations, d as unknown as Citation] } : view;
+    case "artifact":
+      return isArtifact(d)
+        ? { ...view, artifacts: [...view.artifacts, d as unknown as ArtifactView] }
+        : view;
     case "run.done":
       return {
         ...view,
@@ -119,6 +136,7 @@ export function foldEvent(view: RunView, evt: RunEvent): RunView {
         status: str(d.status, "SUCCEEDED"),
         degraded: d.degraded === true,
         cancelled: d.cancelled === true,
+        warnings: Array.isArray(d.warnings) ? d.warnings.filter((w) => typeof w === "string") : [],
       };
     case "run.error":
       return { ...view, done: true, status: "FAILED", error: str(d.user_message, "The run failed.") };

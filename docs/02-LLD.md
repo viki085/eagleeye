@@ -55,8 +55,9 @@ Envelope for all JSON: `{ "success": bool, "data": T|null, "error": {code,messag
 | GET | `/v1/documents/{id}/chunks/{cid}` | Citation target (original text, page, bbox) |
 | GET | `/v1/datasets` | CSV/tabular datasets (user + enterprise) with profile |
 | GET | `/v1/datasets/{id}/profile` | EDA profile JSON |
-| GET | `/v1/sources` | Data sources visible to the user (names/descriptions only) |
-| GET | `/v1/artifacts/{id}` | Table/chart artifact (signed URL for large) |
+| GET | `/v1/sources` | Data sources the caller's role can use: granted tables with descriptions, `can_see_pii` |
+| GET | `/v1/artifacts/{id}?offset=&limit=` | Owner-only table artifact: columns, page of rows (≤ 200), `row_count`, `truncated`, `sql` (404 for others) |
+| GET | `/v1/artifacts/{id}/csv` | Owner-only CSV download (≤ 10,000 rows; cells starting `= + - @` prefixed with `'`) |
 | POST | `/v1/messages/{id}/feedback` | Thumbs + comment |
 | GET/PUT/DELETE | `/v1/me/facts` | User facts (view/edit/delete) |
 | — | `/v1/admin/...` | Sources, catalog descriptions, enterprise docs & ACLs, usage, audit, kill switches (role=admin) |
@@ -74,8 +75,8 @@ text.delta       {text}
 text.replace     {text}                       # output filter / citation cleanup replaced the answer
 citation         {n, document_id, chunk_id, title, page, heading_path, scope, snippet}
 chat.updated     {chat_id, title}
-artifact         {artifact_id, type: table|chart|profile, title, preview?}   # Phase 4–5
-run.done         {message_id, status, degraded, cancelled, usage{in,out,cost}}
+artifact         {artifact_id, type: table, title, sql, columns, row_count, truncated, preview}  # Phase 4 (charts: Phase 5)
+run.done         {message_id, status, degraded, cancelled, usage{in,out,cost}, warnings[]}  # e.g. "unverified_numbers"
 run.error        {code, user_message}         # after 200, errors are events
 ```
 Names live in `packages/events/eagleeye_events/names.py`; the web fold is `apps/web/src/lib/run-fold.ts`.
@@ -121,6 +122,8 @@ Tabular files: `UPLOADED → PROFILING → READY` (Parquet conversion in Seaweed
 Chunks routed to: Qdrant (scope=enterprise) or Supabase pgvector (scope=personal).
 
 ## 5. Data Gateway (see C5)
+**As built (Phase 4):** `apps/data-gateway` on :8100, `POST /execute {source_id, sql, title}` + header `X-Context-Token` (HMAC `{user_id, source_id, run_id, exp}`), `GET /health`. Persisted message part `{"type": "artifacts", "items": [...]}`; the run part carries `warnings`. Supervisor tools: `query_database(question, source?)` (nested SQL sub-agent) and `list_data_sources`, registered only when `ENABLE_SQL` and the user has a grant.
+
 Internal-only FastAPI service (not exposed through Nginx). `POST /execute {source_id, sql, user_ctx(signed), limits}` → re-validates SQL (never trusts caller), applies row-level grants, executes with read-only credentials, `statement_timeout`, `LIMIT` cap, streams results to Parquet in SeaweedFS/S3, returns schema + sample + row count. Auth: service-to-service via shared internal HMAC secret + short-lived signed context token (HMAC + exp, 30 s). Phase 2 replaces with SigV4 or service mesh mTLS.
 
 ## 6. Sandbox (see C6)

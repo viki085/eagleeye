@@ -5,7 +5,8 @@ import remarkGfm from "remark-gfm";
 
 import { CitationChips } from "@/components/chat/citation-chips";
 import { StepTree } from "@/components/chat/step-tree";
-import type { Citation } from "@/lib/api";
+import { ArtifactCard } from "@/components/data/artifact-card";
+import type { ArtifactView, Citation } from "@/lib/api";
 import type { StepView } from "@/lib/run-fold";
 
 interface MessageBubbleProps {
@@ -13,12 +14,16 @@ interface MessageBubbleProps {
   text: string;
   streaming?: boolean;
   citations?: readonly Citation[];
+  artifacts?: readonly ArtifactView[];
   steps?: readonly StepView[];
   status?: string | null;
   route?: string | null;
   degraded?: boolean;
   replaced?: boolean;
+  warnings?: readonly string[];
   onOpenCitation?: (citation: Citation) => void;
+  onViewArtifact?: (artifact: ArtifactView) => void;
+  onDownloadArtifact?: (artifact: ArtifactView) => void;
 }
 
 function Notice({ tone, children }: { tone: "warn" | "muted"; children: React.ReactNode }) {
@@ -29,9 +34,19 @@ function Notice({ tone, children }: { tone: "warn" | "muted"; children: React.Re
   return <div className={`mt-2 rounded-md border px-2.5 py-1 text-xs ${cls}`}>{children}</div>;
 }
 
-function Notices({ status, degraded, replaced }: Pick<MessageBubbleProps, "status" | "degraded" | "replaced">) {
+function Notices({
+  status,
+  degraded,
+  replaced,
+  warnings = [],
+}: Pick<MessageBubbleProps, "status" | "degraded" | "replaced" | "warnings">) {
   return (
     <>
+      {warnings.includes("unverified_numbers") && (
+        <Notice tone="warn">
+          Some figures in this answer couldn&apos;t be matched to the query results — check them against the table.
+        </Notice>
+      )}
       {status === "BUDGET_EXCEEDED" && (
         <Notice tone="warn">Reached the work limit — this answer may be incomplete.</Notice>
       )}
@@ -47,12 +62,16 @@ export function MessageBubble({
   text,
   streaming = false,
   citations = [],
+  artifacts = [],
   steps = [],
   status = null,
   route = null,
   degraded = false,
   replaced = false,
+  warnings = [],
   onOpenCitation,
+  onViewArtifact,
+  onDownloadArtifact,
 }: MessageBubbleProps) {
   if (role === "user") {
     return (
@@ -76,8 +95,18 @@ export function MessageBubble({
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           {streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-neutral-400" />}
         </div>
+        {artifacts.map((a) => (
+          <ArtifactCard
+            key={a.artifact_id}
+            artifact={a}
+            onViewAll={(x) => onViewArtifact?.(x)}
+            onDownload={(x) => onDownloadArtifact?.(x)}
+          />
+        ))}
         {onOpenCitation && <CitationChips citations={citations} onOpen={onOpenCitation} />}
-        {!streaming && <Notices status={status} degraded={degraded} replaced={replaced} />}
+        {!streaming && (
+          <Notices status={status} degraded={degraded} replaced={replaced} warnings={warnings} />
+        )}
       </div>
     </div>
   );

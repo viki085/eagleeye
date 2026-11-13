@@ -6,12 +6,13 @@ import { Composer } from "@/components/chat/composer";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
 import { SourceDrawer } from "@/components/chat/source-drawer";
+import { ArtifactModal } from "@/components/data/artifact-modal";
 import { DocumentsPanel } from "@/components/documents/documents-panel";
 import { UsagePanel } from "@/components/usage/usage-panel";
 import { useApi } from "@/hooks/use-api";
 import { useDocuments } from "@/hooks/use-documents";
 import { useUsage } from "@/hooks/use-usage";
-import { ApiError, type ChatSummary, type Citation } from "@/lib/api";
+import { ApiError, type ArtifactView, type ChatSummary, type Citation } from "@/lib/api";
 import { fromRun, toUiMessage, userMessage, type UiMessage } from "@/lib/messages";
 import { foldEvent, initialRun, type RunView } from "@/lib/run-fold";
 import { consumeSse } from "@/lib/sse";
@@ -27,6 +28,15 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [stream, setStream] = useState<RunView | null>(null);
   const [openCitation, setOpenCitation] = useState<Citation | null>(null);
+  const [openArtifact, setOpenArtifact] = useState<ArtifactView | null>(null);
+  const downloadArtifact = useCallback(
+    (a: ArtifactView) => {
+      api.downloadArtifactCsv(a.artifact_id, a.title).catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Download failed");
+      });
+    },
+    [api],
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -182,6 +192,7 @@ export default function ChatPage() {
 
   const selectedCount = docs.selectedIds.length;
   const closeDrawer = useCallback(() => setOpenCitation(null), []);
+  const closeArtifact = useCallback(() => setOpenArtifact(null), []);
 
   return (
     <div className="flex h-screen">
@@ -216,7 +227,11 @@ export default function ChatPage() {
                 route={m.route}
                 degraded={m.degraded}
                 replaced={m.replaced}
+                artifacts={m.artifacts}
+                warnings={m.warnings}
                 onOpenCitation={setOpenCitation}
+                onViewArtifact={setOpenArtifact}
+                onDownloadArtifact={downloadArtifact}
               />
             ))}
             {stream !== null && (
@@ -224,7 +239,10 @@ export default function ChatPage() {
                 role="assistant"
                 text={stream.text}
                 steps={stream.steps}
+                artifacts={stream.artifacts}
                 route={stream.guard?.route ?? null}
+                onViewArtifact={setOpenArtifact}
+                onDownloadArtifact={downloadArtifact}
                 streaming
               />
             )}
@@ -247,8 +265,14 @@ export default function ChatPage() {
           }
         />
       </main>
-      <DocumentsPanel state={docs} currentUserId={me} />
+      <DocumentsPanel state={docs} currentUserId={me} api={api} />
       <SourceDrawer api={api} citation={openCitation} onClose={closeDrawer} />
+      <ArtifactModal
+        api={api}
+        artifact={openArtifact}
+        onClose={closeArtifact}
+        onDownload={downloadArtifact}
+      />
     </div>
   );
 }

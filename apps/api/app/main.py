@@ -2,8 +2,10 @@ import logging
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
+from eagleeye_catalog.repo import CatalogRepo
+from eagleeye_catalog.service import CatalogService
 from eagleeye_core.config import get_settings
-from eagleeye_core.storage import build_object_store
+from eagleeye_core.storage import S3ObjectStore, build_object_store
 from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +13,7 @@ from qdrant_client import AsyncQdrantClient
 
 from app.db import create_pool
 from app.errors import install_error_handlers
-from app.routers import chats, documents, health, me, runs
+from app.routers import artifacts, chats, documents, health, me, runs, sources
 from app.services.task_queue import CeleryTaskQueue
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -48,6 +50,12 @@ async def lifespan(app: FastAPI):
     state.enterprise_store = QdrantEnterpriseStore(
         state.qdrant, settings.qdrant_collection, settings.embed_dim
     )
+    # Phase 4: catalog metadata (no warehouse credentials here) + result-table reader
+    state.catalog = CatalogService(CatalogRepo(state.pool))
+    state.artifact_store = S3ObjectStore(
+        settings.s3_endpoint_url, settings.s3_access_key, settings.s3_secret_key,
+        settings.artifacts_bucket,
+    )
     await _prepare_storage(app)
     try:
         yield
@@ -67,7 +75,10 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "Last-Event-ID"],
     )
     install_error_handlers(app)
-    for router in (health.router, me.router, chats.router, runs.router, documents.router):
+    for router in (
+        health.router, me.router, chats.router, runs.router, documents.router,
+        sources.router, artifacts.router,
+    ):
         app.include_router(router, prefix="/v1")
     return app
 

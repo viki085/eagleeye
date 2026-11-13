@@ -8,7 +8,10 @@ dependencies = [
     "eagleeye-llm",
     "eagleeye-retrieval",
     "eagleeye-events",
+    "eagleeye-sqlsafe",
+    "eagleeye-catalog",
     "asyncpg>=0.30",
+    "httpx>=0.28",
     "langgraph>=0.2.60",
     "pydantic>=2.9",
 ]
@@ -25,6 +28,8 @@ eagleeye-core = { workspace = true }
 eagleeye-llm = { workspace = true }
 eagleeye-retrieval = { workspace = true }
 eagleeye-events = { workspace = true }
+eagleeye-sqlsafe = { workspace = true }
+eagleeye-catalog = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

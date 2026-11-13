@@ -68,5 +68,47 @@ Golden set of ≥ 100 question→SQL→expected result pairs per source; metrics
 ## 8. Performance targets
 Catalog retrieval < 150 ms; SQL generation p50 < 3 s (capable-class); validation < 20 ms; query execution budget 15 s; end-to-end p50 < 10 s for typical questions.
 
+## As built (Phase 4, 2026-11-13)
+
+What runs today, and where it departs from the design above (ADR-30):
+
+- **Demo warehouse**: `infra/warehouse/` (Postgres 16 on :5433) with schemas `sales` (regions, customers, products, orders, order_items, shipments, returns) and `hr.salaries`, which exists only to show that access is denied. The seed is deterministic (`setseed(0.42)`). The role `eagleeye_ro` has SELECT on `sales` only, with `default_transaction_read_only` and `statement_timeout=15s`.
+- **Grants by role, not group**: `source_grants(data_source_id, role, allowed_tables, can_see_pii)`. In the seed, `member` gets `sales.*` without PII, while `data_admin` and `admin` get `sales.*` with PII. `hr.salaries` is disabled. `row_filter_sql` is not implemented.
+- **Defence in depth** (each layer works without the others):
+  1. Grants filter the catalog before it is ranked, so the model never sees ungranted tables.
+  2. The worker runs `sqlsafe` as a convenience check.
+  3. The gateway runs `sqlsafe` again with a policy it builds itself, from the user's role read from `users`, never taken from the caller. This check is the real control.
+  4. The database role is read-only and has no grant on `hr`.
+- **sqlsafe** (`packages/sqlsafe`) works on the sqlglot AST:
+  - It accepts a single SELECT or set operation and rejects forbidden nodes.
+  - It allows only tables in the policy. Unknown and ungranted tables get the same message.
+  - It qualifies columns and expands `*`.
+  - It blocks PII columns unless the role may see them.
+  - Function policy: typed functions are allowed except a deny-list of identity and version functions; unknown functions are denied unless allow-listed.
+  - It rejects joins without ON/USING, injects or lowers the LIMIT, and regenerates the SQL with `comments=False`.
+- **Gateway** (`apps/data-gateway`, :8100):
+  - Requires a 30 s HMAC context token `{user_id, source_id, run_id}`.
+  - Checks the plan with EXPLAIN (`SQL_EXPLAIN_MAX_ROWS`).
+  - Runs queries in a `READ ONLY` transaction with `SET LOCAL statement_timeout` and a semaphore per source.
+  - Fetches `max_rows + 1` rows to detect truncation.
+  - Writes results as a Parquet artifact in `ARTIFACTS_BUCKET` and logs every statement, including rejections, to `sql_query_log`.
+  - Returns errors as `{code, user_safe_error, retryable}`, so database errors reach the agent for self-correction and driver details stay inside the gateway.
+- **SQL agent**: a nested sub-agent behind the `query_database` tool, plus a direct `sql` route for simple data questions.
+  - Limits: at most 4 generations and 3 executions.
+  - Validation and database errors are fed back to the model. Zero rows gets one retry hint.
+  - Outcomes are `ok`, `clarify`, `unavailable` (for example salary data or write requests) and `failed`.
+  - The model sees at most 50 rows, with PII masked by column flag and by email/phone pattern. The UI shows the real values to roles that may see PII.
+- **Numeric grounding check**: figures in the answer that appear in neither the results nor the retrieved passages nor the question raise an `unverified_numbers` warning, shown as a UI notice. There is no regeneration.
+- **UI**: an artifact card with the title, row count, a collapsible SQL block and the first 10 rows. "View all" opens a paged modal (`GET /v1/artifacts/{id}`), and there is a CSV export (`/csv`) with formula escaping. A "Data sources" list sits in the right panel.
+
+**Evaluation** (`evals/sql_eval.py`, 25 answerable questions and 5 that must be refused, run 2026-11-13):
+
+| Model (SQL generation) | Execution accuracy | Refusals | Cost (30 q) | p50 latency |
+|---|---|---|---|---|
+| gpt-6.1-terra | 25/25 | 5/5 | $0.068 | 2.8 s |
+| gpt-6-luna | 25/25 | 5/5 | $0.0068 | 2.4 s |
+
+No question needed a self-correction, so only unit tests (`packages/agents/tests/test_sql_agent.py`) cover the retry loop. The golden set is small and drawn from one schema, so it needs expanding to 100 or more questions (Phase 6) before it can gate releases.
+
 ## 9. Open questions
 D3: which DB engines and where do they live (network path)? Are there read replicas? Existing data dictionaries/BI semantic layers (dbt, LookML) we can import to bootstrap the catalog? Per-user row-level entitlements?

@@ -24,7 +24,9 @@ class Tool(Protocol):
     args_model: type[BaseModel]
     timeout_s: float
 
-    async def run(self, args: BaseModel, ctx: "RunContext") -> ToolResult: ...
+    async def run(self, args: BaseModel, ctx: "RunContext", step_id: str) -> ToolResult:
+        """`step_id` lets a tool nest its own sub-steps under the tool call in the UI."""
+        ...
 
 
 def spec_of(tool: Tool) -> ToolSpec:

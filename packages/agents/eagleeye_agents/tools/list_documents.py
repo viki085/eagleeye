@@ -19,7 +19,7 @@ class ListDocumentsTool:
     args_model = NoArgs
     timeout_s = 10.0
 
-    async def run(self, args: BaseModel, ctx: "RunContext") -> ToolResult:
+    async def run(self, args: BaseModel, ctx: "RunContext", step_id: str = "") -> ToolResult:
         docs = await ctx.store.visible_ready_documents(ctx.user_id)
         if not docs:
             return ToolResult(True, "The user has no documents yet.", "0 documents")

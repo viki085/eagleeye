@@ -13,7 +13,8 @@ async def health() -> dict:
     """Liveness + dependency readiness: reports each infra service's status."""
     results: list[ServiceHealth] = await check_all()
     overall = all(s.status == "up" for s in results)
-    return ok({"overall": "up" if overall else "degraded", "services": [s.__dict__ for s in results]})
+    services = [s.__dict__ for s in results]
+    return ok({"overall": "up" if overall else "degraded", "services": services})
 
 
 @router.get("/health/live")

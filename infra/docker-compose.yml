@@ -51,7 +51,27 @@ services:
       timeout: 3s
       retries: 20
 
+  # Demo "enterprise warehouse" for text-to-SQL (Phase 4). Only the data gateway
+  # connects to it, with the read-only role created by 03_roles.sql.
+  warehouse:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: warehouse
+      POSTGRES_USER: warehouse_admin
+      POSTGRES_PASSWORD: warehouse-local-admin # local demo only
+    ports:
+      - "5433:5432"
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+      - ./warehouse:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_admin -d warehouse"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   redis-data:
   qdrant-data:
   seaweed-data:
+  warehouse-data:

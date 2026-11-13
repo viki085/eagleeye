@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     agent_max_cost_usd: float = 0.25
     agent_max_seconds: int = 120
     max_active_runs_per_user: int = 2
+
+    # Phase 4: text-to-SQL. WAREHOUSE_DSN is read ONLY by the data gateway (and onboarding CLI).
+    enable_sql: bool = True
+    warehouse_dsn: str = "postgresql://eagleeye_ro:eagleeye-ro-local@127.0.0.1:5433/warehouse"
+    gateway_url: str = "http://127.0.0.1:8100"
+    gateway_hmac_secret: str = ""  # required outside APP_ENV=local
+    artifacts_bucket: str = "eagleeye-local-artifacts"
+    sql_explain_max_rows: int = 5_000_000  # EXPLAIN estimate above this → rejected
+    sql_max_concurrency: int = 4  # per source, in the gateway
     usage_limit_usd: float = 500.0  # lifetime LLM spend cap per user; new runs refused beyond it
 
     clerk_secret_key: str = ""

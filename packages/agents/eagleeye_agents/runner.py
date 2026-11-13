@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
+from typing import Any
 
 import asyncpg
 import redis.asyncio as aioredis
@@ -40,6 +41,8 @@ class RunnerDeps:
     settings: AgentSettings
     prompts: Prompts
     model_ids: dict[str, str]
+    gateway: Any = None  # sql.gateway_client.GatewayPort (None = SQL disabled)
+    catalog: Any = None  # eagleeye_catalog.service.CatalogService
 
 
 @dataclass(frozen=True)
@@ -62,6 +65,8 @@ def _parts(ctx: RunContext, outcome: Outcome) -> list[dict]:
     parts: list[dict] = [{"type": "text", "text": ctx.text.value}]
     if outcome.citations:
         parts.append({"type": "citations", "items": outcome.citations})
+    if ctx.artifacts:
+        parts.append({"type": "artifacts", "items": [a.to_dict() for a in ctx.artifacts]})
     parts.append({"type": "steps", "items": [r.compact() for r in ctx.steps.records]})
     parts.append(
         {
@@ -69,6 +74,7 @@ def _parts(ctx: RunContext, outcome: Outcome) -> list[dict]:
             "status": outcome.status,
             "route": outcome.route,
             "degraded": ctx.usage.degraded,
+            "warnings": list(dict.fromkeys(ctx.warnings)),
         }
     )
     return parts
@@ -157,7 +163,21 @@ def _build_context(deps: RunnerDeps, run: asyncpg.Record, sink: EventSink) -> Ru
         cancel=CancelToken(cancel_requested),
         prompts=deps.prompts,
         settings=deps.settings,
+        gateway=deps.gateway,
+        catalog=deps.catalog,
     )
+
+
+async def _enable_sql(deps: RunnerDeps, ctx: RunContext) -> None:
+    """Role from the users table (never the model); SQL tools only if a source is reachable."""
+    if deps.gateway is None or deps.catalog is None:
+        return
+    ctx.user_role = await persistence.load_user_role(deps.pool, ctx.user_id)
+    try:
+        ctx.sql_available = bool(await deps.catalog.accessible_sources(ctx.user_role))
+    except Exception:
+        logger.warning("catalog unavailable; SQL disabled for run %s", ctx.run_id, exc_info=True)
+        ctx.sql_available = False
 
 
 async def _fail(
@@ -196,6 +216,7 @@ async def execute_run(
     beat = asyncio.create_task(_heartbeat_loop(deps.pool, run_id))
     try:
         await sink.emit(RUN_STARTED, {"run_id": run_id})
+        await _enable_sql(deps, ctx)
         question, history = await persistence.load_conversation(deps.pool, ctx.chat_id, run_id)
         doc_ids = [str(d) for d in (run["params"] or {}).get("doc_ids", [])]
         initial: RunState = {"question": question, "history": history, "doc_ids": doc_ids}
@@ -214,6 +235,7 @@ async def execute_run(
                 "status": outcome.status,
                 "degraded": ctx.usage.degraded,
                 "cancelled": outcome.cancelled,
+                "warnings": list(dict.fromkeys(ctx.warnings)),
                 "usage": {
                     "in": ctx.usage.tokens_in,
                     "out": ctx.usage.tokens_out,

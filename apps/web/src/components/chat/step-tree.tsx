@@ -34,17 +34,22 @@ function StepRow({ step, all, depth }: { step: StepView; all: readonly StepView[
   const children = all.filter((s) => s.parentId === step.id);
   return (
     <li>
-      <div className="flex items-baseline gap-2 py-0.5" style={{ paddingLeft: `${depth * 16}px` }}>
+      <div className="flex min-w-0 items-baseline gap-2 py-0.5" style={{ paddingLeft: `${depth * 16}px` }}>
         <span aria-hidden className="w-4 shrink-0 text-center text-neutral-400">
           {KIND_ICON[step.kind] ?? "•"}
         </span>
-        <span className="font-medium text-neutral-700 dark:text-neutral-300">{step.name}</span>
+        <span className="shrink-0 whitespace-nowrap font-medium text-neutral-700 dark:text-neutral-300">
+          {step.name}
+        </span>
         {step.inputSummary && step.kind === "tool" && (
-          <code className="truncate text-[11px] text-neutral-400" title={step.inputSummary}>
+          <code className="min-w-0 truncate text-[11px] text-neutral-400" title={step.inputSummary}>
             {step.inputSummary}
           </code>
         )}
-        <span className={`ml-auto shrink-0 ${STATUS_CLASS[step.status]}`}>
+        <span
+          className={`ml-auto min-w-0 max-w-[55%] truncate ${STATUS_CLASS[step.status]}`}
+          title={step.outputSummary}
+        >
           {step.status === "running" ? "running…" : step.outputSummary || step.status}
         </span>
         <span className="w-14 shrink-0 text-right tabular-nums text-neutral-400">{formatMs(step.durationMs)}</span>
