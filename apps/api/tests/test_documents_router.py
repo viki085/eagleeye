@@ -58,12 +58,22 @@ class FakeDocs:
     async def insert_document(self, pool, **kw):  # noqa: ANN001
         now = datetime.now(UTC)
         row = {
-            "id": kw["doc_id"], "scope": kw["scope"], "uploaded_by": kw["user_id"],
+            "id": kw["doc_id"],
+            "scope": kw["scope"],
+            "uploaded_by": kw["user_id"],
             "owner_id": kw["user_id"] if kw["scope"] == "personal" else None,
-            "title": kw["title"], "filename": kw["filename"], "mime": kw["mime"],
-            "size_bytes": kw["size_bytes"], "sha256": kw["sha256"], "s3_key": kw["s3_key"],
-            "status": "UPLOADING", "error": None, "page_count": None, "chunk_count": None,
-            "created_at": now, "updated_at": now,
+            "title": kw["title"],
+            "filename": kw["filename"],
+            "mime": kw["mime"],
+            "size_bytes": kw["size_bytes"],
+            "sha256": kw["sha256"],
+            "s3_key": kw["s3_key"],
+            "status": "UPLOADING",
+            "error": None,
+            "page_count": None,
+            "chunk_count": None,
+            "created_at": now,
+            "updated_at": now,
         }
         self.rows[row["id"]] = row
         return row
@@ -75,7 +85,9 @@ class FakeDocs:
         return None
 
     async def list_visible(self, pool, user_id):  # noqa: ANN001
-        return [r for r in self.rows.values() if r["scope"] == "enterprise" or r["owner_id"] == user_id]
+        return [
+            r for r in self.rows.values() if r["scope"] == "enterprise" or r["owner_id"] == user_id
+        ]
 
     async def delete_document(self, pool, doc_id):  # noqa: ANN001
         self.rows.pop(doc_id, None)
@@ -90,8 +102,15 @@ class FakeDocs:
 @pytest.fixture
 def env(monkeypatch: pytest.MonkeyPatch) -> dict:
     fake = FakeDocs()
-    for name in ("find_duplicate", "insert_document", "get_visible", "list_visible",
-                 "delete_document", "mark_failed", "get_visible_chunk"):
+    for name in (
+        "find_duplicate",
+        "insert_document",
+        "get_visible",
+        "list_visible",
+        "delete_document",
+        "mark_failed",
+        "get_visible_chunk",
+    ):
         monkeypatch.setattr(docs_repo, name, getattr(fake, name))
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: ME
@@ -102,8 +121,12 @@ def env(monkeypatch: pytest.MonkeyPatch) -> dict:
     return {"client": TestClient(app), "docs": fake, "state": app.state}
 
 
-def _upload(client: TestClient, name: str = "policy.txt", data: bytes = b"hello", scope: str = "personal"):  # noqa: ANN202, E501
-    return client.post("/v1/documents", files={"file": (name, data, "text/plain")}, data={"scope": scope})
+def _upload(
+    client: TestClient, name: str = "policy.txt", data: bytes = b"hello", scope: str = "personal"
+):  # noqa: ANN202, E501
+    return client.post(
+        "/v1/documents", files={"file": (name, data, "text/plain")}, data={"scope": scope}
+    )
 
 
 def test_upload_stores_and_enqueues(env: dict) -> None:
@@ -161,7 +184,11 @@ def _as(env: dict, role: str) -> None:
     )
 
 
-def test_me_reports_enterprise_permission(env: dict) -> None:
+def test_me_reports_enterprise_permission(env: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def no_row(pool, user_id):  # noqa: ANN001, ANN202 - fall back to the request's user
+        return None
+
+    monkeypatch.setattr("app.routers.me.fresh_role", no_row)
     assert env["client"].get("/v1/me").json()["data"]["can_manage_enterprise"] is False
     _as(env, "knowledge_admin")
     assert env["client"].get("/v1/me").json()["data"]["can_manage_enterprise"] is True
@@ -176,8 +203,14 @@ def test_storage_failure_marks_failed_and_502(env: dict) -> None:
 
 def test_other_users_personal_doc_is_404(env: dict) -> None:
     doc_id = str(uuid.uuid4())
-    env["docs"].rows[doc_id] = {"id": doc_id, "scope": "personal", "owner_id": OTHER_ID,
-                                "uploaded_by": OTHER_ID, "s3_key": "k", "sha256": "s"}
+    env["docs"].rows[doc_id] = {
+        "id": doc_id,
+        "scope": "personal",
+        "owner_id": OTHER_ID,
+        "uploaded_by": OTHER_ID,
+        "s3_key": "k",
+        "sha256": "s",
+    }
     assert env["client"].get(f"/v1/documents/{doc_id}").status_code == 404
     assert env["client"].delete(f"/v1/documents/{doc_id}").status_code == 404
 
@@ -185,8 +218,14 @@ def test_other_users_personal_doc_is_404(env: dict) -> None:
 @pytest.mark.parametrize("uploaded_by", [OTHER_ID, ME.id])
 def test_member_cannot_delete_enterprise_docs_even_their_own(env: dict, uploaded_by: str) -> None:
     doc_id = str(uuid.uuid4())
-    env["docs"].rows[doc_id] = {"id": doc_id, "scope": "enterprise", "owner_id": None,
-                                "uploaded_by": uploaded_by, "s3_key": "k", "sha256": "s"}
+    env["docs"].rows[doc_id] = {
+        "id": doc_id,
+        "scope": "enterprise",
+        "owner_id": None,
+        "uploaded_by": uploaded_by,
+        "s3_key": "k",
+        "sha256": "s",
+    }
     assert env["client"].delete(f"/v1/documents/{doc_id}").status_code == 403
     assert doc_id in env["docs"].rows
 

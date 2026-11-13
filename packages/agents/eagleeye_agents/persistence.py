@@ -1,6 +1,7 @@
 """Worker-side run persistence (parameterised SQL only)."""
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 import asyncpg
@@ -114,11 +115,14 @@ async def finish_run(
     usage: dict,
     cost_usd: float,
     error_code: str | None = None,
+    first_token_at: datetime | None = None,
+    warnings: Sequence[str] = (),
 ) -> None:
     await pool.execute(
         """
         UPDATE runs SET status = $2, route = $3, guard = $4, degraded = $5, usage = $6,
-                        cost_usd = $7, error_code = $8, updated_at = now()
+                        cost_usd = $7, error_code = $8, first_token_at = $9,
+                        warnings = $10, finished_at = now(), updated_at = now()
         WHERE id = $1
         """,
         run_id,
@@ -129,6 +133,8 @@ async def finish_run(
         usage,
         cost_usd,
         error_code,
+        first_token_at,
+        list(dict.fromkeys(warnings)),
     )
 
 

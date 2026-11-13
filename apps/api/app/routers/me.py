@@ -1,24 +1,32 @@
+from dataclasses import replace
+
 from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
 from fastapi import APIRouter, Request
 
 from app.auth import CurrentUser
 from app.repos import usage as usage_repo
+from app.repos.users import fresh_role
 from app.services.permissions import can_manage_enterprise
 
 router = APIRouter(tags=["me"])
 
 
 @router.get("/me")
-async def me(user: CurrentUser) -> dict:
+async def me(request: Request, user: CurrentUser) -> dict:
+    # role read fresh (the auth cache keeps a user for 60 s) so the UI matches what the admin
+    # and enterprise checks will decide right now
+    current = await fresh_role(request.app.state.pool, user.id)
+    role = current[0] if current else user.role
+    effective = replace(user, role=role)
     return ok(
         {
             "id": user.id,
             "email": user.email,
             "display_name": user.display_name,
-            "role": user.role,
+            "role": role,
             # the UI hides enterprise upload/delete when false; the API enforces it regardless
-            "can_manage_enterprise": can_manage_enterprise(user),
+            "can_manage_enterprise": can_manage_enterprise(effective),
         }
     )
 

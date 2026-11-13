@@ -10,6 +10,9 @@ from eagleeye_core.config import Settings, get_settings
 from fastapi import Depends, Header, HTTPException, Request
 from jwt import PyJWKClient
 
+from app.services import rate_limit
+from app.services.rate_limit import Limit
+
 logger = logging.getLogger(__name__)
 
 JWKS_CACHE_TTL_S = 3600
@@ -78,9 +81,7 @@ class ClerkUserDirectory:
             raise HTTPException(status_code=401, detail="Unknown user")
         data = resp.json()
         emails = {e["id"]: e["email_address"] for e in data.get("email_addresses", [])}
-        email = emails.get(data.get("primary_email_address_id")) or next(
-            iter(emails.values()), ""
-        )
+        email = emails.get(data.get("primary_email_address_id")) or next(iter(emails.values()), "")
         first = data.get("first_name") or ""
         last = data.get("last_name") or ""
         display_name = f"{first} {last}".strip() or None
@@ -118,6 +119,11 @@ async def get_current_user(
     request: Request,
     authorization: Annotated[str | None, Header()] = None,
 ) -> AuthedUser:
+    redis = getattr(request.app.state, "redis", None)
+    settings = get_settings()
+    if redis is not None:  # bound unauthenticated / token-guessing traffic per client IP
+        client_ip = request.client.host if request.client else "unknown"
+        await rate_limit.hit(redis, Limit("ip", settings.rate_limit_ip_per_min), client_ip)
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
     token = authorization.removeprefix("Bearer ")
@@ -126,6 +132,10 @@ async def get_current_user(
 
     cached = _user_cache.get(clerk_user_id)
     if cached is not None:
+        if redis is not None:
+            await rate_limit.hit(
+                redis, Limit("user", settings.rate_limit_general_per_min), cached.id
+            )
         return cached
 
     from app.repos.users import get_or_create_user  # local import avoids cycle
@@ -146,6 +156,8 @@ async def get_current_user(
     if row["status"] != "active":
         raise HTTPException(status_code=403, detail="Account disabled")
     _user_cache.put(clerk_user_id, user)
+    if redis is not None:
+        await rate_limit.hit(redis, Limit("user", settings.rate_limit_general_per_min), user.id)
     return user
 
 

@@ -13,10 +13,21 @@ from qdrant_client import AsyncQdrantClient
 
 from app.db import create_pool
 from app.errors import install_error_handlers
-from app.routers import artifacts, chats, datasets, documents, health, me, runs, sources
+from app.request_context import RequestIdLogFilter, RequestIdMiddleware
+from app.routers import admin, artifacts, chats, datasets, documents, health, me, runs, sources
+from app.security import (
+    JsonBodyLimitMiddleware,
+    SecurityHeadersMiddleware,
+    UnhandledErrorMiddleware,
+)
 from app.services.task_queue import CeleryTaskQueue
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s",
+)
+for _handler in logging.getLogger().handlers:
+    _handler.addFilter(RequestIdLogFilter())
 logger = logging.getLogger(__name__)
 
 
@@ -53,7 +64,9 @@ async def lifespan(app: FastAPI):
     # Phase 4: catalog metadata (no warehouse credentials here) + result-table reader
     state.catalog = CatalogService(CatalogRepo(state.pool))
     state.artifact_store = S3ObjectStore(
-        settings.s3_endpoint_url, settings.s3_access_key, settings.s3_secret_key,
+        settings.s3_endpoint_url,
+        settings.s3_access_key,
+        settings.s3_secret_key,
         settings.artifacts_bucket,
     )
     await _prepare_storage(app)
@@ -67,17 +80,31 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="EagleEye API", version="0.3.0", lifespan=lifespan)
+    app = FastAPI(title="EagleEye API", version="0.6.0", lifespan=lifespan)
+    # Starlette runs the LAST added middleware first:
+    # request id → headers → size limit → CORS → crash-to-envelope → routes
+    app.add_middleware(UnhandledErrorMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.web_origin],
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", "Last-Event-ID"],
+        allow_headers=["Authorization", "Content-Type", "Last-Event-ID", "X-Request-ID"],
+        expose_headers=["X-Request-ID", "Retry-After"],
     )
+    app.add_middleware(JsonBodyLimitMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestIdMiddleware)
     install_error_handlers(app)
     for router in (
-        health.router, me.router, chats.router, runs.router, documents.router,
-        sources.router, artifacts.router, datasets.router,
+        health.router,
+        me.router,
+        chats.router,
+        runs.router,
+        documents.router,
+        sources.router,
+        artifacts.router,
+        datasets.router,
+        admin.router,
     ):
         app.include_router(router, prefix="/v1")
     return app

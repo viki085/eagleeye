@@ -23,6 +23,7 @@ import {
 export interface CurrentUser {
   id: string;
   canManageEnterprise: boolean;
+  isAdmin: boolean;
 }
 
 interface DocumentsPanelProps {

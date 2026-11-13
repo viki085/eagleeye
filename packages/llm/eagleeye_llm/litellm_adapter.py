@@ -5,6 +5,7 @@ from typing import Any
 import litellm
 
 from eagleeye_llm.gateway import ChatMessage, StreamChunk, Tier, ToolCall, ToolSpec, Usage
+from eagleeye_llm.resilience import CircuitOpenError, ModelGuards, counts_as_provider_failure
 
 logger = logging.getLogger(__name__)
 
@@ -88,16 +89,46 @@ class LiteLLMGateway:
         price_reference_model: str | None = None,
         reasoning_fast: str = "",
         reasoning_capable: str = "",
+        guards: ModelGuards | None = None,
     ) -> None:
         self._models: dict[Tier, str] = {"fast": model_fast, "capable": model_capable}
         self._fallbacks: dict[Tier, str] = {"fast": fallback_fast, "capable": fallback_capable}
         self._price_ref = price_reference_model or model_capable
         self._efforts: dict[Tier, str] = {"fast": reasoning_fast, "capable": reasoning_capable}
+        self._guards = guards or ModelGuards()
 
     def _candidates(self, tier: Tier) -> list[tuple[str, bool]]:
+        """Models to try in order, skipping any whose circuit breaker is open."""
         primary = [(self._models[tier], False)]
         fallback = self._fallbacks[tier]
-        return primary + ([(fallback, True)] if fallback else [])
+        allowed = [
+            (model, degraded)
+            for model, degraded in primary + ([(fallback, True)] if fallback else [])
+            if self._guards.breaker(model).available()
+        ]
+        if not allowed:
+            raise CircuitOpenError(f"all models for tier '{tier}' are temporarily unavailable")
+        if allowed[0][0] != self._models[tier]:
+            logger.warning("circuit open for %s; using fallback %s", self._models[tier], fallback)
+        return allowed
+
+    def _claim(self, model: str, last: bool) -> bool:
+        """Claims a call slot (the probe in half-open). If another request just took the
+        probe, try the next candidate; with none left, fail fast."""
+        if self._guards.breaker(model).allow():
+            return True
+        if last:
+            raise CircuitOpenError(f"model {model} is temporarily unavailable")
+        return False
+
+    def _failed(self, model: str, exc: BaseException) -> None:
+        if counts_as_provider_failure(exc):
+            self._guards.breaker(model).record_failure()
+        else:  # the request itself was bad; the provider answered, so it is healthy
+            self._guards.breaker(model).record_success()
+
+    def breaker_states(self) -> dict[str, str]:
+        return dict(self._guards.states())
 
     def _model_params(self, tier: Tier, model: str, temperature: float | None) -> dict[str, Any]:
         """Per-model knobs. Reasoning models (GPT-5/6, o-series) take `reasoning_effort` and
@@ -132,15 +163,24 @@ class LiteLLMGateway:
             }
             if tools:
                 kwargs["tools"] = tool_schemas(tools)
-            try:
-                response = await litellm.acompletion(**kwargs)
-            except Exception:
-                if i == len(candidates) - 1:
-                    raise
-                logger.warning("model %s failed; falling back", model, exc_info=True)
+            if not self._claim(model, i == len(candidates) - 1):
                 continue
-            async for chunk in self._consume(response, model, degraded):
-                yield chunk
+            async with self._guards.semaphore(model):
+                try:
+                    response = await litellm.acompletion(**kwargs)
+                except Exception as exc:
+                    self._failed(model, exc)
+                    if i == len(candidates) - 1:
+                        raise
+                    logger.warning("model %s failed; falling back", model, exc_info=True)
+                    continue
+                try:
+                    async for chunk in self._consume(response, model, degraded):
+                        yield chunk
+                except Exception as exc:  # mid-stream: text already sent, no fallback possible
+                    self._failed(model, exc)
+                    raise
+                self._guards.breaker(model).record_success()
             return
 
     async def _consume(
@@ -181,13 +221,18 @@ class LiteLLMGateway:
             }
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
-            try:
-                response = await litellm.acompletion(**kwargs)
-            except Exception:
-                if i == len(candidates) - 1:
-                    raise
-                logger.warning("model %s failed; falling back", model, exc_info=True)
+            if not self._claim(model, i == len(candidates) - 1):
                 continue
+            async with self._guards.semaphore(model):
+                try:
+                    response = await litellm.acompletion(**kwargs)
+                except Exception as exc:
+                    self._failed(model, exc)
+                    if i == len(candidates) - 1:
+                        raise
+                    logger.warning("model %s failed; falling back", model, exc_info=True)
+                    continue
+            self._guards.breaker(model).record_success()
             text = response.choices[0].message.content or ""
             return text, self._to_usage(response.usage, model, degraded)
         raise RuntimeError("no model candidates configured")  # unreachable

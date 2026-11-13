@@ -119,6 +119,62 @@ async def test_successful_run_persists_parts_and_emits_done(db: DB) -> None:
     assert done["message_id"] == "m1" and done["cancelled"] is False
 
 
+async def test_run_records_time_to_first_token_and_warnings(db: DB) -> None:
+    llm = FakeLLM([guard_json(intent="chitchat"), "Greeting chat"], [Turn("Hello!")])
+    await runner.execute_run(_deps(llm, FakeRedis()), "r1", lambda rid: FakeSink())
+    assert db.finished["first_token_at"] is not None
+    assert list(db.finished["warnings"]) == []
+
+
+class SwitchRedis(FakeRedis):
+    def __init__(self, killed: set[str]) -> None:
+        super().__init__()
+        self.killed = killed
+
+    async def exists(self, key: str) -> int:
+        return int(key in self.killed)
+
+
+class UpExecutor:
+    async def available(self) -> bool:
+        return True
+
+
+class OneSourceCatalog:
+    async def accessible_sources(self, role):  # noqa: ANN001, ANN201
+        return ["acme"]
+
+
+@pytest.mark.parametrize(
+    ("killed", "sql", "analysis"),
+    [(set(), True, True), ({"kill:sql"}, False, True), ({"kill:analysis"}, True, False)],
+)
+async def test_kill_switches_hide_sql_and_analysis(
+    monkeypatch: pytest.MonkeyPatch, killed: set[str], sql: bool, analysis: bool
+) -> None:
+    async def role(pool, user_id):  # noqa: ANN001, ANN202
+        return "member"
+
+    monkeypatch.setattr(persistence, "load_user_role", role)
+    deps = runner.RunnerDeps(
+        pool=None,
+        redis=SwitchRedis(killed),
+        llm=FakeLLM(),
+        retriever=FakeRetriever(),  # type: ignore[arg-type]
+        settings=AgentSettings(),
+        prompts=load_prompts(),
+        model_ids={},
+        gateway=object(),
+        catalog=OneSourceCatalog(),
+        workspace=object(),
+        executor=UpExecutor(),
+    )
+    ctx = runner._build_context(deps, RUN, FakeSink())
+    await runner._enable_sql(deps, ctx)
+    await runner._enable_analysis(deps, ctx)
+    assert ctx.sql_available is sql and ctx.analysis_available is analysis
+
+
 async def test_cancelled_run_is_persisted_as_cancelled(db: DB) -> None:
     sink = FakeSink()
     redis = FakeRedis(cancelled=True)

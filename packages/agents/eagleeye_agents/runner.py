@@ -10,6 +10,7 @@ from typing import Any
 
 import asyncpg
 import redis.asyncio as aioredis
+from eagleeye_core.switches import is_killed
 from eagleeye_events import EventSink, cancel_key
 from eagleeye_events.names import CHAT_UPDATED, RUN_DONE, RUN_ERROR, RUN_STARTED
 from eagleeye_llm.gateway import LLMGateway
@@ -149,6 +150,8 @@ async def _persist(deps: RunnerDeps, ctx: RunContext, outcome: Outcome) -> str:
         degraded=ctx.usage.degraded,
         cost_usd=ctx.usage.cost_usd,
         usage={"tokens_in": ctx.usage.tokens_in, "tokens_out": ctx.usage.tokens_out},
+        first_token_at=ctx.text.first_emit_at,
+        warnings=ctx.warnings,
     )
     return message_id
 
@@ -182,6 +185,9 @@ async def _enable_analysis(deps: RunnerDeps, ctx: RunContext) -> None:
     """analyze_data only when the sandbox is reachable; such runs get the longer deadline."""
     if deps.executor is None or deps.workspace is None:
         return
+    if await is_killed(deps.redis, "analysis"):
+        logger.info("analysis kill switch on; analyze_data hidden for run %s", ctx.run_id)
+        return
     try:
         available = await deps.executor.available()
     except Exception:
@@ -201,6 +207,9 @@ async def _enable_sql(deps: RunnerDeps, ctx: RunContext) -> None:
     if deps.gateway is None or deps.catalog is None:
         return
     ctx.user_role = await persistence.load_user_role(deps.pool, ctx.user_id)
+    if await is_killed(deps.redis, "sql"):
+        logger.info("SQL kill switch on; SQL tools hidden for run %s", ctx.run_id)
+        return
     try:
         ctx.sql_available = bool(await deps.catalog.accessible_sources(ctx.user_role))
     except Exception:
@@ -226,6 +235,7 @@ async def _fail(
         cost_usd=ctx.usage.cost_usd,
         usage={},
         error_code=code,
+        first_token_at=ctx.text.first_emit_at,
     )
     await sink.emit(RUN_ERROR, {"code": code, "user_message": message})
 

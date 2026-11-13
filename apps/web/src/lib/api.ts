@@ -236,7 +236,7 @@ export interface ChatDetail {
 export interface Envelope<T> {
   success: boolean;
   data: T | null;
-  error: { code: string; message: string } | null;
+  error: { code: string; message: string; request_id?: string | null } | null;
 }
 
 export type TokenGetter = () => Promise<string | null>;
@@ -245,9 +245,96 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly requestId: string | null = null,
   ) {
-    super(message);
+    super(requestId ? `${message} (request ${requestId.slice(0, 12)})` : message);
   }
+}
+
+// --- admin console -----------------------------------------------------------------------
+
+export type AdminRange = "24h" | "7d" | "30d";
+
+export interface AdminSeriesPoint {
+  bucket: string;
+  runs: number;
+  users: number;
+  cost_usd: number;
+  failed: number;
+}
+
+export interface AdminOverview {
+  range: AdminRange;
+  active_users: number;
+  runs: number;
+  succeeded: number;
+  failed: number;
+  cancelled: number;
+  degraded: number;
+  cost_usd: number;
+  cost_per_run_usd: number;
+  p50_duration_s: number | null;
+  p95_duration_s: number | null;
+  p50_ttft_s: number | null;
+  p95_ttft_s: number | null;
+  series: AdminSeriesPoint[];
+}
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  last_seen_at: string | null;
+  created_at: string | null;
+  runs: number;
+  cost_usd: number;
+  tokens: number;
+  last_run_at: string | null;
+  lifetime_cost_usd: number;
+  limit_used_pct: number | null;
+}
+
+export interface AdminUsers {
+  items: AdminUserRow[];
+  total: number;
+  offset: number;
+  usage_limit_usd: number;
+}
+
+export type AdminUserSort = "last_seen" | "cost" | "runs" | "email";
+
+export interface AdminUsage {
+  by_model: { day: string; model_id: string; cost_usd: number; tokens_in: number; tokens_out: number }[];
+  top_users: { email: string; cost_usd: number; runs: number }[];
+  routes: { route: string; runs: number }[];
+  tools: { name: string; calls: number; errors: number; avg_ms: number }[];
+}
+
+export interface AdminSafety {
+  events: { kind: string; category: string; events: number }[];
+  sql_rejections: { reason: string; queries: number }[];
+  sql_queries: number;
+  sandbox: { mode: string; status: string; runs: number; avg_ms: number }[];
+  unverified_figures: { unverified: number; finished: number };
+  failed_runs: { id: string; created_at: string; email: string; status: string; error_code: string | null; route: string | null }[];
+  admin_actions: { created_at: string; email: string | null; category: string; detail: Record<string, unknown> }[];
+}
+
+export interface AdminContent {
+  documents: { scope: string; status: string; documents: number; chunks: number }[];
+  document_failures: { title: string; scope: string; error: string | null; updated_at: string }[];
+  datasets: { status: string; files: number; rows: number }[];
+  dataset_failures: { title: string; error: string | null; updated_at: string }[];
+}
+
+export type KillSwitchName = "chat" | "sql" | "analysis" | "uploads";
+
+export interface AdminSystem {
+  services: ServiceHealth[];
+  queues: Record<string, number | null>;
+  runs: { active: number; stuck: number };
+  switches: { name: KillSwitchName; killed: boolean; description: string }[];
 }
 
 export class ApiClient {
@@ -274,9 +361,47 @@ export class ApiClient {
     }
     if (!resp.ok || body === null || !body.success || body.data === null) {
       const message = body?.error?.message ?? `API responded ${resp.status}`;
-      throw new ApiError(message, resp.status);
+      const requestId = body?.error?.request_id ?? resp.headers.get("X-Request-ID");
+      throw new ApiError(message, resp.status, requestId);
     }
     return body.data;
+  }
+
+  adminOverview(range: AdminRange): Promise<AdminOverview> {
+    return this.request<AdminOverview>(`/v1/admin/overview?range=${range}`);
+  }
+
+  adminUsers(range: AdminRange, sort: AdminUserSort, offset: number): Promise<AdminUsers> {
+    return this.request<AdminUsers>(
+      `/v1/admin/users?range=${range}&sort=${sort}&offset=${offset}&limit=50`,
+    );
+  }
+
+  adminUsage(range: AdminRange): Promise<AdminUsage> {
+    return this.request<AdminUsage>(`/v1/admin/usage?range=${range}`);
+  }
+
+  adminSafety(range: AdminRange): Promise<AdminSafety> {
+    return this.request<AdminSafety>(`/v1/admin/safety?range=${range}`);
+  }
+
+  adminContent(): Promise<AdminContent> {
+    return this.request<AdminContent>("/v1/admin/content");
+  }
+
+  adminSystem(): Promise<AdminSystem> {
+    return this.request<AdminSystem>("/v1/admin/system");
+  }
+
+  setKillSwitch(name: KillSwitchName, killed: boolean): Promise<{ name: string; killed: boolean }> {
+    return this.request(`/v1/admin/switches/${name}`, {
+      method: "POST",
+      body: JSON.stringify({ killed }),
+    });
+  }
+
+  clearStuckRuns(): Promise<{ cleared: number }> {
+    return this.request("/v1/admin/runs/clear-stuck", { method: "POST" });
   }
 
   fetchHealth(): Promise<HealthData> {

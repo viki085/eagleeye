@@ -14,6 +14,7 @@ from app.repos import documents as docs_repo
 from app.repos import messages as messages_repo
 from app.repos import runs as runs_repo
 from app.repos import usage as usage_repo
+from app.services.guards import ensure_enabled, limit_action
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -82,6 +83,8 @@ async def send_message(
     duplicate = await messages_repo.find_by_idempotency_key(pool, chat_id, body.idempotency_key)
     if duplicate is not None:
         return ok({"run_id": str(duplicate["run_id"]), "deduplicated": True})
+    await ensure_enabled(request, "chat")
+    await limit_action(request, user, "messages")
 
     doc_ids = list(dict.fromkeys(str(d) for d in body.doc_ids))
     if doc_ids:

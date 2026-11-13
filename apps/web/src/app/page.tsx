@@ -53,7 +53,13 @@ export default function ChatPage() {
     void refreshChats();
     api
       .getMe()
-      .then((u) => setMe({ id: u.id, canManageEnterprise: u.can_manage_enterprise === true }))
+      .then((u) =>
+        setMe({
+          id: u.id,
+          canManageEnterprise: u.can_manage_enterprise === true,
+          isAdmin: u.role === "admin",
+        }),
+      )
       .catch(() => setMe(null));
   }, [api, refreshChats]);
 
@@ -202,6 +208,7 @@ export default function ChatPage() {
         chats={chats}
         activeChatId={activeChatId}
         busy={busy}
+        isAdmin={me?.isAdmin ?? false}
         onNewChat={handleNewChat}
         onSelect={(id) => void openChat(id)}
         onDelete={(id) => void handleDelete(id)}

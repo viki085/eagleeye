@@ -63,6 +63,24 @@ async def fail_stale_runs(pool: asyncpg.Pool, user_id: str) -> int:
     return int(result.split()[-1])
 
 
+async def fail_all_stale_runs(pool: asyncpg.Pool) -> int:
+    """Admin action: same rule as fail_stale_runs, across every user."""
+    result = await pool.execute(
+        f"""
+        UPDATE runs SET status = 'FAILED', error_code = 'WORKER_LOST', finished_at = now(),
+                        updated_at = now()
+        WHERE status IN {ACTIVE} AND (
+            (status = 'RUNNING' AND coalesce(heartbeat_at, updated_at)
+                < now() - make_interval(secs => $1))
+            OR (status = 'QUEUED' AND created_at < now() - make_interval(secs => $2))
+        )
+        """,  # noqa: S608 - constant fragment, values are bound
+        RUNNING_STALE_S,
+        QUEUED_STALE_S,
+    )
+    return int(result.split()[-1])
+
+
 async def count_active_for_user(pool: asyncpg.Pool, user_id: str) -> int:
     return int(
         await pool.fetchval(

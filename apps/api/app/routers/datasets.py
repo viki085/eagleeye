@@ -19,6 +19,7 @@ from fastapi import APIRouter, File, Query, Request, UploadFile
 from app.auth import CurrentUser
 from app.errors import ApiException
 from app.services import artifact_reader, uploads
+from app.services.guards import ensure_enabled, limit_action
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/datasets", tags=["datasets"])
@@ -85,6 +86,8 @@ async def upload_dataset(
     user: CurrentUser,
     file: UploadFile = File(...),  # noqa: B008 - FastAPI dependency marker
 ) -> dict:
+    await ensure_enabled(request, "uploads")
+    await limit_action(request, user, "uploads")
     filename = uploads.safe_filename(file.filename)
     ext, origin, mime = _require_data_file(filename)
     payload = await uploads.read_limited(file, get_settings().max_upload_mb * 1024 * 1024)

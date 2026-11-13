@@ -1,8 +1,10 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ModeSwitch } from "@/components/admin/mode-switch";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePanelOpen } from "@/hooks/use-panel-open";
 import type { ChatSummary } from "@/lib/api";
@@ -15,16 +17,19 @@ interface SidebarProps {
   onSelect: (chatId: string) => void;
   onDelete: (chatId: string) => void;
   footer?: ReactNode;
+  /** Admins see the Chat | Admin console switch (the API enforces access regardless). */
+  isAdmin?: boolean;
 }
 
 const RAIL_BUTTON =
   "flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-800 disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-200";
 
 /** Collapsed: a slim rail that keeps expand, new chat, theme and account one click away. */
-function CollapsedRail({ busy, onNewChat, onExpand }: {
+function CollapsedRail({ busy, onNewChat, onExpand, isAdmin }: {
   busy: boolean;
   onNewChat: () => void;
   onExpand: () => void;
+  isAdmin: boolean;
 }) {
   return (
     <aside
@@ -43,6 +48,11 @@ function CollapsedRail({ busy, onNewChat, onExpand }: {
       >
         +
       </button>
+      {isAdmin && (
+        <Link href="/admin" aria-label="Admin console" title="Admin console" className={RAIL_BUTTON}>
+          ▦
+        </Link>
+      )}
       <div className="mt-auto flex flex-col items-center gap-2">
         <ThemeToggle />
         <UserButton />
@@ -59,10 +69,18 @@ export function Sidebar({
   onSelect,
   onDelete,
   footer,
+  isAdmin = false,
 }: SidebarProps) {
   const [open, setOpen] = usePanelOpen("chats");
   if (!open) {
-    return <CollapsedRail busy={busy} onNewChat={onNewChat} onExpand={() => setOpen(true)} />;
+    return (
+      <CollapsedRail
+        busy={busy}
+        onNewChat={onNewChat}
+        onExpand={() => setOpen(true)}
+        isAdmin={isAdmin}
+      />
+    );
   }
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
@@ -81,6 +99,7 @@ export function Sidebar({
           </button>
         </div>
       </div>
+      {isAdmin && <ModeSwitch active="chat" />}
       <button
         onClick={onNewChat}
         disabled={busy}

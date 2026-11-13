@@ -12,6 +12,7 @@ from app.auth import AuthedUser, CurrentUser
 from app.errors import ApiException
 from app.repos import documents as docs_repo
 from app.services import uploads
+from app.services.guards import ensure_enabled, limit_action
 from app.services.permissions import can_manage_enterprise
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,9 @@ def _public(row: asyncpg.Record) -> dict:
 
 def _require_enterprise_manager(user: AuthedUser, action: str) -> None:
     if not can_manage_enterprise(user):
-        raise ApiException(403, "FORBIDDEN", f"Only knowledge admins can {action} enterprise documents.")
+        raise ApiException(
+            403, "FORBIDDEN", f"Only knowledge admins can {action} enterprise documents."
+        )
 
 
 UPLOAD_FAILED = "Upload could not be processed. Try again."
@@ -55,6 +58,8 @@ async def upload_document(
 ) -> dict:
     if scope == "enterprise":
         _require_enterprise_manager(user, "add")
+    await ensure_enabled(request, "uploads")
+    await limit_action(request, user, "uploads")
     filename = uploads.safe_filename(file.filename)
     ext, mime = uploads.require_supported(filename)
     payload = await uploads.read_limited(file, get_settings().max_upload_mb * 1024 * 1024)
@@ -69,8 +74,15 @@ async def upload_document(
     key = uploads.object_key(scope, doc_id, ext)
     try:
         row = await docs_repo.insert_document(
-            pool, doc_id=doc_id, scope=scope, user_id=user.id, title=uploads.title_from(filename),
-            filename=filename, mime=mime, size_bytes=len(payload.data), sha256=payload.sha256,
+            pool,
+            doc_id=doc_id,
+            scope=scope,
+            user_id=user.id,
+            title=uploads.title_from(filename),
+            filename=filename,
+            mime=mime,
+            size_bytes=len(payload.data),
+            sha256=payload.sha256,
             s3_key=key,
         )
     except asyncpg.UniqueViolationError as exc:  # concurrent duplicate upload

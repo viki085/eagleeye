@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     dataset_max_rows: int = 2_000_000
     dataset_max_columns: int = 200
 
+    # Phase 6: rate limits (per verified user per minute; per IP before authentication)
+    rate_limit_general_per_min: int = 300  # the UI's own polling is ~60/min while files process
+    rate_limit_messages_per_min: int = 20
+    rate_limit_uploads_per_min: int = 20
+    rate_limit_ip_per_min: int = 600
+    max_streams_per_user: int = 4
+
     clerk_secret_key: str = ""
     clerk_publishable_key: str = Field(
         default="", validation_alias="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"

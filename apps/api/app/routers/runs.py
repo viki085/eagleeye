@@ -4,14 +4,17 @@ import time
 from collections.abc import AsyncIterator
 from uuid import UUID
 
+from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
 from eagleeye_events import CANCEL_TTL_S, TERMINAL_EVENTS, cancel_key, read_events
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 
 from app.auth import CurrentUser
 from app.errors import ApiException
 from app.repos import runs as runs_repo
+from app.services.rate_limit import StreamSlots
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -50,26 +53,33 @@ async def stream_run(run_id: UUID, request: Request, user: CurrentUser) -> Strea
     last_event_id = request.headers.get("Last-Event-ID", "0")
     redis = request.app.state.redis
     rid = str(run_id)
+    slots = StreamSlots(redis, user.id, get_settings().max_streams_per_user)
+    await slots.acquire()  # 429 when this user already has too many streams open
 
     async def generate() -> AsyncIterator[str]:
         last_id = last_event_id
         deadline = time.monotonic() + STREAM_MAX_LIFETIME_S
-        while time.monotonic() < deadline:
-            if await request.is_disconnected():
-                return
-            events, last_id = await read_events(redis, rid, last_id)
-            if not events:
-                yield ": heartbeat\n\n"
-                continue
-            for stream_id, seq, event, data in events:
-                payload = json.dumps({"seq": seq, **data})
-                yield f"id: {stream_id}\nevent: {event}\ndata: {payload}\n\n"
-                if event in TERMINAL_EVENTS:
+        try:
+            while time.monotonic() < deadline:
+                if await request.is_disconnected():
                     return
-        logger.warning("stream for run %s hit lifetime cap", rid)
+                events, last_id = await read_events(redis, rid, last_id)
+                if not events:
+                    yield ": heartbeat\n\n"
+                    continue
+                for stream_id, seq, event, data in events:
+                    payload = json.dumps({"seq": seq, **data})
+                    yield f"id: {stream_id}\nevent: {event}\ndata: {payload}\n\n"
+                    if event in TERMINAL_EVENTS:
+                        return
+            logger.warning("stream for run %s hit lifetime cap", rid)
+        finally:
+            await slots.release()
 
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        # covers a client that disconnects before the generator starts (release is idempotent)
+        background=BackgroundTask(slots.release),
     )

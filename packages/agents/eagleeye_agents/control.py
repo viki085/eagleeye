@@ -3,6 +3,7 @@
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from eagleeye_events.names import TEXT_DELTA, TEXT_REPLACE
 from eagleeye_llm.gateway import Usage
@@ -87,6 +88,7 @@ class TextChannel:
         self._sink = sink
         self._pieces: list[str] = []
         self._new_segment = False
+        self.first_emit_at: datetime | None = None  # time-to-first-token for the admin console
 
     @property
     def value(self) -> str:
@@ -102,6 +104,8 @@ class TextChannel:
         if self._new_segment and self._pieces:
             text = SEGMENT_SEP + text.lstrip()
         self._new_segment = False
+        if self.first_emit_at is None:
+            self.first_emit_at = datetime.now(UTC)
         self._pieces.append(text)
         await self._sink.emit(TEXT_DELTA, {"text": text})
 
