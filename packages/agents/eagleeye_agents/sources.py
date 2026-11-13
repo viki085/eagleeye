@@ -32,10 +32,15 @@ def _snippet(text: str) -> str:
     return flat if len(flat) <= SNIPPET_CHARS else flat[: SNIPPET_CHARS - 1].rstrip() + "…"
 
 
+# "<" and characters a model may read as "<": fullwidth, small, angle brackets, HTML entities
+_OPEN_BRACKET = r"(?:<|&lt;|&#0*60;|&#x0*3c;|\uff1c|\ufe64|\u2329|\u27e8|\u3008)"
+
+
 def neutralise(text: str, tags: tuple[str, ...] = ("context", "tool_data")) -> str:
-    """Stop untrusted text from opening/closing our delimiter tags."""
+    """Stop untrusted text from opening/closing our delimiter tags, including look-alike
+    brackets and HTML-escaped tags (indirect prompt injection)."""
     for tag in tags:
-        text = re.sub(rf"<\s*(/?)\s*{tag}", rf"‹\1{tag}", text, flags=re.IGNORECASE)
+        text = re.sub(rf"{_OPEN_BRACKET}\s*(/?)\s*{tag}", rf"‹\1{tag}", text, flags=re.IGNORECASE)
     return text
 
 

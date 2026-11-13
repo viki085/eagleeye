@@ -1,6 +1,7 @@
 """Ingest pipeline: SCANNING → PARSING → CHUNKING → EMBEDDING → upsert → READY (C4 §3)."""
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import asyncpg
@@ -15,7 +16,7 @@ from qdrant_client import AsyncQdrantClient
 from ingest_worker import repo
 from ingest_worker.chunking import PATH_SEP, Chunk, chunk
 from ingest_worker.errors import PermanentIngestError, TransientIngestError
-from ingest_worker.parsing.base import sanitize
+from ingest_worker.parsing.base import ParsedDocument, sanitize
 from ingest_worker.parsing.registry import parser_for
 from ingest_worker.sniff import sniff
 
@@ -78,6 +79,46 @@ async def _upsert(
         raise TransientIngestError("The vector store is temporarily unavailable.") from exc
 
 
+def _chunks(parsed: ParsedDocument) -> list[Chunk]:
+    s = get_settings()
+    chunks = chunk(
+        parsed.elements,
+        max_chars=s.chunk_max_chars,
+        soft_chars=s.chunk_soft_chars,
+        min_chars=s.chunk_min_chars,
+        overlap=s.chunk_overlap_chars,
+    )
+    if not chunks:
+        raise PermanentIngestError("No text could be extracted from the document.")
+    return chunks
+
+
+async def reindex(document_id: str, deps: PipelineDeps) -> bool:
+    """Re-chunk and re-embed a READY document with the current settings.
+
+    The document stays READY throughout (retrieval only searches READY documents) and its
+    chunks are swapped in one transaction. A permanent error keeps the old chunks rather than
+    marking a working document FAILED. Transient errors raise, so the task retries.
+    Returns True when the chunks were replaced.
+    """
+    doc = await repo.get_document(deps.conn, document_id)
+    if doc is None or doc["status"] != "READY":
+        logger.info("reindex %s skipped: not READY", document_id)
+        return False
+    try:
+        data = await _load_bytes(deps, doc["s3_key"])
+        parsed = sanitize(parser_for(sniff(doc["filename"], data)).parse(data))
+        chunks = _chunks(parsed)
+        vectors = await _embed(deps, doc["title"], chunks)
+        await _upsert(deps, doc, chunks, vectors)
+        await repo.mark_ready(deps.conn, document_id, len(chunks))
+    except PermanentIngestError as exc:
+        logger.warning("reindex %s skipped, old chunks kept: %s", document_id, exc.user_message)
+        return False
+    logger.info("document %s re-indexed with %d chunks", document_id, len(chunks))
+    return True
+
+
 async def process(document_id: str, deps: PipelineDeps) -> None:
     """Runs every stage. Permanent errors mark the document FAILED; transient ones raise."""
     doc = await repo.get_document(deps.conn, document_id)
@@ -94,9 +135,7 @@ async def process(document_id: str, deps: PipelineDeps) -> None:
         await repo.set_page_count(deps.conn, document_id, parsed.page_count)
 
         await repo.set_status(deps.conn, document_id, "CHUNKING")
-        chunks = chunk(parsed.elements)
-        if not chunks:
-            raise PermanentIngestError("No text could be extracted from the document.")
+        chunks = _chunks(parsed)
 
         await repo.set_status(deps.conn, document_id, "EMBEDDING")
         vectors = await _embed(deps, doc["title"], chunks)
@@ -116,8 +155,10 @@ async def mark_failed(document_id: str, message: str) -> None:
         await conn.close()
 
 
-async def run_pipeline(document_id: str) -> None:
-    """Entry point for one task: builds and tears down every client inside one event loop."""
+async def _with_deps(
+    document_id: str, step: Callable[[str, PipelineDeps], Awaitable[object]]
+) -> None:
+    """Builds and tears down every client inside one event loop (one Celery task)."""
     s = get_settings()
     conn = await repo.connect(s.database_url)
     qdrant = AsyncQdrantClient(url=s.qdrant_url)
@@ -130,7 +171,15 @@ async def run_pipeline(document_id: str) -> None:
             enterprise_store=enterprise,
         )
         await enterprise.ensure_collection()
-        await process(document_id, deps)
+        await step(document_id, deps)
     finally:
         await qdrant.close()
         await conn.close()
+
+
+async def run_pipeline(document_id: str) -> None:
+    await _with_deps(document_id, process)
+
+
+async def run_reindex(document_id: str) -> None:
+    await _with_deps(document_id, reindex)

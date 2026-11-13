@@ -16,10 +16,12 @@ from itertools import takewhile
 
 from ingest_worker.parsing.base import ParsedElement
 
-MAX_CHARS = 3000
-SOFT_CHARS = 2400
-MIN_CHARS = 600
-OVERLAP_CHARS = 300
+# Chosen with the retrieval eval (config C, ADR-32): budgeted recall 0.86 vs 0.80 for the old
+# 2400/3000 setting. The worker reads these from settings (CHUNK_* env vars).
+MAX_CHARS = 1600
+SOFT_CHARS = 1200
+MIN_CHARS = 400
+OVERLAP_CHARS = 200
 MAX_HEADING_CHARS = 200
 PATH_SEP = " › "
 PARA_SEP = "\n\n"

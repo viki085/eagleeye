@@ -1,7 +1,12 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Credentials of the local SeaweedFS container (docker-compose). Fine for a laptop; refused
+# anywhere APP_ENV is not "local" (see Settings._no_local_secrets_when_deployed).
+LOCAL_S3_ACCESS_KEY = "eagleeye"
+LOCAL_S3_SECRET = "eagleeye-local-secret"  # noqa: S105 — local-only default, guarded below
 
 
 class Settings(BaseSettings):
@@ -17,8 +22,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     qdrant_url: str = "http://localhost:6333"
     s3_endpoint_url: str = "http://localhost:8333"
-    s3_access_key: str = "eagleeye"
-    s3_secret_key: str = "eagleeye-local-secret"
+    s3_access_key: str = LOCAL_S3_ACCESS_KEY
+    s3_secret_key: str = LOCAL_S3_SECRET
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
     llm_provider: str = "openai"
@@ -39,6 +44,12 @@ class Settings(BaseSettings):
     reasoning_effort_capable: str = "none"
     embed_model: str = "text-embedding-3-small"
     embed_dim: int = 1536
+    # Document chunking (chosen with evals/retrieval_eval.py, ADR-32). Changing these only
+    # affects new uploads; run `python -m ingest_worker.reindex --all` to re-chunk the rest.
+    chunk_max_chars: int = 1600
+    chunk_soft_chars: int = 1200
+    chunk_min_chars: int = 400
+    chunk_overlap_chars: int = 200
 
     docs_bucket: str = "eagleeye-local-docs"
     max_upload_mb: int = 25
@@ -91,6 +102,17 @@ class Settings(BaseSettings):
         default="", validation_alias="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
     )
     clerk_issuer: str = ""  # optional pin, e.g. https://xxx.clerk.accounts.dev
+
+    @model_validator(mode="after")
+    def _no_local_secrets_when_deployed(self) -> "Settings":
+        if self.app_env != "local" and (
+            self.s3_secret_key == LOCAL_S3_SECRET or self.s3_access_key == LOCAL_S3_ACCESS_KEY
+        ):
+            raise ValueError(
+                "S3_ACCESS_KEY / S3_SECRET_KEY still use the local development defaults; "
+                f"set real object-store credentials for APP_ENV={self.app_env}."
+            )
+        return self
 
 
 @lru_cache

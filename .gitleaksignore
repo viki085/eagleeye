@@ -1,0 +1,6 @@
+# Reviewed false positives (Phase 6B security review, docs/security-review-phase6.md).
+# Each entry is pinned to one commit/file/line, so new secrets are still reported.
+
+# Fake AWS key used as test input for the output secret-redaction filter (git history; the
+# current file carries an inline gitleaks:allow marker on that line).
+f84656d85a14d1cbdbfea800c2e520269266ec28:packages/agents/tests/test_units.py:aws-access-token:167

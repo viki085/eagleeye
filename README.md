@@ -23,7 +23,7 @@ packages/events     Run event vocabulary + Redis Stream sink/reader
 packages/retrieval  Hybrid retrieval: Qdrant + pgvector + tsvector, RRF, access filter
 packages/agents     Agent graph: guard → router → simple | RAG | supervisor ⇄ tools → checks
 infra/              docker-compose.yml (local stack) + warehouse/ (demo DB seed) + sandbox/ (image)
-evals/              Guard smoke eval, SQL + analysis golden sets and harnesses, fixtures/
+evals/              Guard smoke eval, SQL, analysis + retrieval golden sets and harnesses, fixtures/
 docs/               Design pack (HLD, LLD, components, ADRs)
 ```
 
@@ -66,6 +66,26 @@ Open http://localhost:3000 and sign in. Upload a PDF/DOCX/MD/TXT in the right-ha
 
 Upload a CSV or Excel file (e.g. `evals/fixtures/targets.csv`) to get an automatic profile (the "Profile" button in **Data files**), then ask analysis questions — "Compare monthly 2026 net revenue from the database with my targets file and flag the months below target, with a chart". Analysis code (DuckDB SQL or Python) runs in a Docker container with no network; the step tree shows it, charts are drawn from the result table, and the code sits in the collapsed result card. Without Docker or the image, data files and charts still work and the assistant says analysis is unavailable. Each answer shows a collapsible step tree (guard → route → retrieval / tool calls → checks), cites `[n]` sources you can open, and can be stopped mid-answer. `/status` shows live health of every service.
 
+### Accounts and the admin console
+
+There is no self-signup: only people an admin adds can sign in (the API refuses any other Clerk
+account). Sign-in is by Google, or username / work email with a password or an emailed code. The
+first admin is set in the database (`UPDATE users SET role='admin' WHERE email=…`); after that,
+admins add people from **Admin console → Users** (one at a time or a CSV with `email, username,
+first_name, last_name, role`) and delete them with a typed confirmation. In Clerk, set sign-up mode
+to *Restricted* as well. Admins switch between **Chat** and the **Admin console** (Overview KPIs and
+charts, Users, Usage & cost, Quality & safety, Content with enterprise uploads, System & controls
+with kill switches).
+
+### Re-indexing documents
+
+Chunking settings (`CHUNK_*`, see `.env.example`) apply to new uploads. To re-chunk existing
+documents (they stay searchable throughout), with the ingest worker running:
+
+```bash
+uv run --package eagleeye-ingest-worker python -m ingest_worker.reindex --all   # or --document <id>, --dry-run
+```
+
 ## Tests
 
 ```bash
@@ -80,4 +100,10 @@ uv run --package eagleeye-agent-worker python evals/sql_eval.py gpt-6.1-terra gp
 
 # Analysis golden set: numeric accuracy over the fixtures, in the real sandbox (~$0.05 for terra)
 uv run --package eagleeye-agent-worker --with scipy --with pandas python evals/analysis_eval.py gpt-6-luna
+
+# Retrieval eval: compares chunking configurations (embeddings only, ~$0.01 per configuration)
+uv run --package eagleeye-ingest-worker --with fpdf2 python evals/fixtures/make_docs.py   # regenerate fixtures
+uv run --package eagleeye-ingest-worker python evals/retrieval_eval.py --split dev --configs A,B,C,D
 ```
+
+Security review and how to re-run the scans: [docs/security-review-phase6.md](docs/security-review-phase6.md).

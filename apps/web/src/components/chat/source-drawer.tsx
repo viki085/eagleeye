@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import type { ApiClient, ChunkDetail, Citation } from "@/lib/api";
+import { isSourceGone } from "@/lib/citation";
 
 interface SourceDrawerProps {
   api: ApiClient;
@@ -13,6 +14,7 @@ interface SourceDrawerProps {
 type LoadState =
   | { kind: "loading" }
   | { kind: "loaded"; chunk: ChunkDetail }
+  | { kind: "saved" } // passage gone (re-indexed or deleted): show the snippet saved with the answer
   | { kind: "error"; message: string };
 
 export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
@@ -26,9 +28,9 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
       .getChunk(citation.document_id, citation.chunk_id)
       .then((chunk) => !cancelled && setState({ kind: "loaded", chunk }))
       .catch((e: unknown) => {
-        if (!cancelled) {
-          setState({ kind: "error", message: e instanceof Error ? e.message : "Failed to load" });
-        }
+        if (cancelled) return;
+        if (isSourceGone(e)) setState({ kind: "saved" });
+        else setState({ kind: "error", message: e instanceof Error ? e.message : "Failed to load" });
       });
     return () => {
       cancelled = true;
@@ -67,6 +69,15 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
         <div className="flex-1 overflow-y-auto p-4 text-sm leading-relaxed">
           {state.kind === "loading" && <p className="text-neutral-400">Loading…</p>}
           {state.kind === "error" && <p className="text-red-600">{state.message}</p>}
+          {state.kind === "saved" && (
+            <>
+              <p className="mb-3 rounded-md bg-neutral-100 px-3 py-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
+                This document has been updated or re-indexed since the answer was written, so the
+                full passage is no longer available. Showing the excerpt saved with the answer.
+              </p>
+              <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{citation.snippet}</p>
+            </>
+          )}
           {state.kind === "loaded" && (
             <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{state.chunk.content}</p>
           )}

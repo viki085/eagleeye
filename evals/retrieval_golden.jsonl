@@ -1,0 +1,150 @@
+{"id": "q001", "doc": "travel_policy", "kind": "pdf_numbered", "section": "1. Scope", "question": "Besides staff, which non-employees does the travel policy apply to?", "span": "contractors and interns", "split": "dev"}
+{"id": "q002", "doc": "travel_policy", "kind": "pdf_numbered", "section": "2. Booking", "question": "How far ahead do I need to reserve a plane ticket?", "span": "at least 14 days before departure", "split": "dev"}
+{"id": "q003", "doc": "travel_policy", "kind": "pdf_numbered", "section": "2. Booking", "question": "When is economy seating mandatory?", "span": "shorter than six hours", "split": "test"}
+{"id": "q004", "doc": "travel_policy", "kind": "pdf_numbered", "section": "2. Booking", "question": "For what journey length can I upgrade to premium economy?", "span": "six to ten hours", "split": "dev"}
+{"id": "q005", "doc": "travel_policy", "kind": "pdf_numbered", "section": "2. Booking", "question": "Who has to sign off on a business class seat?", "span": "approval from a vice president", "split": "dev"}
+{"id": "q006", "doc": "travel_policy", "kind": "pdf_numbered", "section": "3. Hotels", "question": "What is the maximum room rate per night in places like Paris or Madrid?", "span": "EUR 180 in EU capitals", "split": "test"}
+{"id": "q007", "doc": "travel_policy", "kind": "pdf_numbered", "section": "3. Hotels", "question": "What kind of accommodation is preferred for long stays?", "span": "serviced apartment", "split": "dev"}
+{"id": "q008", "doc": "travel_policy", "kind": "pdf_numbered", "section": "4. Ground transport", "question": "When should I take the train rather than fly?", "span": "journeys under four hours", "split": "dev"}
+{"id": "q009", "doc": "travel_policy", "kind": "pdf_numbered", "section": "4. Ground transport", "question": "Which size of hire car is standard?", "span": "compact category", "split": "test"}
+{"id": "q010", "doc": "travel_policy", "kind": "pdf_numbered", "section": "4. Ground transport", "question": "What is the reimbursement rate for driving my own car?", "span": "EUR 0.30 per kilometre", "split": "dev"}
+{"id": "q011", "doc": "travel_policy", "kind": "pdf_numbered", "section": "5. Allowances", "question": "How much food money do I get per day on an international trip?", "span": "EUR 75 abroad", "split": "dev"}
+{"id": "q012", "doc": "travel_policy", "kind": "pdf_numbered", "section": "5. Allowances", "question": "Can I claim drinks with alcohol?", "span": "Alcohol is never reimbursed", "split": "test"}
+{"id": "q013", "doc": "travel_policy", "kind": "pdf_numbered", "section": "6. Safety", "question": "How early must I notify security before a trip to a dangerous destination?", "span": "72 hours before leaving", "split": "dev"}
+{"id": "q014", "doc": "travel_policy", "kind": "pdf_numbered", "section": "6. Safety", "question": "What number do I call for help while travelling?", "span": "+44 20 7946 0000", "split": "dev"}
+{"id": "q015", "doc": "travel_policy", "kind": "pdf_numbered", "section": "6. Safety", "question": "Do I need to buy my own travel insurance?", "span": "provided automatically through the corporate card", "split": "test"}
+{"id": "q016", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Welcome To Security", "question": "What is the deadline for finishing the security course?", "span": "first 10 working days", "split": "dev"}
+{"id": "q017", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Welcome To Security", "question": "How long does the onboarding security module last?", "span": "about 45 minutes", "split": "dev"}
+{"id": "q018", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Passwords And Access", "question": "What is the minimum password length?", "span": "at least 14 characters", "split": "test"}
+{"id": "q019", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Passwords And Access", "question": "Is two-step login optional for any system?", "span": "mandatory on every account", "split": "dev"}
+{"id": "q020", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Passwords And Access", "question": "Which password manager are we allowed to use?", "span": "Keeper", "split": "dev"}
+{"id": "q021", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Devices", "question": "When does my laptop screen lock itself?", "span": "after 5 minutes idle", "split": "test"}
+{"id": "q022", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Devices", "question": "How is the data on company laptops protected at rest?", "span": "Full-disk encryption", "split": "dev"}
+{"id": "q023", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Devices", "question": "How quickly do I need to report a missing laptop?", "span": "within 1 hour", "split": "dev"}
+{"id": "q024", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Phishing", "question": "How do I flag a suspicious message?", "span": "Phish Alert button", "split": "test"}
+{"id": "q025", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Phishing", "question": "How often are fake phishing emails sent to staff?", "span": "every month", "split": "dev"}
+{"id": "q026", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Data Handling", "question": "Where am I allowed to keep client data?", "span": "approved systems such as Salesforce", "split": "dev"}
+{"id": "q027", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Data Handling", "question": "Where must confidential documents never be forwarded?", "span": "personal email address", "split": "test"}
+{"id": "q028", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Data Handling", "question": "Can I use a USB stick on my work machine?", "span": "blocked by default", "split": "dev"}
+{"id": "q029", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Getting Help", "question": "How do I contact the security team by email?", "span": "security@example.com", "split": "dev"}
+{"id": "q030", "doc": "security_onboarding_slides", "kind": "pdf_slides", "section": "Getting Help", "question": "Which chat channel is used for security problems?", "span": "#sec-help", "split": "test"}
+{"id": "q031", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Health Insurance", "question": "When does health cover begin for a new hire?", "span": "first day of employment", "split": "dev"}
+{"id": "q032", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Health Insurance", "question": "How much of family coverage does the employer fund?", "span": "80 percent of the premium", "split": "dev"}
+{"id": "q033", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Health Insurance", "question": "What is the annual limit for teeth treatment?", "span": "EUR 1,500 per year", "split": "test"}
+{"id": "q034", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Pension Plan", "question": "How much retirement saving does the company match?", "span": "up to 6 percent of salary", "split": "dev"}
+{"id": "q035", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Pension Plan", "question": "Is there a waiting period before matched pension money is mine?", "span": "vest immediately", "split": "dev"}
+{"id": "q036", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Time Off", "question": "How much annual leave does a full-time employee get?", "span": "28 days of paid holiday", "split": "test"}
+{"id": "q037", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Time Off", "question": "How many vacation days roll over?", "span": "Up to 5 unused days", "split": "dev"}
+{"id": "q038", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Time Off", "question": "How long is paid leave after a baby arrives?", "span": "20 weeks at full pay", "split": "dev"}
+{"id": "q039", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Time Off", "question": "How much time can I spend on charity work?", "span": "2 volunteering days", "split": "test"}
+{"id": "q040", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Wellbeing", "question": "How much does the company contribute to a fitness membership?", "span": "EUR 40 per month", "split": "dev"}
+{"id": "q041", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Wellbeing", "question": "Where can I get confidential therapy sessions?", "span": "Employee Assistance Programme", "split": "dev"}
+{"id": "q042", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Wellbeing", "question": "How much can I spend on courses and training?", "span": "learning budget of EUR 1,000", "split": "test"}
+{"id": "q043", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Other Perks", "question": "How is the cycle leasing paid for?", "span": "salary sacrifice scheme", "split": "dev"}
+{"id": "q044", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Other Perks", "question": "What can I claim for setting up my desk at home?", "span": "EUR 500 once", "split": "dev"}
+{"id": "q045", "doc": "benefits_guide", "kind": "pdf_titlecase", "section": "Other Perks", "question": "When is the bonus for recommending a candidate paid out?", "span": "after the new hire passes probation", "split": "test"}
+{"id": "q046", "doc": "engineering_handbook", "kind": "docx", "section": "Code Review", "question": "How many approvals does a code change require?", "span": "at least two reviewers", "split": "dev"}
+{"id": "q047", "doc": "engineering_handbook", "kind": "docx", "section": "Code Review", "question": "What is the expected turnaround for reviewing someone's change?", "span": "within one business day", "split": "dev"}
+{"id": "q048", "doc": "engineering_handbook", "kind": "docx", "section": "Code Review", "question": "At what size should a change be broken up?", "span": "larger than 400 lines", "split": "test"}
+{"id": "q049", "doc": "engineering_handbook", "kind": "docx", "section": "Testing", "question": "What test coverage threshold do we enforce?", "span": "above 80 percent", "split": "dev"}
+{"id": "q050", "doc": "engineering_handbook", "kind": "docx", "section": "Testing", "question": "When and where do the full user-journey tests run?", "span": "nightly against the staging environment", "split": "dev"}
+{"id": "q051", "doc": "engineering_handbook", "kind": "docx", "section": "Deployments", "question": "When are releases to production not allowed?", "span": "Friday 15:00 until Monday 09:00", "split": "test"}
+{"id": "q052", "doc": "engineering_handbook", "kind": "docx", "section": "Deployments", "question": "How much load does the canary get initially?", "span": "5 percent of traffic", "split": "dev"}
+{"id": "q053", "doc": "engineering_handbook", "kind": "docx", "section": "Deployments", "question": "How fast must we be able to revert a release?", "span": "within 10 minutes", "split": "dev"}
+{"id": "q054", "doc": "engineering_handbook", "kind": "docx", "section": "On-Call", "question": "Which day does the pager switch to the next engineer?", "span": "hand over on Tuesdays", "split": "test"}
+{"id": "q055", "doc": "engineering_handbook", "kind": "docx", "section": "On-Call", "question": "How much extra pay comes with a week of pager duty?", "span": "EUR 300 per week", "split": "dev"}
+{"id": "q056", "doc": "engineering_handbook", "kind": "docx", "section": "On-Call", "question": "How quickly do I have to respond to an alert?", "span": "acknowledged within 15 minutes", "split": "dev"}
+{"id": "q057", "doc": "engineering_handbook", "kind": "docx", "section": "Architecture Decisions", "question": "Where do we document major technical decisions?", "span": "recorded as ADRs", "split": "test"}
+{"id": "q058", "doc": "engineering_handbook", "kind": "docx", "section": "Architecture Decisions", "question": "Who approves building a new microservice?", "span": "architecture guild", "split": "dev"}
+{"id": "q059", "doc": "engineering_handbook", "kind": "docx", "section": "Tooling", "question": "Which programming language do we pick for fresh backend services?", "span": "is Go", "split": "dev"}
+{"id": "q060", "doc": "engineering_handbook", "kind": "docx", "section": "Tooling", "question": "Where are API keys and passwords kept?", "span": "HashiCorp Vault", "split": "test"}
+{"id": "q061", "doc": "incident_runbook", "kind": "md", "section": "Severity Levels", "question": "What counts as the most severe incident?", "span": "full outage affecting all customers", "split": "dev"}
+{"id": "q062", "doc": "incident_runbook", "kind": "md", "section": "Severity Levels", "question": "How is a partial slowdown for some users classified?", "span": "degraded service for a subset of customers", "split": "dev"}
+{"id": "q063", "doc": "incident_runbook", "kind": "md", "section": "Severity Levels", "question": "What is the lowest incident level?", "span": "minor issue with a workaround", "split": "test"}
+{"id": "q064", "doc": "incident_runbook", "kind": "md", "section": "First Response", "question": "Who becomes the incident lead by default?", "span": "first on-call engineer to acknowledge", "split": "dev"}
+{"id": "q065", "doc": "incident_runbook", "kind": "md", "section": "First Response", "question": "How should the incident chat room be named?", "span": "inc-YYYYMMDD-short-title", "split": "dev"}
+{"id": "q066", "doc": "incident_runbook", "kind": "md", "section": "First Response", "question": "When is the first progress note due?", "span": "within 15 minutes of declaring", "split": "test"}
+{"id": "q067", "doc": "incident_runbook", "kind": "md", "section": "Communication", "question": "How often do we update the public status page?", "span": "every 30 minutes", "split": "dev"}
+{"id": "q068", "doc": "incident_runbook", "kind": "md", "section": "Communication", "question": "Who is allowed to speak to journalists during an outage?", "span": "communications lead", "split": "dev"}
+{"id": "q069", "doc": "incident_runbook", "kind": "md", "section": "Communication", "question": "When are senior leaders alerted?", "span": "paged for every SEV1", "split": "test"}
+{"id": "q070", "doc": "incident_runbook", "kind": "md", "section": "Recovery", "question": "What is the preferred fix when a release broke things?", "span": "rollback over a hotfix", "split": "dev"}
+{"id": "q071", "doc": "incident_runbook", "kind": "md", "section": "Recovery", "question": "How frequent are the backups we restore from?", "span": "every 4 hours", "split": "dev"}
+{"id": "q072", "doc": "incident_runbook", "kind": "md", "section": "After The Incident", "question": "When must the incident review document be finished?", "span": "within 5 business days", "split": "test"}
+{"id": "q073", "doc": "incident_runbook", "kind": "md", "section": "After The Incident", "question": "Where are follow-up tasks from outages recorded?", "span": "INC Jira project", "split": "dev"}
+{"id": "q074", "doc": "incident_runbook", "kind": "md", "section": "After The Incident", "question": "Which meeting discusses incident write-ups?", "span": "Thursday reliability meeting", "split": "dev"}
+{"id": "q075", "doc": "incident_runbook", "kind": "md", "section": "After The Incident", "question": "What happens if the same failure recurs within a month?", "span": "escalated to the CTO", "split": "test"}
+{"id": "q076", "doc": "expense_faq", "kind": "txt", "section": "Submitting Claims", "question": "What is the time limit for filing an expense?", "span": "within 60 days of the purchase", "split": "dev"}
+{"id": "q077", "doc": "expense_faq", "kind": "txt", "section": "Submitting Claims", "question": "Above what amount do I need proof of purchase?", "span": "over EUR 25", "split": "dev"}
+{"id": "q078", "doc": "expense_faq", "kind": "txt", "section": "Submitting Claims", "question": "Which tool do I use to send in receipts?", "span": "Concur mobile app", "split": "test"}
+{"id": "q079", "doc": "expense_faq", "kind": "txt", "section": "Approval", "question": "What is the most my manager can sign off on alone?", "span": "up to EUR 2,000", "split": "dev"}
+{"id": "q080", "doc": "expense_faq", "kind": "txt", "section": "Approval", "question": "Who else must approve a large expense?", "span": "finance director approval", "split": "dev"}
+{"id": "q081", "doc": "expense_faq", "kind": "txt", "section": "Payment", "question": "When do I get reimbursed?", "span": "next monthly payroll", "split": "test"}
+{"id": "q082", "doc": "expense_faq", "kind": "txt", "section": "Payment", "question": "Which exchange rate is used for spending abroad?", "span": "rate on the day of purchase", "split": "dev"}
+{"id": "q083", "doc": "expense_faq", "kind": "txt", "section": "Corporate Card", "question": "How much can I spend on the company card each month?", "span": "monthly limit of EUR 5,000", "split": "dev"}
+{"id": "q084", "doc": "expense_faq", "kind": "txt", "section": "Corporate Card", "question": "What if I accidentally buy something private with it?", "span": "repaid within 10 days", "split": "test"}
+{"id": "q085", "doc": "expense_faq", "kind": "txt", "section": "Corporate Card", "question": "How do I cancel a missing company card?", "span": "card provider hotline", "split": "dev"}
+{"id": "q086", "doc": "expense_faq", "kind": "txt", "section": "Specific Items", "question": "What is the cap on presents for customers?", "span": "EUR 50 per person", "split": "dev"}
+{"id": "q087", "doc": "expense_faq", "kind": "txt", "section": "Specific Items", "question": "Is my broadband at home covered if I work remotely?", "span": "EUR 30 per month for remote employees", "split": "test"}
+{"id": "q088", "doc": "expense_faq", "kind": "txt", "section": "Specific Items", "question": "When can I expense a cab?", "span": "after 21:00", "split": "dev"}
+{"id": "q089", "doc": "expense_faq", "kind": "txt", "section": "Specific Items", "question": "Who must agree before I register for a paid event?", "span": "pre-approval from your budget owner", "split": "dev"}
+{"id": "q090", "doc": "expense_faq", "kind": "txt", "section": "Specific Items", "question": "Which kinds of penalties are not refunded?", "span": "parking tickets", "split": "test"}
+{"id": "q091", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "1. Purpose", "question": "On what basis may we keep information?", "span": "legal or business need", "split": "dev"}
+{"id": "q092", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "2. Retention Periods", "question": "How long do accounting documents have to be stored?", "span": "kept for 10 years", "split": "dev"}
+{"id": "q093", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "2. Retention Periods", "question": "When are personnel records destroyed?", "span": "6 years after the person leaves", "split": "test"}
+{"id": "q094", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "2. Retention Periods", "question": "How long do we hold CVs of unsuccessful applicants?", "span": "deleted after 6 months", "split": "dev"}
+{"id": "q095", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "2. Retention Periods", "question": "What is the retention period for helpdesk cases?", "span": "kept for 3 years", "split": "dev"}
+{"id": "q096", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "2. Retention Periods", "question": "How long are audit logs kept?", "span": "13 months", "split": "test"}
+{"id": "q097", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "2. Retention Periods", "question": "When are inactive mailing-list contacts purged?", "span": "after 24 months", "split": "dev"}
+{"id": "q098", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "3. Deletion", "question": "Is removing expired data done by hand?", "span": "automated", "split": "dev"}
+{"id": "q099", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "3. Deletion", "question": "How long until deleted data disappears from backups?", "span": "within 90 days", "split": "test"}
+{"id": "q100", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "4. Legal Hold", "question": "What does a litigation hold do to retention rules?", "span": "suspends all deletion", "split": "dev"}
+{"id": "q101", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "4. Legal Hold", "question": "Who controls litigation holds?", "span": "General Counsel", "split": "dev"}
+{"id": "q102", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "5. Responsibilities", "question": "Who applies retention rules for a given application?", "span": "named data owner", "split": "test"}
+{"id": "q103", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "5. Responsibilities", "question": "How often is retention compliance checked?", "span": "every 12 months", "split": "dev"}
+{"id": "q104", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "5. Responsibilities", "question": "Who is told when retention rules are broken?", "span": "Data Protection Officer", "split": "dev"}
+{"id": "q105", "doc": "data_retention_policy", "kind": "pdf_numbered", "section": "5. Responsibilities", "question": "What is the deadline for responding to a subject access request?", "span": "answered within 30 days", "split": "test"}
+{"id": "q106", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Our Ideal Customer", "question": "What company size do we target?", "span": "200 to 2,000 employees", "split": "dev"}
+{"id": "q107", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Our Ideal Customer", "question": "Which sectors should reps focus on?", "span": "logistics, retail and healthcare", "split": "dev"}
+{"id": "q108", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Pipeline Stages", "question": "What makes a prospect qualified?", "span": "confirms budget and timeline", "split": "test"}
+{"id": "q109", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Pipeline Stages", "question": "When is a deal considered stale?", "span": "no activity for 30 days", "split": "dev"}
+{"id": "q110", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Pipeline Stages", "question": "When is the weekly forecast due?", "span": "every Monday by 12:00", "split": "dev"}
+{"id": "q111", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Pricing And Discounts", "question": "How big a price cut can a rep give on their own?", "span": "up to 10 percent", "split": "test"}
+{"id": "q112", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Pricing And Discounts", "question": "Who approves a 20 percent discount?", "span": "regional sales director", "split": "dev"}
+{"id": "q113", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Pricing And Discounts", "question": "What incentive do longer contracts get?", "span": "extra 5 percent discount per additional year", "split": "dev"}
+{"id": "q114", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Contracts", "question": "What are our normal invoice payment terms?", "span": "net 30 days", "split": "test"}
+{"id": "q115", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Contracts", "question": "Who reviews custom contract clauses?", "span": "deal desk", "split": "dev"}
+{"id": "q116", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Commission", "question": "How is a rep's commission calculated?", "span": "8 percent of first-year contract value", "split": "dev"}
+{"id": "q117", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Commission", "question": "When does commission rate increase?", "span": "above 120 percent of quota", "split": "test"}
+{"id": "q118", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Commission", "question": "When do reps receive commission?", "span": "after the customer pays the first invoice", "split": "dev"}
+{"id": "q119", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Tools", "question": "Which CRM holds our deals?", "span": "tracked in HubSpot", "split": "dev"}
+{"id": "q120", "doc": "sales_playbook_slides", "kind": "pdf_slides", "section": "Tools", "question": "Where are sales calls recorded and analysed?", "span": "reviewed weekly in Gong", "split": "test"}
+{"id": "q121", "doc": "remote_work_guide", "kind": "docx", "section": "Eligibility", "question": "When can a new hire start working from home?", "span": "3-month probation", "split": "dev"}
+{"id": "q122", "doc": "remote_work_guide", "kind": "docx", "section": "Eligibility", "question": "How long may I work from another country?", "span": "up to 30 days per year", "split": "dev"}
+{"id": "q123", "doc": "remote_work_guide", "kind": "docx", "section": "Core Hours", "question": "During which hours must remote staff be available?", "span": "10:00 to 15:00 local time", "split": "test"}
+{"id": "q124", "doc": "remote_work_guide", "kind": "docx", "section": "Core Hours", "question": "What should my calendar display?", "span": "working hours and location", "split": "dev"}
+{"id": "q125", "doc": "remote_work_guide", "kind": "docx", "section": "Equipment", "question": "Which equipment is supplied for home working?", "span": "a laptop, a monitor and a headset", "split": "dev"}
+{"id": "q126", "doc": "remote_work_guide", "kind": "docx", "section": "Equipment", "question": "How do I request a better office chair?", "span": "facilities portal", "split": "test"}
+{"id": "q127", "doc": "remote_work_guide", "kind": "docx", "section": "Equipment", "question": "When must kit be given back after resignation?", "span": "returned within 14 days", "split": "dev"}
+{"id": "q128", "doc": "remote_work_guide", "kind": "docx", "section": "Security At Home", "question": "What must I use on a cafe network?", "span": "corporate VPN", "split": "dev"}
+{"id": "q129", "doc": "remote_work_guide", "kind": "docx", "section": "Security At Home", "question": "What is forbidden with a home printer?", "span": "Printing confidential documents", "split": "test"}
+{"id": "q130", "doc": "remote_work_guide", "kind": "docx", "section": "Meetings", "question": "When should my video be switched on?", "span": "fewer than 8 people", "split": "dev"}
+{"id": "q131", "doc": "remote_work_guide", "kind": "docx", "section": "Meetings", "question": "How often do teams meet in person?", "span": "twice a year", "split": "dev"}
+{"id": "q132", "doc": "remote_work_guide", "kind": "docx", "section": "Meetings", "question": "Who covers the cost of travelling to an offsite?", "span": "paid by the company", "split": "test"}
+{"id": "q133", "doc": "remote_work_guide", "kind": "docx", "section": "Wellbeing", "question": "Is there money for a shared office space?", "span": "coworking allowance of EUR 150", "split": "dev"}
+{"id": "q134", "doc": "remote_work_guide", "kind": "docx", "section": "Wellbeing", "question": "How often should I have a check-in with my manager?", "span": "at least every two weeks", "split": "dev"}
+{"id": "q135", "doc": "remote_work_guide", "kind": "docx", "section": "Wellbeing", "question": "Do I have to reply to chats in the evening?", "span": "outside working hours", "split": "test"}
+{"id": "q136", "doc": "it_support_faq", "kind": "md", "section": "Getting Help", "question": "When is the IT helpdesk staffed?", "span": "07:00 to 19:00 CET", "split": "dev"}
+{"id": "q137", "doc": "it_support_faq", "kind": "md", "section": "Getting Help", "question": "Which number do I ring for urgent IT problems at night?", "span": "+44 20 7946 0999", "split": "dev"}
+{"id": "q138", "doc": "it_support_faq", "kind": "md", "section": "Getting Help", "question": "Where do I raise an IT request?", "span": "ServiceNow portal", "split": "test"}
+{"id": "q139", "doc": "it_support_faq", "kind": "md", "section": "Accounts", "question": "Where can I reset my password myself?", "span": "reset.example.com", "split": "dev"}
+{"id": "q140", "doc": "it_support_faq", "kind": "md", "section": "Accounts", "question": "When does an unused account get switched off?", "span": "90 days without a login", "split": "dev"}
+{"id": "q141", "doc": "it_support_faq", "kind": "md", "section": "Accounts", "question": "When do new employees get their login details?", "span": "first morning", "split": "test"}
+{"id": "q142", "doc": "it_support_faq", "kind": "md", "section": "Software", "question": "How long does it take to get new software approved?", "span": "within 3 business days", "split": "dev"}
+{"id": "q143", "doc": "it_support_faq", "kind": "md", "section": "Software", "question": "Where do I get approved applications from?", "span": "Company Portal", "split": "dev"}
+{"id": "q144", "doc": "it_support_faq", "kind": "md", "section": "Software", "question": "How long can I have administrator access on my laptop?", "span": "maximum of 24 hours", "split": "test"}
+{"id": "q145", "doc": "it_support_faq", "kind": "md", "section": "Hardware", "question": "How often do we get a new laptop?", "span": "replaced every 4 years", "split": "dev"}
+{"id": "q146", "doc": "it_support_faq", "kind": "md", "section": "Hardware", "question": "Where can I get a cracked display fixed?", "span": "IT bar on the 2nd floor", "split": "dev"}
+{"id": "q147", "doc": "it_support_faq", "kind": "md", "section": "Hardware", "question": "How long can I borrow a spare laptop?", "span": "up to 2 weeks", "split": "test"}
+{"id": "q148", "doc": "it_support_faq", "kind": "md", "section": "Collaboration", "question": "Which video conferencing tool is standard?", "span": "Microsoft Teams", "split": "dev"}
+{"id": "q149", "doc": "it_support_faq", "kind": "md", "section": "Collaboration", "question": "How much storage does a team drive have?", "span": "1 TB per team", "split": "dev"}
+{"id": "q150", "doc": "it_support_faq", "kind": "md", "section": "Collaboration", "question": "How long can I recover a file I removed?", "span": "restored for 30 days", "split": "test"}

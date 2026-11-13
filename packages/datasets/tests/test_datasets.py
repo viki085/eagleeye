@@ -47,6 +47,19 @@ def test_csv_types_names_and_values_match_pandas() -> None:
     assert frame(out.parquet)["target_eur"].sum() == pytest.approx(reference["Target (EUR)"].sum())
 
 
+def test_hostile_headers_cannot_inject_sql() -> None:
+    """Column names are interpolated into DuckDB queries (as quoted identifiers). Headers
+    crafted as SQL must come out as plain identifiers and profiling must still work."""
+    csv = '"x"" FROM t; DROP TABLE t; --","\'; SELECT 1 --",normal\n1,a,10\n2,b,20\n3,c,30\n'
+    out = convert_csv(csv.encode())
+    names = [c["name"] for c in out.columns]
+    assert all(n.replace("_", "").isalnum() for n in names), names
+    assert names[2] == "normal" and out.row_count == 3
+    profile = profile_parquet(out.parquet, out.column_map)
+    assert profile["row_count"] == 3 and profile["column_count"] == 3
+    assert out.column_map[names[0]].startswith('x" FROM t')  # original kept for display only
+
+
 @pytest.mark.parametrize(
     "raw",
     [

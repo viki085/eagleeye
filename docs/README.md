@@ -56,7 +56,19 @@ All milestones below run on the local Docker Compose stack; AWS (Phase 2 of ADR-
 | 5 | Hardening: guardrails, load test to 2k concurrent, security review | Load-test + security sign-off |
 | 6 (Phase 2) | AWS lift: Terraform, ECS Fargate, Supabase Cloud, managed Redis/Qdrant | Cloud deploy green; parity with local demo |
 
-**Build status (2026-11-12):** milestones 0 and 1 done. Milestone 2 (RAG) is functionally complete — upload, ingest worker, dual-store hybrid retrieval, cited answers (see C4 §9 "As built"); its exit criterion (golden-set recall@5) waits on the eval harness. Agent orchestration (C3) is built: guard → router → supervisor with tools in a Celery agent worker (see C3 §8 "As built").
+**Build status (2026-11-13):**
+
+| Milestone | Status |
+|---|---|
+| 0 Scaffold | ✅ Done |
+| 1 Auth, chat, streaming | ✅ Done |
+| 2 RAG | ✅ Done — retrieval eval (150 questions): budget recall 0.86, recall@5 0.87 with the chosen chunking (C4 §9.1, ADR-32) |
+| 3 Text-to-SQL | 🟡 Built (C5 "As built"); SQL golden set exists (`evals/sql_eval.py`), the formal execution-accuracy target is deferred |
+| 4 CSV EDA, cross-source analysis, charts | ✅ Done — document + database + data-file demo passed (C6 "As built") |
+| 5 Hardening | 🟡 Guardrails, rate limits, kill switches, admin console, admin-provisioned accounts and the security review are done (C8 §7, [security-review-phase6.md](security-review-phase6.md)); the 2,000-concurrent load test moves to cloud pre-production |
+| 6 AWS lift (Phase 2) | ⏳ Next |
+
+Build phases map onto milestones as: phase 2 → M2, phase 4 → M3, phase 5 → M4, phases 3 and 6 → M5 (agent orchestration C3 §8 is the enabler for M3–M4).
 
 ## Notes on the reference site
 

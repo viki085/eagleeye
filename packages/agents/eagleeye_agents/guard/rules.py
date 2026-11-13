@@ -71,7 +71,9 @@ class RuleHit:
 def normalise(text: str) -> str:
     """NFKC folds look-alike characters; zero-width characters are dropped."""
     folded = unicodedata.normalize("NFKC", text)
-    return re.sub(r"[​-‏⁠﻿]", "", folded)
+    # zero-width space…right-to-left mark, word joiner, BOM — written as escapes so the
+    # source has no invisible characters (bandit B613 / "trojan source")
+    return re.sub(r"[\u200b-\u200f\u2060\ufeff]", "", folded)
 
 
 def check_rules(text: str, denied_topics: tuple[str, ...] = ()) -> RuleHit | None:

@@ -42,5 +42,24 @@ Mechanics: datasets versioned in `evals/`; runner supports **mock-LLM mode** (fa
 ## 5. Dashboards & on-call
 Dashboards (Grafana, Phase 1; + CloudWatch dashboards Phase 2): Chat health, LLM cost & quota, RAG quality, SQL accuracy, Ingestion, Security events. Paging for SLO burn, DLQ > 0, LLM provider quota exhaustion, Supabase/Redis health, gateway outage per source. Runbooks per alarm.
 
+## 5a. As built — Phase 6 (local, ADR-32)
+
+Monitoring is an **in-app admin console** (`/admin`, admins only) instead of Grafana/Langfuse in the
+local phase. Every figure is a read-only aggregate computed when an admin opens the console —
+nothing is added to answer generation; aggregates are cached 60 s per period.
+
+| Report | Contents |
+|---|---|
+| Overview | Active users, requests, success and failure rate (period-over-period deltas, sparklines), LLM cost (billing ledger), average response time (p95, first token); live database health (Postgres + Qdrant pings), active/stalled agents, safety events, enterprise knowledge; request outcomes per day/hour, LLM cost by model (donut), request routing distribution, slowest pipeline steps (mean), step latency trend and change for six major stages |
+| Users | Accounts, roles, last seen, requests, tokens, cost, usage-limit share; add (one or CSV), delete |
+| Usage & cost | Cost per day by model, top spenders, agent tool usage |
+| Quality & safety | Guard events by category, SQL refusals, sandbox results, unverified-figure rate, failed runs, admin audit trail |
+| Content | Enterprise knowledge base (upload one or many, delete with typed confirmation), indexing status, failures |
+| System & controls | Service health, queue depth, active/stuck runs, kill switches, clear stuck runs |
+
+Runs now record `first_token_at`, `finished_at` and `warnings`. Evaluation suites in `evals/`:
+guard, SQL, analysis, model bench and (Phase 6) **retrieval** (`retrieval_eval.py`, see C4 §9.1).
+Structured JSON logs, tracing and the 2,000-connection load test move to the cloud phase.
+
 ## 6. Load & chaos testing
 k6 scripts: 2,000 concurrent SSE with stubbed LLM (LiteLLM mock mode); separate LLM provider rate-limit test (simulate 429 storms); Celery ingestion backlog test (1,000 docs); chaos: kill Celery workers mid-run (resume via LangGraph checkpoint), throttle LLM provider (fallback model chain), drop Redis node (failover), block a DB source (degrade gracefully), expire Clerk JWKS cache.

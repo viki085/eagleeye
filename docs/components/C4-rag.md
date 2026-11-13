@@ -84,6 +84,20 @@ Golden set (≥ 150 Q/A with source chunks across enterprise + personal): recall
 | Answer | Grounded system prompt with numbered `<context>` (document text neutralised, marked untrusted); `[n]` → `citation` SSE events + persisted `citations` message part; UI chips open the exact chunk | Output assertion re-check |
 | Relevance floor | `RAG_MIN_SCORE=0.25` cosine. Local calibration: on-topic questions 0.50–0.55, off-topic 0.10 | Golden-set calibration |
 
+### 9.1 As built — Phase 6 (retrieval quality, ADR-32)
+
+| Area | Implemented |
+|------|-------------|
+| Retrieval eval | `evals/retrieval_eval.py` over `evals/fixtures/retrieval_docs/` (10 documents: slide PDFs, numbered-heading PDFs, a Title Case PDF, DOCX with tables, Markdown, plain text) and `evals/retrieval_golden.jsonl` (150 paraphrased questions with a gold answer span; 100 dev / 50 held out). Corpus and questions come from one spec (`evals/fixtures/docs_spec.py`) so every span exists. Real parser → chunker → embeddings → pgvector/tsvector rows for a temporary user → real `Retriever` with rewriting off |
+| Metric | **Budget recall**: gold span inside the top results cut to 6,000 chars (what the model reads; hydrate truncates each chunk to 2,000). Also recall@5 and MRR, per document kind |
+| Result | Old (2400/3000): budget recall 0.79, recall@5 0.83, MRR 0.69 → **chosen C: 0.86 / 0.87 / 0.73** (all 150). Chosen on dev (C 0.85 vs D 0.84, B 0.83, A 0.79), confirmed on held-out (C 0.88 vs A 0.82) |
+| Chunking | Soft 1,200 / max 1,600 / overlap 200 / merge below 400 — settings `CHUNK_SOFT_CHARS`, `CHUNK_MAX_CHARS`, `CHUNK_OVERLAP_CHARS`, `CHUNK_MIN_CHARS` |
+| PDF structure | `PdfOptions`: slide markers (`Slide 3 of 12`, `SLIDE 137: Title`, title on the next line) start a section with the slide title as heading; bullets (incl. glyphs pypdf extracts as control/private-use chars) start their own block. Title Case headings implemented but **off** (misfired on a real deck: footer names, wrapped title fragments) |
+| Re-index | `python -m ingest_worker.reindex --all \| --document <id> [--dry-run]` queues `ingest.reindex_document`; documents stay READY and chunks swap in one transaction; permanent errors keep the old chunks. Real "Section 14" deck: 11 chunks (avg 1,885 chars, none with a heading) → 22 chunks (avg 909, 21 with the slide heading) |
+| Old citations | Re-indexing changes chunk ids; the source drawer falls back to the snippet saved with the answer and says so |
+
+Remaining misses are mostly paraphrases with little word overlap ("journalists" vs "press"); production query rewriting (off in the eval) targets exactly these. The synthetic corpus is easier than real documents: numbers compare chunkers, they are not an absolute quality score.
+
 ## 10. Open questions
 - Languages besides English? (affects embedding model/tokenizer choice).
 - Do enterprise docs have existing labels/classification we should import as ACLs?

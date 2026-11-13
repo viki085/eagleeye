@@ -62,10 +62,18 @@ class FakeRepo:
     filename: str = "policy.txt"
     statuses: list[tuple[str, str | None]] = field(default_factory=list)
     vectors_passed: list | None = None
+    status: str = "UPLOADING"
 
     async def get_document(self, conn, document_id):  # noqa: ANN001
-        return {"id": DOC_ID, "scope": self.scope, "owner_id": None, "title": "Policy",
-                "filename": self.filename, "s3_key": "k", "status": "UPLOADING"}
+        return {
+            "id": DOC_ID,
+            "scope": self.scope,
+            "owner_id": None,
+            "title": "Policy",
+            "filename": self.filename,
+            "s3_key": "k",
+            "status": self.status,
+        }
 
     async def set_status(self, conn, document_id, status, error=None):  # noqa: ANN001
         self.statuses.append((status, error))
@@ -120,6 +128,29 @@ async def test_spoofed_file_marks_failed(fake_repo: FakeRepo) -> None:
 async def test_missing_object_marks_failed(fake_repo: FakeRepo) -> None:
     await pipeline.process(DOC_ID, _deps(_Store(ObjectNotFoundError("k")), _Embedder(), _Vectors()))
     assert fake_repo.statuses[-1][0] == "FAILED"
+
+
+async def test_reindex_keeps_the_document_searchable(fake_repo: FakeRepo) -> None:
+    """No PARSING/CHUNKING/... statuses: retrieval only searches READY documents, so a
+    re-index must never make a working document disappear from answers."""
+    fake_repo.status = "READY"
+    vectors = _Vectors()
+    assert await pipeline.reindex(DOC_ID, _deps(_Store(BODY), _Embedder(), vectors)) is True
+    assert [s for s, _ in fake_repo.statuses] == ["READY"]  # only the chunk-count refresh
+    assert vectors.deleted == [DOC_ID] and len(vectors.points) >= 1
+
+
+async def test_reindex_skips_documents_that_are_not_ready(fake_repo: FakeRepo) -> None:
+    fake_repo.status = "EMBEDDING"
+    assert await pipeline.reindex(DOC_ID, _deps(_Store(BODY), _Embedder(), _Vectors())) is False
+    assert fake_repo.statuses == []
+
+
+async def test_reindex_permanent_failure_leaves_old_chunks(fake_repo: FakeRepo) -> None:
+    fake_repo.status = "READY"
+    fake_repo.filename = "policy.pdf"  # content doesn't match: a permanent parse error
+    assert await pipeline.reindex(DOC_ID, _deps(_Store(BODY), _Embedder(), _Vectors())) is False
+    assert fake_repo.statuses == [] and fake_repo.vectors_passed is None  # nothing replaced
 
 
 async def test_embedding_outage_is_transient(fake_repo: FakeRepo) -> None:

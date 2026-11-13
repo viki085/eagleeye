@@ -164,7 +164,7 @@ def test_grounding_flags_uncited_answer_unless_not_found() -> None:
     "leak",
     [
         "sk-proj-abcdefghijklmnopqrstuvwxyz12",
-        "AKIAABCDEFGHIJKLMNOP",
+        "AKIAABCDEFGHIJKLMNOP",  # gitleaks:allow — fake key, input for the secret filter
         "-----BEGIN RSA PRIVATE KEY-----",
         "eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0.SflKxwRJSMeKKF2QT4",
     ],

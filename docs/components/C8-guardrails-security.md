@@ -56,3 +56,22 @@ Data residency by region choice (D5); data processing agreement with Clerk (iden
 
 ## 6. Incident response (outline)
 Severity matrix; kill switches (env/Redis flags Phase 1; AppConfig Phase 2) for SQL, analysis, uploads, whole chat; revoke Clerk sessions; rotate secrets runbook; forensic trail via trace_id ↔ audit_log ↔ sql_query_log; post-mortem template.
+
+## 7. As built — Phase 6 (local, ADR-32)
+
+Full review with scan results and accepted risks: [security-review-phase6.md](../security-review-phase6.md).
+
+| Control | Implemented |
+|---|---|
+| Accounts | **Admin-provisioned only.** Admins add users (one, or CSV in batches of 25) → Clerk account + company Clerk organisation + EagleEye row with a role; usernames chosen or derived from the email. The API refuses any Clerk account it did not provision (`403`, "ask your administrator"), so a Clerk-side sign-up can never create an EagleEye account. No sign-up route |
+| Sign-in | Custom page on Clerk Core 3: Google, or username/work email → password or 6-digit emailed code; device-trust codes; the `choose-organization` session task resolved automatically; post-sign-in redirect restricted to this origin |
+| Account removal | Delete revokes the Clerk sign-in, marks the row `deleted` (billing/audit kept) and drops the cached identity at once; self-delete and last-admin delete refused; re-adding the email reactivates |
+| Admin authorisation | Role and status re-read from the database on every admin call; route matrix test generated from the OpenAPI schema |
+| Audit | `security_events` kind `admin_action`, written **before** the action: kill switches, clear stuck runs, user add/import/delete, enterprise document add/delete |
+| Kill switches | Redis `kill:{chat,sql,analysis,uploads}`; reads fail open; chat/uploads refuse with 503, the runner hides SQL/analysis tools |
+| Rate limits | Redis fixed window per user (per IP before auth): 300 req/min general, 20 messages/min, 20 uploads/min, 600/min per IP, ≤ 4 open streams per user; `429` + `Retry-After`; fail open |
+| Request hygiene | Request ids on every response, log line and error envelope; JSON bodies > 64 KB refused; crash responses keep CORS headers and hide internals |
+| Headers | API: `nosniff`, `X-Frame-Options: DENY`, referrer and permissions policies. Web: CSP (no `unsafe-eval` in production; Clerk frontend API, accounts portal and bot protection allowed; Clerk telemetry off) |
+| Indirect injection | `neutralise()` also defeats look-alike brackets (`＜`, `〈`, `⟨`…) and HTML-escaped tags; unknown tool calls refused; tool set fixed per run |
+| Config safety | Settings refuse to load outside `APP_ENV=local` while the local object-store credentials are in use |
+| Supply chain | `pip-audit`, `npm audit`, `gitleaks` (allow-list by fingerprint), `trivy` on the sandbox image, `bandit` — re-run commands in the review |

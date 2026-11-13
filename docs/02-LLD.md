@@ -63,10 +63,36 @@ Envelope for all JSON: `{ "success": bool, "data": T|null, "error": {code,messag
 | GET | `/v1/artifacts/{id}/csv` | Owner-only CSV download (≤ 10,000 rows; cells starting `= + - @` prefixed with `'`) |
 | POST | `/v1/messages/{id}/feedback` | Thumbs + comment |
 | GET/PUT/DELETE | `/v1/me/facts` | User facts (view/edit/delete) |
-| — | `/v1/admin/...` | Sources, catalog descriptions, enterprise docs & ACLs, usage, audit, kill switches (role=admin) |
+| — | `/v1/admin/...` | Sources, catalog descriptions, enterprise docs & ACLs, usage, audit, kill switches (role=admin) — **as built in Phase 6, see §2.2a** |
 | POST | `/v1/webhooks/clerk` | Clerk user/org events (Svix signature verified) |
 
 Errors: `400 validation, 401, 403, 404, 409 duplicate, 413 too large, 422, 429 rate/quota (Retry-After), 503 degraded`.
+
+### 2.2a As built — Phase 6 (admin, accounts, hardening; ADR-32)
+
+**Middleware (outermost first):** request id → security headers → JSON body limit (64 KB) → CORS
+(exposes `X-Request-ID`, `Retry-After`) → crash-to-envelope → routes. Rate limits run in the auth
+dependency (IP before token check, user after). Every error envelope carries `request_id`.
+
+**Accounts:** no lazy provisioning — a Clerk user without an EagleEye row gets `403` ("ask your
+administrator"); `deleted`/`disabled` accounts get `403`.
+
+| Method | Path | Purpose (all `/v1/admin/*` require role `admin`, re-read from the DB per call) |
+|--------|------|---------|
+| GET | `/v1/admin/overview?range=24h\|7d\|30d` | KPIs + previous period, series, cost by model, routes, slowest steps, step trend/change, knowledge base; live database health + active runs. Aggregates cached 60 s per range |
+| GET | `/v1/admin/users?range&sort&offset&limit` | Live accounts (not `deleted`) with period requests/tokens/cost and usage-limit share |
+| POST | `/v1/admin/users` | Add one user `{email, username?, first_name, last_name, role}` → Clerk account + organisation membership + row (`201`; `409` existing; rollback on failure) |
+| POST | `/v1/admin/users/bulk` | `{users: [...≤25]}` → per-row `{email, ok, error?, user?}` |
+| DELETE | `/v1/admin/users/{id}` | Revoke Clerk sign-in, mark `deleted`; `400` self, `409` last admin; audited first |
+| GET | `/v1/admin/usage\|safety\|content\|system` | Usage & cost, quality & safety (incl. admin audit trail), content status, service health/queues/runs/switches |
+| POST | `/v1/admin/switches/{chat\|sql\|analysis\|uploads}` | `{killed: bool}`; audited before the flag changes |
+| POST | `/v1/admin/runs/clear-stuck` | Fail runs with no worker heartbeat |
+
+Enterprise document upload/delete (`/v1/documents`, scope `enterprise`) is audited as an admin
+action. Limits (settings): `RATE_LIMIT_GENERAL_PER_MIN=300`, `RATE_LIMIT_MESSAGES_PER_MIN=20`,
+`RATE_LIMIT_UPLOADS_PER_MIN=20`, `RATE_LIMIT_IP_PER_MIN=600`, `MAX_STREAMS_PER_USER=4`.
+Chunking: `CHUNK_SOFT_CHARS=1200`, `CHUNK_MAX_CHARS=1600`, `CHUNK_OVERLAP_CHARS=200`,
+`CHUNK_MIN_CHARS=400`; re-index with `python -m ingest_worker.reindex --all`.
 
 ### 2.3 SSE event vocabulary (single sink stamps gapless `seq` from 0)
 ```
