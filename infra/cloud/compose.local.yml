@@ -1,0 +1,55 @@
+# Laptop override for compose.demo.yml: run the containerised services against the local stack
+# (Supabase on the host, and the redis / qdrant / seaweedfs / warehouse containers from
+# infra/docker-compose.yml) instead of their own Redis and an empty warehouse.
+#
+#   scripts\stop.cmd                       (stop the laptop API, gateway and workers first)
+#   docker compose -f infra/cloud/compose.demo.yml -f infra/cloud/compose.local.yml \
+#     --env-file .env up -d api gateway agent-worker ingest-worker
+#
+# The repo's .env is read by Docker itself; only the local addresses are replaced here.
+services:
+  api: &local
+    env_file: ../../.env
+    networks: [default, infra]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      S3_ENDPOINT_URL: http://seaweedfs:8333
+      WAREHOUSE_DSN: postgresql://eagleeye_ro:eagleeye-ro-local@warehouse:5432/warehouse
+      SERVICE: api
+    depends_on: !reset []
+  gateway:
+    <<: *local
+    depends_on: !reset []
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      WAREHOUSE_DSN: postgresql://eagleeye_ro:eagleeye-ro-local@warehouse:5432/warehouse
+      S3_ENDPOINT_URL: http://seaweedfs:8333  # query results are stored as artifacts
+      SERVICE: gateway
+  agent-worker:
+    <<: *local
+    depends_on: !reset []
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      S3_ENDPOINT_URL: http://seaweedfs:8333
+      SERVICE: agent-worker
+  ingest-worker:
+    <<: *local
+    depends_on: !reset []
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      S3_ENDPOINT_URL: http://seaweedfs:8333
+      SERVICE: ingest-worker
+  # the local stack already has these
+  redis: { profiles: [cloud-only] }
+  warehouse: { profiles: [cloud-only] }
+
+networks:
+  infra:
+    name: eagleeye_default
+    external: true

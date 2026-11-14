@@ -1,0 +1,99 @@
+# The demo machine (Phase 7 demo mode): the four EagleEye services from ONE image, plus Redis
+# and the read-only Grand Line warehouse. Supabase (database), Qdrant Cloud (vectors) and S3
+# (files) are managed services reached through the settings in the env file.
+#
+# On the EC2 machine the boot script writes /opt/eagleeye/.env.demo from SSM Parameter Store
+# and sets EAGLEEYE_IMAGE to the image tag recorded by the deploy pipeline:
+#   docker compose -f compose.demo.yml up -d
+#
+# On a laptop, add compose.local.yml to run against the local Supabase and infra containers.
+name: eagleeye-demo
+
+x-service: &service
+  image: ${EAGLEEYE_IMAGE:-eagleeye:local}
+  env_file: ${EAGLEEYE_ENV_FILE:-.env.demo}
+  restart: unless-stopped
+  # Celery warm shutdown / uvicorn graceful shutdown: let running answers finish
+  stop_grace_period: 120s
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+x-internal-urls: &internal-urls
+  REDIS_URL: redis://redis:6379/0
+  GATEWAY_URL: http://gateway:8100
+  WAREHOUSE_DSN: ${WAREHOUSE_DSN:-postgresql://eagleeye_ro:eagleeye-ro-local@warehouse:5432/warehouse}
+
+services:
+  api:
+    <<: *service
+    environment:
+      <<: *internal-urls
+      SERVICE: api
+      # only CloudFront's origin-facing addresses may set the client address (set per deploy)
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      redis: { condition: service_healthy }
+      gateway: { condition: service_healthy }
+
+  gateway:
+    <<: *service
+    environment:
+      <<: *internal-urls
+      SERVICE: gateway
+    depends_on:
+      warehouse: { condition: service_healthy }
+
+  agent-worker:
+    <<: *service
+    environment:
+      <<: *internal-urls
+      SERVICE: agent-worker
+      AGENT_CONCURRENCY: ${AGENT_CONCURRENCY:-8}
+    depends_on:
+      redis: { condition: service_healthy }
+      gateway: { condition: service_healthy }
+
+  ingest-worker:
+    <<: *service
+    environment:
+      <<: *internal-urls
+      SERVICE: ingest-worker
+    depends_on:
+      redis: { condition: service_healthy }
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Grand Line operations data, queried only by the gateway as eagleeye_ro. The role comes from
+  # warehouse/init; the data is loaded once into the volume (Phase 7B).
+  warehouse:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: warehouse
+      POSTGRES_USER: warehouse_admin
+      POSTGRES_PASSWORD: ${WAREHOUSE_ADMIN_PASSWORD:?set WAREHOUSE_ADMIN_PASSWORD}
+    volumes:
+      - warehouse-data:/var/lib/postgresql/data
+      - ../warehouse/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_admin -d warehouse"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  redis-data:
+  warehouse-data:

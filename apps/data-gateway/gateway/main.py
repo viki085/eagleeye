@@ -39,7 +39,9 @@ async def _meta_pool(dsn: str) -> asyncpg.Pool:
             "jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog"
         )
 
-    return await asyncpg.create_pool(dsn, min_size=1, max_size=5, init=_init)
+    return await asyncpg.create_pool(
+        dsn, min_size=1, max_size=get_settings().db_pool_max_gateway, init=_init
+    )
 
 
 @asynccontextmanager
@@ -47,7 +49,7 @@ async def lifespan(app: FastAPI):
     s = get_settings()
     app.state.secret = resolve_secret(s.gateway_hmac_secret, s.app_env)  # fails fast in prod
     meta = await _meta_pool(s.database_url)
-    store = S3ObjectStore(s.s3_endpoint_url, s.s3_access_key, s.s3_secret_key, s.artifacts_bucket)
+    store = S3ObjectStore.from_settings(s, s.artifacts_bucket)
     try:
         await store.ensure_bucket()
     except Exception:

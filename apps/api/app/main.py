@@ -8,10 +8,9 @@ from eagleeye_catalog.repo import CatalogRepo
 from eagleeye_catalog.service import CatalogService
 from eagleeye_core.config import get_settings
 from eagleeye_core.storage import S3ObjectStore, build_object_store
-from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore
+from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_qdrant_client
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from qdrant_client import AsyncQdrantClient
 
 from app.db import create_pool
 from app.demo import reset_loop
@@ -75,18 +74,13 @@ async def lifespan(app: FastAPI):
         settings.clerk_secret_key, settings.clerk_organization_id
     )
     state.store = build_object_store()
-    state.qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    state.qdrant = build_qdrant_client(settings)
     state.enterprise_store = QdrantEnterpriseStore(
         state.qdrant, settings.qdrant_collection, settings.embed_dim
     )
     # Phase 4: catalog metadata (no warehouse credentials here) + result-table reader
     state.catalog = CatalogService(CatalogRepo(state.pool))
-    state.artifact_store = S3ObjectStore(
-        settings.s3_endpoint_url,
-        settings.s3_access_key,
-        settings.s3_secret_key,
-        settings.artifacts_bucket,
-    )
+    state.artifact_store = S3ObjectStore.from_settings(settings, settings.artifacts_bucket)
     await _prepare_storage(app)
     demo_reset = asyncio.create_task(reset_loop.run_forever(state, settings))
     try:

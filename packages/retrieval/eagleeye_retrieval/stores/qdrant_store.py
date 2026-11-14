@@ -1,11 +1,15 @@
 """Enterprise-scope vectors in Qdrant (ADR-04). Point id == document_chunks.id."""
 
 import logging
+from typing import TYPE_CHECKING
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client import models as qm
 
 from eagleeye_retrieval.types import AccessScope, VectorHit, VectorPoint
+
+if TYPE_CHECKING:
+    from eagleeye_core.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +18,11 @@ UPSERT_BATCH = 128
 
 class CollectionDimMismatchError(RuntimeError):
     pass
+
+
+def build_qdrant_client(settings: "Settings") -> AsyncQdrantClient:
+    """The one place the Qdrant client is built: the local server has no key, Qdrant Cloud does."""
+    return AsyncQdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key or None)
 
 
 class QdrantEnterpriseStore:
@@ -58,16 +67,12 @@ class QdrantEnterpriseStore:
                 wait=True,
             )
 
-    async def search(
-        self, vector: list[float], scope: AccessScope, limit: int
-    ) -> list[VectorHit]:
+    async def search(self, vector: list[float], scope: AccessScope, limit: int) -> list[VectorHit]:
         query_filter = None
         if scope.doc_ids:
             query_filter = qm.Filter(
                 must=[
-                    qm.FieldCondition(
-                        key="document_id", match=qm.MatchAny(any=list(scope.doc_ids))
-                    )
+                    qm.FieldCondition(key="document_id", match=qm.MatchAny(any=list(scope.doc_ids)))
                 ]
             )
         resp = await self._client.query_points(

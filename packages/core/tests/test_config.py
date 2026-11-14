@@ -24,3 +24,14 @@ def test_deployed_env_with_real_storage_keys_loads() -> None:
         s3_secret_key="a-real-secret",  # noqa: S106 — test value
     )
     assert s.app_env == "production"
+
+
+def test_pool_sizes_are_settings_with_safe_defaults() -> None:
+    s = Settings(_env_file=None)
+    assert (s.db_pool_max_api, s.db_pool_max_worker, s.db_pool_max_gateway) == (10, 10, 5)
+    small = Settings(_env_file=None, db_pool_max_api=3, db_pool_max_worker=2, db_pool_max_gateway=2)
+    assert (small.db_pool_max_api, small.db_pool_max_worker, small.db_pool_max_gateway) == (3, 2, 2)
+
+
+def test_qdrant_api_key_defaults_to_none_for_the_local_server() -> None:
+    assert Settings(_env_file=None).qdrant_api_key == ""

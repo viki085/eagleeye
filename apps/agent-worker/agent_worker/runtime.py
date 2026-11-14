@@ -31,24 +31,21 @@ from eagleeye_llm.embeddings import CachingEmbedder, LiteLLMEmbedder
 from eagleeye_llm.litellm_adapter import LiteLLMGateway
 from eagleeye_retrieval.service import Retriever
 from eagleeye_retrieval.stores.pgvector_store import PgVectorPersonalStore
-from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore
+from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_qdrant_client
 from eagleeye_sandbox.docker_executor import DockerExecutor
-from qdrant_client import AsyncQdrantClient
-
-POOL_MAX_SIZE = 10
 
 _lock = threading.Lock()
 _loop: asyncio.AbstractEventLoop | None = None
 _deps: RunnerDeps | None = None
 
 
-async def _create_pool(dsn: str) -> asyncpg.Pool:
+async def _create_pool(dsn: str, max_size: int) -> asyncpg.Pool:
     async def _init(conn: asyncpg.Connection) -> None:
         await conn.set_type_codec(
             "jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog"
         )
 
-    return await asyncpg.create_pool(dsn, min_size=1, max_size=POOL_MAX_SIZE, init=_init)
+    return await asyncpg.create_pool(dsn, min_size=1, max_size=max_size, init=_init)
 
 
 def agent_settings(s: Settings) -> AgentSettings:
@@ -69,16 +66,14 @@ def _analysis(s: Settings, pool: asyncpg.Pool) -> tuple[PgDataWorkspace | None, 
     is probed per run (so starting Docker later turns analysis on without a restart)."""
     if not s.enable_analysis:
         return None, None
-    artifacts = S3ObjectStore(
-        s.s3_endpoint_url, s.s3_access_key, s.s3_secret_key, s.artifacts_bucket
-    )
+    artifacts = S3ObjectStore.from_settings(s, s.artifacts_bucket)
     workspace = PgDataWorkspace(pool, build_object_store(), artifacts)
     executor = DockerExecutor(s.sandbox_image, s.sandbox_mem_mb, s.sandbox_timeout_s)
     return workspace, executor
 
 
 async def _build_deps(s: Settings) -> RunnerDeps:
-    pool = await _create_pool(s.database_url)
+    pool = await _create_pool(s.database_url, s.db_pool_max_worker)
     redis = aioredis.from_url(s.redis_url, socket_connect_timeout=5)
     llm = LiteLLMGateway(
         s.model_fast,
@@ -88,7 +83,7 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         reasoning_fast=s.reasoning_effort_fast,
         reasoning_capable=s.reasoning_effort_capable,
     )
-    qdrant = AsyncQdrantClient(url=s.qdrant_url)
+    qdrant = build_qdrant_client(s)
     cache = AppCache(redis, s.app_cache_ttl_s, s.app_cache_enabled)
     embedder = LiteLLMEmbedder(s.embed_model, s.embed_dim)
     # searches reuse cached query vectors; the catalog keeps the plain embedder

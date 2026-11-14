@@ -21,10 +21,19 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379/0"
     qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""  # Qdrant Cloud; empty for the local server
+    # Object storage. Local: the S3-compatible server with its keys. AWS: leave the endpoint and
+    # both keys empty, and boto3 uses the machine's role (no keys in settings) in aws_region.
     s3_endpoint_url: str = "http://localhost:8333"
     s3_access_key: str = LOCAL_S3_ACCESS_KEY
     s3_secret_key: str = LOCAL_S3_SECRET
+    aws_region: str = "us-east-1"
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    # Database connections per process. In the cloud many tasks share Supabase's pooler, so
+    # these are lowered there to fit its connection limit.
+    db_pool_max_api: int = 10
+    db_pool_max_worker: int = 10
+    db_pool_max_gateway: int = 5
 
     llm_provider: str = "openai"
     openai_api_key: str = ""

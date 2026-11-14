@@ -2,11 +2,14 @@
 
 import asyncio
 import logging
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
+
+if TYPE_CHECKING:
+    from eagleeye_core.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +34,43 @@ def _is_not_found(exc: ClientError) -> bool:
 
 
 class S3ObjectStore:
-    """boto3 is sync; every call is pushed to a thread so the event loop never blocks."""
+    """boto3 is sync; every call is pushed to a thread so the event loop never blocks.
 
-    def __init__(self, endpoint_url: str, access_key: str, secret_key: str, bucket: str) -> None:
+    With an endpoint (the local S3-compatible server) it uses path-style addressing and the given
+    keys. Without one it talks to AWS S3 in `region`; empty keys mean boto3's default credential
+    chain, i.e. the machine's or task's IAM role, so no keys live in settings.
+    """
+
+    def __init__(
+        self,
+        endpoint_url: str,
+        access_key: str,
+        secret_key: str,
+        bucket: str,
+        region: str = "us-east-1",
+    ) -> None:
         self._bucket = bucket
+        custom_endpoint = bool(endpoint_url)
         self._client = boto3.client(
             "s3",
-            endpoint_url=endpoint_url,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name="us-east-1",
-            config=Config(s3={"addressing_style": "path"}, retries={"max_attempts": 3}),
+            endpoint_url=endpoint_url or None,
+            aws_access_key_id=access_key or None,
+            aws_secret_access_key=secret_key or None,
+            region_name=region,
+            config=Config(
+                s3={"addressing_style": "path"} if custom_endpoint else {},
+                retries={"max_attempts": 3},
+            ),
+        )
+
+    @classmethod
+    def from_settings(cls, settings: "Settings", bucket: str) -> "S3ObjectStore":
+        return cls(
+            settings.s3_endpoint_url,
+            settings.s3_access_key,
+            settings.s3_secret_key,
+            bucket,
+            settings.aws_region,
         )
 
     async def ensure_bucket(self) -> None:
@@ -79,4 +108,4 @@ def build_object_store() -> S3ObjectStore:
     from eagleeye_core.config import get_settings
 
     s = get_settings()
-    return S3ObjectStore(s.s3_endpoint_url, s.s3_access_key, s.s3_secret_key, s.docs_bucket)
+    return S3ObjectStore.from_settings(s, s.docs_bucket)

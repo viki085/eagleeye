@@ -9,9 +9,8 @@ from eagleeye_core.config import get_settings
 from eagleeye_core.storage import ObjectNotFoundError, ObjectStore, build_object_store
 from eagleeye_llm.embeddings import Embedder, LiteLLMEmbedder
 from eagleeye_retrieval.stores.base import VectorStore
-from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore
+from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_qdrant_client
 from eagleeye_retrieval.types import VectorPoint
-from qdrant_client import AsyncQdrantClient
 
 from ingest_worker import repo
 from ingest_worker.chunking import PATH_SEP, Chunk, chunk
@@ -161,7 +160,7 @@ async def _with_deps(
     """Builds and tears down every client inside one event loop (one Celery task)."""
     s = get_settings()
     conn = await repo.connect(s.database_url)
-    qdrant = AsyncQdrantClient(url=s.qdrant_url)
+    qdrant = build_qdrant_client(s)
     try:
         enterprise = QdrantEnterpriseStore(qdrant, s.qdrant_collection, s.embed_dim)
         deps = PipelineDeps(
