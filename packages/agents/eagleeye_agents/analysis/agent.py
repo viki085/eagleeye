@@ -1,4 +1,4 @@
-"""The analysis sub-agent (C6 §3–4): ≤ 4 generations, ≤ 3 sandbox executions per call.
+"""The analysis sub-agent (C6 §3–4): ≤ 3 generations, ≤ 3 sandbox executions per call.
 
 Steps nest under the tool call: load inputs → write code → check code → run in sandbox.
 Inputs are owner-checked by the workspace; code runs only in the sandbox container.
@@ -31,14 +31,26 @@ from eagleeye_agents.sql.types import UI_PREVIEW_ROWS, ArtifactRef
 
 logger = logging.getLogger(__name__)
 
-MAX_GENERATIONS = 4
+# Code-writing attempts per analyze_data call. They have their own cap and don't count toward
+# the planner's steps, so one hard analysis can't use up the whole answer (cost and time limits
+# still apply to every attempt).
+MAX_GENERATIONS = 3
 MAX_EXECUTIONS = 3
+# Room for a complete script inside the JSON reply (code is escaped, so it costs more tokens).
+# A reply that uses the whole allowance was cut off mid-way.
+CODE_MAX_TOKENS = 4000
 MAX_PYTHON_RUNS_PER_RUN = 3
 MAX_STATS_FOR_MODEL = 40
 DISABLED = "Data analysis is not available right now."
 QUOTA = "The hourly analysis limit has been reached. Try again later."
 NO_INPUTS = "None of the given inputs are available to you. Use list_datasets to see them."
 PYTHON_OFF = "Python analysis is turned off; write DuckDB SQL instead."
+CUT_OFF = (
+    "Your last reply was cut off at the length limit before the JSON was complete: the code was "
+    "too long. Write a shorter script that covers the most important part of the task (fewer "
+    "steps, at most 3 small tables), and say in assumptions what was left out."
+)
+BAD_JSON = "Your last reply was not valid JSON. Return only the JSON object."
 RETRY_HINT = {
     "timeout": "It took too long: aggregate earlier, filter, or sample the data.",
     "oom": "It ran out of memory: aggregate earlier or work on fewer columns.",
@@ -94,17 +106,17 @@ async def _load_inputs(
 
 async def _generate(
     ctx: RunContext, system: str, question: str, feedback: list[str], parent: str | None
-) -> Draft | None:
+) -> tuple[Draft | None, bool]:
+    """(draft, cut_off): no draft when the reply isn't usable; cut_off when it hit the limit."""
     today = datetime.now(UTC).strftime("%Y-%m-%d")
     user = f"Today's date: {today}\n\nTask: {question}"
     if feedback:
         user += "\n\nPrevious attempts and problems:\n" + "\n".join(f"- {f}" for f in feedback)
-    ctx.budget.record_step()
     async with ctx.steps.step("llm", "write analysis code", question, parent) as step:
         raw, usage = await ctx.llm.complete(
             "capable",
             [ChatMessage("system", system), ChatMessage("user", user)],
-            max_tokens=1400,
+            max_tokens=CODE_MAX_TOKENS,
             json_mode=True,
             temperature=0,
         )
@@ -113,8 +125,10 @@ async def _generate(
         try:
             draft = parse_draft(raw)
         except (ValueError, json.JSONDecodeError):
-            step.status, step.output_summary = "error", "invalid JSON"
-            return None
+            cut_off = usage.tokens_out >= CODE_MAX_TOKENS
+            step.status = "error"
+            step.output_summary = "cut off: code too long" if cut_off else "invalid JSON"
+            return None, cut_off
         step.output_summary = (
             f"{MODE_LABEL[draft.mode]}: {draft.code}"
             if draft.code
@@ -122,7 +136,7 @@ async def _generate(
             if draft.unavailable
             else "asks a clarifying question"
         )
-    return draft
+    return draft, False
 
 
 async def _check(
@@ -248,9 +262,10 @@ async def _loop(
     for attempt in range(1, MAX_GENERATIONS + 1):
         if ctx.budget.breach(ctx.usage.cost_usd):
             break
-        draft = await _generate(ctx, system, question, feedback, parent)
+        draft, cut_off = await _generate(ctx, system, question, feedback, parent)
         if draft is None:
-            feedback.append("Your last reply was not valid JSON. Return only the JSON object.")
+            feedback.append(CUT_OFF if cut_off else BAD_JSON)
+            last_problem = "the code was too long" if cut_off else "the reply was not valid JSON"
             continue
         if draft.unavailable and not draft.code:
             return AnalysisOutcome("no_access", draft.unavailable, attempts=attempt)

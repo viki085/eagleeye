@@ -186,7 +186,7 @@ Tests are written first for each code change.
 1. **Containers**
    - `infra/docker/python.Dockerfile`: one multi-stage `uv` image, with a build argument selecting the service (API, gateway, agent worker, ingest worker). Non-root user, health check.
    - `infra/cloud/compose.demo.yml`: the demo-machine stack built from those images plus Redis and the warehouse.
-2. **Lambda sandbox**
+2. **Lambda sandbox, with notebook mode** (notebook mode is planned in `docs/notebook-eda-plan.md`: analyst-style pandas notebooks with plots and a .ipynb download for company users; demo visitors keep the light version. The runner's new cells mode and figure output are built first, then the Lambda executor implements the same protocol, so the sandbox changes once.)
    - `packages/sandbox/eagleeye_sandbox/lambda_executor.py`: `LambdaExecutor`, same interface and result types as `DockerExecutor`; inputs and outputs through single-use S3 links.
    - `infra/sandbox/lambda_handler.py` and a Lambda variant of the sandbox image, wrapping the existing `runner.py`.
    - `SANDBOX_BACKEND` setting; `apps/agent-worker/agent_worker/runtime.py` and `apps/api/app/services/health_checks.py` pick the implementation from it.

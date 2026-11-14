@@ -30,6 +30,10 @@ def call(name: str, args: dict | None = None, id_: str = "") -> ToolCall:
     return ToolCall(id_ or f"call_{name}", name, json.dumps(args or {}))
 
 
+class CutOff(str):
+    """A completion the model stopped writing because it hit max_tokens."""
+
+
 class FakeLLM:
     def __init__(
         self, completions: Sequence[str | Exception] = (), turns: Sequence[Turn] = ()
@@ -38,12 +42,16 @@ class FakeLLM:
         self.turns = list(turns)
         self.stream_calls: list[dict[str, Any]] = []
         self.complete_calls: list[list[ChatMessage]] = []
+        self.max_tokens_seen: list[int] = []
 
     async def complete(self, tier, messages, max_tokens=1024, json_mode=False, temperature=None):  # noqa: ANN001
         self.complete_calls.append(messages)
+        self.max_tokens_seen.append(max_tokens)
         item = self.completions.pop(0) if self.completions else guard_json()
         if isinstance(item, Exception):
             raise item
+        if isinstance(item, CutOff):  # the reply used the whole allowance and stopped mid-way
+            return str(item), Usage(5, max_tokens, 0.0001, "fast-model")
         return item, Usage(5, 5, 0.0001, "fast-model")
 
     async def stream(

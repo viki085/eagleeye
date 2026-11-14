@@ -194,3 +194,55 @@ async def test_supervisor_analyses_then_charts_with_grounded_figures() -> None:
     assert "unverified_numbers" not in ctx.warnings  # 80 and 100 came from the result
     tool_specs = [t.name for t in llm.stream_calls[0]["tools"]]
     assert {"analyze_data", "make_chart", "list_datasets"} <= set(tool_specs)
+
+
+# ---- long code: length limit, cut-off feedback, own retry cap ------------------------------
+
+
+async def test_code_writer_gets_room_for_a_full_script() -> None:
+    from eagleeye_agents.analysis.agent import CODE_MAX_TOKENS
+
+    llm = FakeLLM([analysis_draft()])
+    ctx, _, _ = make_ctx(llm)
+    enable_analysis(ctx)
+    await run_analysis_agent(ctx, QUESTION, INPUTS, None)
+    assert CODE_MAX_TOKENS >= 4000 and llm.max_tokens_seen == [CODE_MAX_TOKENS]
+
+
+async def test_a_cut_off_reply_is_reported_as_too_long_not_as_bad_json() -> None:
+    from fakes import CutOff
+
+    llm = FakeLLM(
+        [CutOff('{"mode": "python", "code": "import pandas as pd\n# a very long'), analysis_draft()]
+    )
+    ctx, sink, _ = make_ctx(llm)
+    enable_analysis(ctx)
+    outcome = await run_analysis_agent(ctx, QUESTION, INPUTS, None)
+    assert outcome.status == "ok"
+    retry_prompt = llm.complete_calls[1][1].content
+    assert "cut off" in retry_prompt and "shorter" in retry_prompt
+    assert "not valid JSON" not in retry_prompt
+    summaries = [s.get("output_summary") for s in sink.of("step.finished")]
+    assert "cut off: code too long" in summaries
+
+
+async def test_code_attempts_do_not_use_up_the_planners_steps() -> None:
+    from eagleeye_agents.budgets import BudgetLimits
+
+    # one planner step left: retries inside analyze_data must still be possible
+    llm = FakeLLM(["not json", analysis_draft()])
+    ctx, _, _ = make_ctx(llm, limits=BudgetLimits(max_steps=1))
+    enable_analysis(ctx)
+    outcome = await run_analysis_agent(ctx, QUESTION, INPUTS, None)
+    assert outcome.status == "ok" and len(llm.complete_calls) == 2
+
+
+async def test_code_attempts_have_their_own_cap() -> None:
+    from eagleeye_agents.analysis.agent import MAX_GENERATIONS
+
+    llm = FakeLLM(["not json"] * 10)
+    ctx, _, _ = make_ctx(llm)
+    enable_analysis(ctx)
+    outcome = await run_analysis_agent(ctx, QUESTION, INPUTS, None)
+    assert MAX_GENERATIONS == 3
+    assert outcome.status == "failed" and len(llm.complete_calls) == MAX_GENERATIONS

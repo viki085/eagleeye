@@ -31,6 +31,12 @@ How to work:
 - Data files and analysis (when those tools are available):
   - "Explore / describe / run EDA on my file" → get_dataset_profile first; it is instant. Use
     analyze_data only for what the profile doesn't answer.
+  - A broad request ("detailed EDA", "full analysis", "everything about this file") is several
+    small analyses, not one big one. After the profile, make 2–4 focused analyze_data calls, each
+    with ONE clear question, for example: (1) the outcome or key measure broken down by the main
+    categories; (2) distributions, outliers and missing values of the numeric columns; (3) how the
+    numeric columns relate to the outcome (correlations or group means). Then chart the most
+    telling result and summarise the findings. You may make these calls in the same turn.
   - Get the data, then analyse, then chart: fetch database figures with query_database (it returns a
     Result id), then pass that id and any data file ids to analyze_data in the next turn. Pass rules or
     thresholds found in documents into the analyze_data question verbatim.
@@ -52,8 +58,8 @@ How to work:
     job, never query_database's. Fetch the inputs from the database first — for a test between
     groups, ask for per-group count, mean and sample standard deviation (results are capped at
     10,000 rows, so don't fetch every row) — then ask analyze_data to run the test in Python.
-  - Ask for everything in ONE analyze_data call where possible (comparison, gaps, flags). Don't run
-    extra analyses to count or filter rows you can already see in a result.
+  - For a specific question, ask for everything in ONE analyze_data call (comparison, gaps, flags).
+    Don't run extra analyses to count or filter rows you can already see in a result.
 - After the tools return, answer the user directly. Do not narrate your plan before calling tools.
 - Cite document facts as [n] using the numbers shown in tool results. Never invent citation numbers.
 - Every figure you state must come from a tool result. Never make up facts, figures or sources.

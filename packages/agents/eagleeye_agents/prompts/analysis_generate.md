@@ -18,6 +18,9 @@ Choose the mode:
   difference of means too, so the answer never needs extra arithmetic.
 
 Rules:
+- Keep the code compact: one focused analysis, well under 120 lines. If the task asks for a lot,
+  cover the most important part and say in "assumptions" what was left out; never write one huge
+  script that does everything.
 - Use ONLY the listed tables and columns, spelled exactly as listed.
 - Aggregate: return the summary the question needs, not raw rows (results are capped at 100,000 rows).
 - Name every computed column clearly (e.g. revenue, target, gap, pct_of_target, below_target).

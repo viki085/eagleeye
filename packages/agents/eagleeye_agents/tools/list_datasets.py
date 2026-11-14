@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from eagleeye_datasets.render import profile_digest, schema_line
 from pydantic import BaseModel, Field
 
+from eagleeye_agents.checks.numbers import numbers_in
 from eagleeye_agents.tools.base import ToolResult, error_result
 
 if TYPE_CHECKING:
@@ -73,4 +74,6 @@ class GetDatasetProfileTool:
         ]
         ctx.numeric_evidence.extend(float(v) for v in stats)
         ctx.numeric_evidence.append(float(item.row_count))
+        # every number the model was shown counts: correlations, top-value counts, warnings
+        ctx.numeric_evidence.extend(numbers_in([text]))
         return ToolResult(True, text, f"profile of {item.title}")

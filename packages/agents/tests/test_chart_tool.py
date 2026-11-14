@@ -53,3 +53,26 @@ async def test_profile_tool_returns_digest_and_adds_evidence() -> None:
         ProfileArgs(dataset_id=REVENUE_ID), ctx, "s1"
     )
     assert not result_not_dataset.ok
+
+
+async def test_numbers_shown_in_the_profile_count_as_evidence() -> None:
+    """Regression: correlations quoted from the profile were flagged as unverified figures."""
+    from dataclasses import replace
+
+    from eagleeye_agents.checks.numbers import unverified_figures
+
+    class ProfiledWorkspace(FakeWorkspace):
+        def _items(self):  # noqa: ANN202
+            items = super()._items()
+            profile = {
+                **items[TARGETS_ID].profile,
+                "correlations": [{"a": "pclass", "b": "fare", "r": -0.549}],
+            }
+            return {**items, TARGETS_ID: replace(items[TARGETS_ID], profile=profile)}
+
+    ctx, _, _ = make_ctx(FakeLLM())
+    ctx.workspace = ProfiledWorkspace()
+    result = await GetDatasetProfileTool().run(ProfileArgs(dataset_id=TARGETS_ID), ctx, "s1")
+    assert result.ok and "-0.549" in result.content
+    answer = "The strongest correlation was pclass with fare (Pearson *r* = −0.549)."
+    assert unverified_figures(answer, ctx.numeric_evidence, "explore my file") == []
