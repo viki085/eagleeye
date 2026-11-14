@@ -1,14 +1,17 @@
 """guard ─┬─ blocked ────────────────────────────────► finalize
           └─ route ─┬─ simple ──► simple ─────────────► finalize
-                    ├─ rag / rag_auto ─► rag ─────────► finalize
+                    ├─ rag / rag_auto ─► answer_cache ─┬─ hit ──► END (replayed answer)
+                    │                                  └─ miss ─► rag ──► finalize
                     ├─ sql ─► sql (SQL sub-agent) ────► finalize
-                    └─ supervisor ⇄ tools ────────────► finalize
+                    └─ supervisor ─► answer_cache ─┬─ hit ──► END
+                                                   └─ miss ─► supervisor ⇄ tools ─► finalize
 """
 
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
+from eagleeye_agents.answer_cache import CACHEABLE_ROUTES, make_answer_cache_node
 from eagleeye_agents.context import RunContext
 from eagleeye_agents.nodes.answer import make_rag_node, make_simple_node
 from eagleeye_agents.nodes.finalize import make_finalize_node
@@ -31,7 +34,13 @@ _ROUTE_TO_NODE = {
 
 
 def _after_guard(state: RunState) -> str:
+    if state["route"] in CACHEABLE_ROUTES:
+        return "answer_cache"
     return _ROUTE_TO_NODE[state["route"]]
+
+
+def _after_cache(state: RunState) -> str:
+    return END if state.get("cache_hit") else _ROUTE_TO_NODE[state["route"]]
 
 
 def _after_supervisor(state: RunState) -> str:
@@ -52,10 +61,12 @@ def build_graph(ctx: RunContext, registry: ToolRegistry | None = None) -> Any:
     g.add_node("supervisor", make_supervisor_node(ctx, tools))
     g.add_node("tools", make_tools_node(ctx, tools))
     g.add_node("finalize", make_finalize_node(ctx))
+    g.add_node("answer_cache", make_answer_cache_node(ctx))
     g.add_edge(START, "guard")
     g.add_conditional_edges(
-        "guard", _after_guard, ["finalize", "simple", "rag", "sql", "supervisor"]
+        "guard", _after_guard, ["finalize", "simple", "answer_cache", "sql"]
     )
+    g.add_conditional_edges("answer_cache", _after_cache, [END, "rag", "supervisor"])
     g.add_edge("simple", "finalize")
     g.add_edge("rag", "finalize")
     g.add_edge("sql", "finalize")

@@ -65,8 +65,9 @@ async def _seed(c: asyncpg.Connection) -> tuple[str, str]:
             warnings,
         )
         await c.execute(
-            "INSERT INTO usage_ledger (user_id, run_id, model_id, tokens_in, tokens_out, cost_usd)"
-            " VALUES ($1, $2, 'gpt-test', 100, 10, $3)",
+            "INSERT INTO usage_ledger"
+            " (user_id, run_id, model_id, tokens_in, tokens_out, cost_usd, cached_tokens)"
+            " VALUES ($1, $2, 'gpt-test', 100, 10, $3, 40)",
             uid,
             run,
             cost,
@@ -112,7 +113,11 @@ async def test_previous_period_is_separate(conn: asyncpg.Connection) -> None:
 async def test_slow_steps_rank_by_average_not_total(conn: asyncpg.Connection) -> None:
     a, _b = await _seed(conn)
     run = await conn.fetchval("SELECT id FROM runs WHERE user_id = $1 LIMIT 1", a)
-    steps = [("tool", "zz_fast_but_frequent", 50)] * 20 + [("llm", "zz_slow_but_rare", 900)]
+    # durations far above any real step, so both rank in the top 10 whatever else is stored;
+    # the frequent step has the larger total (20 x 4,000 s) but the smaller average
+    steps = [("tool", "zz_fast_but_frequent", 4_000_000)] * 20 + [
+        ("llm", "zz_slow_but_rare", 9_000_000)
+    ]
     for seq, (kind, name, ms) in enumerate(steps):
         await conn.execute(
             "INSERT INTO run_steps (id, run_id, seq, kind, name, status, duration_ms)"
@@ -126,7 +131,7 @@ async def test_slow_steps_rank_by_average_not_total(conn: asyncpg.Connection) ->
         )
     ranked = [s["name"] for s in (await ov.overview(conn, m.WINDOWS["24h"]))["slow_steps"]]
     mine = [n for n in ranked if n.startswith("zz_")]
-    assert mine[0] == "zz_slow_but_rare"  # 900 ms avg beats 50 ms x 20 = 1 s total
+    assert mine[0] == "zz_slow_but_rare"  # higher average wins despite the smaller total
 
 
 async def test_step_trend_and_change_cover_major_steps_only(conn: asyncpg.Connection) -> None:
@@ -251,3 +256,23 @@ async def test_counts_and_content_queries_run(conn: asyncpg.Connection) -> None:
     assert set(counts) == {"active", "stuck"}
     content = await m.content(conn)
     assert set(content) == {"documents", "document_failures", "datasets", "dataset_failures"}
+
+
+async def test_tokens_cache_calls_and_monthly_spend(conn: asyncpg.Connection) -> None:
+    w = m.WINDOWS["14d"]
+    before = await ov.overview(conn, w, budget_usd=50.0)
+    await _seed(conn)
+    after = await ov.overview(conn, w, budget_usd=50.0)
+    cur, prev_cur = after["current"], before["current"]
+    assert cur["llm_calls"] - prev_cur["llm_calls"] == 3
+    assert cur["tokens_in"] - prev_cur["tokens_in"] == 300
+    assert cur["tokens_out"] - prev_cur["tokens_out"] == 30
+    assert cur["cached_tokens"] - prev_cur["cached_tokens"] == 120
+    assert 0 < cur["cache_hit_rate"] <= 1
+    assert len(after["series"]) in (14, 15)  # daily buckets
+    assert sum(s["tokens_in"] for s in after["series"]) == cur["tokens_in"]
+    month = after["month"]
+    assert month["budget_usd"] == 50.0 and month["alerts"] == [0.75, 0.9]
+    assert month["spend_usd"] - before["month"]["spend_usd"] == pytest.approx(0.42)
+    assert month["remaining_usd"] == pytest.approx(max(50.0 - month["spend_usd"], 0), abs=0.01)
+    assert month["month_start"].endswith("-01")

@@ -249,3 +249,12 @@ def test_prompts_load_with_versions() -> None:
     prompts = load_prompts()
     assert set(prompts.versions()) == set(PROMPT_NAMES)
     assert all(len(v) == 8 for v in prompts.versions().values())
+
+
+def test_usage_meter_keeps_cached_tokens() -> None:
+    from eagleeye_agents.control import UsageMeter
+    from eagleeye_llm.gateway import Usage
+
+    meter = UsageMeter()
+    meter.add(Usage(1000, 50, 0.01, "gpt-test", cached_tokens=768))
+    assert meter.entries[0].cached_tokens == 768

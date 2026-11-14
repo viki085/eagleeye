@@ -3,6 +3,7 @@
 import { DeltaBadge, KpiCard, StatusCard, type Health } from "@/components/admin/kpi";
 import { OverviewCharts } from "@/components/admin/overview-charts";
 import { SectionState } from "@/components/admin/parts";
+import { UsageGlance } from "@/components/admin/usage-glance";
 import { useAdminData } from "@/hooks/use-admin-data";
 import { compare, rateDelta, type Better } from "@/lib/admin-kpi";
 import { count, money, ratePct, seconds, when } from "@/lib/admin-format";
@@ -11,6 +12,7 @@ import type { AdminOverview, AdminRange, ApiClient } from "@/lib/api";
 const VERSUS: Record<AdminRange, string> = {
   "24h": "vs prev. 24 h",
   "7d": "vs prev. 7 days",
+  "14d": "vs prev. 14 days",
   "30d": "vs prev. 30 days",
 };
 
@@ -32,18 +34,12 @@ function KpiRow({ d, range }: { d: AdminOverview; range: AdminRange }) {
   const { current: cur, previous: prev, series } = d;
   const share = d.total_users ? Math.round((100 * cur.active_users) / d.total_users) : 0;
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
       <KpiCard
         label="Active users" icon="users" value={count(cur.active_users)}
         delta={<Change cur={cur.active_users} prev={prev.active_users} better="up" range={range} />}
-        hint={`${share}% of ${count(d.total_users)} accounts`}
+        hint={`${share}% of ${count(d.total_users)} accounts · ${cur.active_users ? (cur.requests / cur.active_users).toFixed(1) : "0"} answers each`}
         trend={series.map((s) => s.users)}
-      />
-      <KpiCard
-        label="Requests" icon="bolt" value={count(cur.requests)}
-        delta={<Change cur={cur.requests} prev={prev.requests} better="up" range={range} />}
-        hint={cur.active_users ? `${(cur.requests / cur.active_users).toFixed(1)} per active user` : undefined}
-        trend={series.map((s) => s.requests)}
       />
       <KpiCard
         label="Success rate" icon="check" value={ratePct(cur.success_rate)}
@@ -134,11 +130,12 @@ function StatusRow({ d, range }: { d: AdminOverview; range: AdminRange }) {
 }
 
 export function OverviewTab({ api, range, refreshKey }: { api: ApiClient; range: AdminRange; refreshKey: number }) {
-  const [state] = useAdminData(() => api.adminOverview(range), [api, range, refreshKey]);
+  const [state, reload] = useAdminData(() => api.adminOverview(range), [api, range, refreshKey]);
   return (
     <SectionState state={state}>
       {(d) => (
         <div className="flex flex-col gap-4">
+          <UsageGlance d={d} hourly={range === "24h"} api={api} onBudgetChanged={reload} />
           <KpiRow d={d} range={range} />
           <StatusRow d={d} range={range} />
           <OverviewCharts d={d} hourly={range === "24h"} />

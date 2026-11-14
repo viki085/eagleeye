@@ -23,10 +23,11 @@ from eagleeye_agents.runner import RunnerDeps, execute_run
 from eagleeye_agents.sql.gateway_client import HttpGateway
 from eagleeye_catalog.repo import CatalogRepo
 from eagleeye_catalog.service import CatalogService
+from eagleeye_core.app_cache import AppCache
 from eagleeye_core.config import Settings, get_settings
 from eagleeye_core.service_auth import resolve_secret
 from eagleeye_core.storage import S3ObjectStore, build_object_store
-from eagleeye_llm.embeddings import LiteLLMEmbedder
+from eagleeye_llm.embeddings import CachingEmbedder, LiteLLMEmbedder
 from eagleeye_llm.litellm_adapter import LiteLLMGateway
 from eagleeye_retrieval.service import Retriever
 from eagleeye_retrieval.stores.pgvector_store import PgVectorPersonalStore
@@ -88,7 +89,10 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         reasoning_capable=s.reasoning_effort_capable,
     )
     qdrant = AsyncQdrantClient(url=s.qdrant_url)
+    cache = AppCache(redis, s.app_cache_ttl_s, s.app_cache_enabled)
     embedder = LiteLLMEmbedder(s.embed_model, s.embed_dim)
+    # searches reuse cached query vectors; the catalog keeps the plain embedder
+    query_embedder = CachingEmbedder(embedder, cache, s.embed_model) if cache.enabled else embedder
     gateway, catalog = None, None
     if s.enable_sql:
         # The worker never holds warehouse credentials: it signs tokens and calls the gateway.
@@ -98,11 +102,12 @@ async def _build_deps(s: Settings) -> RunnerDeps:
     retriever = Retriever(
         pool=pool,
         llm=llm,
-        embedder=embedder,
+        embedder=query_embedder,
         enterprise_store=QdrantEnterpriseStore(qdrant, s.qdrant_collection, s.embed_dim),
         personal_store=PgVectorPersonalStore(pool),
         top_k=s.rag_top_k,
         min_score=s.rag_min_score,
+        cache=cache if cache.enabled else None,
     )
     return RunnerDeps(
         pool=pool,
@@ -123,6 +128,7 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         executor=executor,
         python_analysis=s.enable_python_analysis,
         sandbox_runs_per_hour=s.sandbox_runs_per_hour,
+        cache=cache if cache.enabled else None,
     )
 
 

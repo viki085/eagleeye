@@ -83,6 +83,8 @@ class RunContext:
     sandbox_runs_per_hour: int = 60
     python_runs: int = 0
     charts: list[dict[str, Any]] = field(default_factory=list)  # chart event payloads, in order
+    cache: Any = None  # eagleeye_core.app_cache.AppCache (None = no caching)
+    answer_key: tuple | None = None  # set when this run's answer may be reused or stored
     budget: BudgetTracker = field(init=False)
 
     def __post_init__(self) -> None:

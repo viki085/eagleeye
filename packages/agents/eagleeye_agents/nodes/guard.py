@@ -32,6 +32,7 @@ async def _verdict(ctx: RunContext, state: RunState) -> tuple[GuardVerdict, Usag
             state.get("history", []),
             [d.title for d in docs],
             bool(state.get("doc_ids")),
+            cache=ctx.cache,
         )
     except GuardUnavailableError as exc:
         return unavailable(str(exc)), Usage()

@@ -6,11 +6,15 @@ import { DatasetList } from "@/components/data/dataset-list";
 import { ProfileModal } from "@/components/data/profile-modal";
 import { SourcesList } from "@/components/data/sources-list";
 import { DocumentRow } from "@/components/documents/document-row";
+import { DocumentViewer } from "@/components/documents/document-viewer";
 import { EmptyNote, PanelSection } from "@/components/documents/panel-section";
+import { ResizableSplit } from "@/components/documents/resizable-split";
+import { SearchBox } from "@/components/documents/search-box";
 import { UploadButton } from "@/components/documents/upload-button";
 import { useDatasets } from "@/hooks/use-datasets";
 import type { DocumentsState } from "@/hooks/use-documents";
 import { usePanelOpen } from "@/hooks/use-panel-open";
+import { filterDocuments } from "@/lib/doc-search";
 import {
   isDataFile,
   type ApiClient,
@@ -75,16 +79,18 @@ function ScopeTabs({ scope, onChange }: { scope: DocumentScope; onChange: (s: Do
 
 function DocumentList({
   docs,
-  selectedIds,
   canDelete,
   state,
   empty,
+  onOpen,
+  selectable,
 }: {
   docs: readonly DocumentSummary[];
-  selectedIds: readonly string[];
   canDelete: (doc: DocumentSummary) => boolean;
   state: DocumentsState;
   empty: string;
+  onOpen: (doc: DocumentSummary) => void;
+  selectable: boolean;
 }) {
   if (docs.length === 0) return <EmptyNote>{empty}</EmptyNote>;
   return (
@@ -93,10 +99,14 @@ function DocumentList({
         <DocumentRow
           key={doc.id}
           doc={doc}
-          selected={selectedIds.includes(doc.id)}
           canDelete={canDelete(doc)}
-          onToggle={() => state.toggle(doc.id)}
+          onOpen={() => onOpen(doc)}
           onDelete={() => void state.remove(doc.id)}
+          selection={
+            selectable
+              ? { selected: state.selectedIds.includes(doc.id), onToggle: () => state.toggle(doc.id) }
+              : undefined
+          }
         />
       ))}
     </ul>
@@ -104,22 +114,31 @@ function DocumentList({
 }
 
 /**
- * Right panel. Personal tab: your documents + your data files. Enterprise tab: company
- * documents + the databases you can query. Enterprise upload/delete only for knowledge admins
- * (the API enforces the same rule).
+ * Right panel. Personal tab: your documents (tick to restrict answers to them) + your data
+ * files. Enterprise tab, view only: company documents + the databases you can query, filtered
+ * by one search box. Clicking a document opens it in the viewer. Each tab's two sections are
+ * split by a draggable divider. Enterprise upload/delete only for knowledge admins (the API
+ * enforces the same rule).
  */
 export function DocumentsPanel({ state, currentUser, api }: DocumentsPanelProps) {
   const [open, setOpen] = usePanelOpen("documents");
   const [scope, setScope] = useState<DocumentScope>("personal");
   const [profiled, setProfiled] = useState<DatasetSummary | null>(null);
+  const [viewing, setViewing] = useState<DocumentSummary | null>(null);
+  const [query, setQuery] = useState("");
   const data = useDatasets(api);
   const sources = useSources(api);
   const { documents, selectedIds } = state;
+  const personalSelected = selectedIds.filter((id) =>
+    documents.some((d) => d.id === id && d.scope === "personal"),
+  ).length;
   const canManage = currentUser?.canManageEnterprise ?? false;
   const personalDocs = documents.filter(
     (d) => d.scope === "personal" && currentUser !== null && d.owner_id === currentUser.id,
   );
   const enterpriseDocs = documents.filter((d) => d.scope === "enterprise");
+  const shownEnterprise = filterDocuments(enterpriseDocs, query);
+  const searching = query.trim().length > 0;
   const uploading = state.uploading || data.uploading;
   const error = state.error ?? data.error;
   const clearError = () => {
@@ -127,8 +146,8 @@ export function DocumentsPanel({ state, currentUser, api }: DocumentsPanelProps)
     data.clearError();
   };
   const hint =
-    selectedIds.length > 0
-      ? `Answering from ${selectedIds.length} selected`
+    personalSelected > 0
+      ? `Answering from ${personalSelected} selected`
       : "Tick documents to restrict answers to them";
 
   if (!open) {
@@ -182,43 +201,71 @@ export function DocumentsPanel({ state, currentUser, api }: DocumentsPanelProps)
           </div>
         )}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col divide-y divide-neutral-200 border-t border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+      {scope === "enterprise" && (
+        <div className="px-3 pb-2">
+          <SearchBox
+            value={query}
+            onChange={setQuery}
+            placeholder="Search documents, databases, tables, columns"
+            label="Search company documents and data sources"
+          />
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1 flex-col border-t border-neutral-200 dark:border-neutral-800">
         {scope === "personal" ? (
-          <>
-            <PanelSection title="My documents" count={personalDocs.length} hint={hint}>
-              <DocumentList
-                docs={personalDocs}
-                selectedIds={selectedIds}
-                canDelete={() => true}
-                state={state}
-                empty="No documents yet."
-              />
-            </PanelSection>
-            <PanelSection title="My data files" count={data.datasets.length}>
-              <DatasetList
-                datasets={data.datasets}
-                onProfile={setProfiled}
-                onDelete={(d) => void data.remove(d.id)}
-              />
-            </PanelSection>
-          </>
+          <ResizableSplit
+            storageKey="personal"
+            top={
+              <PanelSection title="My documents" count={personalDocs.length} hint={hint}>
+                <DocumentList
+                  docs={personalDocs}
+                  canDelete={() => true}
+                  state={state}
+                  empty="No documents yet."
+                  onOpen={setViewing}
+                  selectable
+                />
+              </PanelSection>
+            }
+            bottom={
+              <PanelSection title="My data files" count={data.datasets.length}>
+                <DatasetList
+                  datasets={data.datasets}
+                  onProfile={setProfiled}
+                  onDelete={(d) => void data.remove(d.id)}
+                />
+              </PanelSection>
+            }
+          />
         ) : (
-          <>
-            <PanelSection title="Enterprise documents" count={enterpriseDocs.length} hint={hint}>
-              <DocumentList
-                docs={enterpriseDocs}
-                selectedIds={selectedIds}
-                canDelete={() => canManage}
-                state={state}
-                empty="No enterprise documents yet."
-              />
-            </PanelSection>
-            <PanelSection title="Data sources" count={sources?.length}>
-              <SourcesList sources={sources} />
-            </PanelSection>
-          </>
+          <ResizableSplit
+            storageKey="enterprise"
+            top={
+              <PanelSection
+                title="Enterprise documents"
+                count={enterpriseDocs.length}
+                countLabel={searching ? `${shownEnterprise.length} of ${enterpriseDocs.length}` : undefined}
+                hint="Click a document to read it"
+              >
+                <DocumentList
+                  docs={shownEnterprise}
+                  canDelete={() => canManage}
+                  state={state}
+                  empty={searching ? `No documents match "${query.trim()}".` : "No enterprise documents yet."}
+                  onOpen={setViewing}
+                  selectable={false}
+                />
+              </PanelSection>
+            }
+            bottom={
+              <PanelSection title="Data sources" count={sources?.length}>
+                <SourcesList sources={sources} query={query} />
+              </PanelSection>
+            }
+          />
         )}
       </div>
+      <DocumentViewer api={api} doc={viewing} onClose={() => setViewing(null)} />
       <ProfileModal api={api} dataset={profiled} onClose={() => setProfiled(null)} />
     </aside>
   );

@@ -20,29 +20,37 @@ function statusClass(status: DocumentStatus): string {
 
 interface DocumentRowProps {
   doc: DocumentSummary;
-  selected: boolean;
   canDelete: boolean;
-  onToggle: () => void;
+  onOpen: () => void;
   onDelete: () => void;
+  /** Personal documents only: tick to restrict answers to the selected documents. */
+  selection?: { selected: boolean; onToggle: () => void };
 }
 
-export function DocumentRow({ doc, selected, canDelete, onToggle, onDelete }: DocumentRowProps) {
+export function DocumentRow({ doc, canDelete, onOpen, onDelete, selection }: DocumentRowProps) {
   const ready = doc.status === "READY";
   return (
     <li className="group rounded-lg px-2 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/60">
       <div className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          checked={selected}
-          disabled={!ready}
-          onChange={onToggle}
-          aria-label={`Use ${doc.title} in this question`}
-          className="mt-0.5 accent-blue-600 disabled:opacity-30"
-        />
+        {selection && (
+          <input
+            type="checkbox"
+            checked={selection.selected}
+            disabled={!ready}
+            onChange={selection.onToggle}
+            aria-label={`Use ${doc.title} in this question`}
+            className="mt-0.5 accent-blue-600 disabled:opacity-30"
+          />
+        )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm" title={doc.filename}>
+          <button
+            type="button"
+            onClick={onOpen}
+            title={`Open ${doc.filename}`}
+            className="block w-full truncate text-left text-sm hover:text-blue-700 hover:underline dark:hover:text-blue-400"
+          >
             {doc.title}
-          </p>
+          </button>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
             <span className={`rounded px-1.5 py-0.5 font-medium ${statusClass(doc.status)}`}>
               {STAGE_LABEL[doc.status]}

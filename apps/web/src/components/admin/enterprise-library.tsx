@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { ConfirmDeleteDialog } from "@/components/admin/confirm-delete-dialog";
 import { Panel, Pill, SectionState } from "@/components/admin/parts";
+import { DocumentViewer } from "@/components/documents/document-viewer";
+import { SearchBox } from "@/components/documents/search-box";
 import { useAdminData } from "@/hooks/use-admin-data";
 import { MAX_BATCH, splitBatch, uploadSequentially, type BatchResult } from "@/lib/admin-library";
 import { count, fileSize, when } from "@/lib/admin-format";
 import type { ApiClient, DocumentSummary } from "@/lib/api";
+import { filterDocuments } from "@/lib/doc-search";
 
 const DOC_TYPES = ".pdf,.docx,.txt,.md";
 const POLL_MS = 3000;
@@ -34,6 +37,8 @@ export function EnterpriseLibrary({ api, onChanged }: { api: ApiClient; onChange
   const [lines, setLines] = useState<readonly UploadLine[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<readonly DocumentSummary[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [viewing, setViewing] = useState<DocumentSummary | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const docs = state.kind === "ok" ? state.data : [];
@@ -100,7 +105,9 @@ export function EnterpriseLibrary({ api, onChanged }: { api: ApiClient; onChange
     });
   }
 
-  const allSelected = docs.length > 0 && docs.every((d) => selected.has(d.id));
+  const shown = filterDocuments(docs, query);
+  // "select all" and bulk delete act on what the search shows, never on hidden rows
+  const allSelected = shown.length > 0 && shown.every((d) => selected.has(d.id));
   const chosen = docs.filter((d) => selected.has(d.id));
 
   return (
@@ -145,22 +152,44 @@ export function EnterpriseLibrary({ api, onChanged }: { api: ApiClient; onChange
         PDF, Word, Markdown or text · visible to everyone in the company · up to {MAX_BATCH} files at once
       </p>
       {notice && <p className="mb-2 text-xs text-amber-700 dark:text-amber-400">{notice}</p>}
+      <div className="mb-2 flex items-center gap-3">
+        <div className="w-full max-w-sm">
+          <SearchBox value={query} onChange={setQuery} placeholder="Search by title or file name" label="Search enterprise documents" />
+        </div>
+        {query.trim() && (
+          <span className="shrink-0 text-[11px] tabular-nums text-neutral-500">
+            {shown.length} of {docs.length}
+          </span>
+        )}
+      </div>
       {lines.length > 0 && <UploadProgress lines={lines} onDismiss={uploading ? undefined : () => setLines([])} />}
       <SectionState state={state}>
         {(rows) =>
           rows.length === 0 ? (
             <p className="py-2 text-xs text-neutral-400">No enterprise documents yet.</p>
+          ) : shown.length === 0 ? (
+            <p className="py-2 text-xs text-neutral-400">No documents match &ldquo;{query.trim()}&rdquo;.</p>
           ) : (
-            <div className="overflow-x-auto">
+            // about 10 rows tall, then scrolls, so the sections below stay in reach
+            <div className="max-h-[20rem] overflow-auto rounded border border-neutral-100 dark:border-neutral-800">
               <table className="w-full text-left text-xs">
-                <thead className="text-[11px] text-neutral-500">
+                <thead className="sticky top-0 z-10 bg-white text-[11px] text-neutral-500 shadow-[0_1px_0_rgba(0,0,0,0.06)] dark:bg-[#1a1a19] dark:shadow-[0_1px_0_rgba(255,255,255,0.08)]">
                   <tr>
                     <th className="w-6 px-2 py-1.5">
                       <input
                         type="checkbox"
                         aria-label="Select all documents"
                         checked={allSelected}
-                        onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((d) => d.id)))}
+                        onChange={() =>
+                          setSelected((prev) => {
+                            const next = new Set(prev);
+                            for (const d of shown) {
+                              if (allSelected) next.delete(d.id);
+                              else next.add(d.id);
+                            }
+                            return next;
+                          })
+                        }
                       />
                     </th>
                     <th className="px-2 py-1.5 font-medium">Document</th>
@@ -172,7 +201,7 @@ export function EnterpriseLibrary({ api, onChanged }: { api: ApiClient; onChange
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((d) => (
+                  {shown.map((d) => (
                     <tr key={d.id} className="border-t border-neutral-100 dark:border-neutral-800">
                       <td className="px-2 py-1.5">
                         <input
@@ -183,7 +212,14 @@ export function EnterpriseLibrary({ api, onChanged }: { api: ApiClient; onChange
                         />
                       </td>
                       <td className="max-w-[18rem] px-2 py-1.5">
-                        <p className="truncate font-medium" title={d.filename}>{d.title}</p>
+                        <button
+                          type="button"
+                          onClick={() => setViewing(d)}
+                          title={`Open ${d.filename}`}
+                          className="block max-w-full truncate text-left font-medium hover:text-[#2a78d6] hover:underline"
+                        >
+                          {d.title}
+                        </button>
                         {d.error && <p className="truncate text-red-600 dark:text-red-400" title={d.error}>{d.error}</p>}
                       </td>
                       <td className="px-2 py-1.5"><Pill tone={statusTone(d.status)}>{d.status}</Pill></td>
@@ -208,6 +244,7 @@ export function EnterpriseLibrary({ api, onChanged }: { api: ApiClient; onChange
           )
         }
       </SectionState>
+      <DocumentViewer api={api} doc={viewing} onClose={() => setViewing(null)} />
       <ConfirmDeleteDialog
         names={toDelete ? toDelete.map((d) => d.title) : null}
         consequence={

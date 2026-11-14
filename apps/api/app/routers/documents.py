@@ -6,7 +6,9 @@ from uuid import UUID
 import asyncpg
 from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
+from eagleeye_core.storage import ObjectNotFoundError
 from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi.responses import Response
 
 from app.auth import AuthedUser, CurrentUser
 from app.errors import ApiException
@@ -161,4 +163,51 @@ async def get_chunk(doc_id: UUID, chunk_id: UUID, request: Request, user: Curren
             "page": row["page"],
             "document": {"id": str(row["document_id"]), "title": row["title"]},
         }
+    )
+
+
+VIEWABLE_INLINE = {"application/pdf", "text/plain", "text/markdown"}
+
+
+@router.get("/{doc_id}/file")
+async def get_file(doc_id: UUID, request: Request, user: CurrentUser) -> Response:
+    """The original file, for the in-app viewer. Same visibility rule as the document itself."""
+    state = request.app.state
+    row = await docs_repo.get_visible(state.pool, str(doc_id), user.id)
+    if row is None:
+        raise ApiException(404, "NOT_FOUND", "Document not found.")
+    try:
+        data = await state.store.get(row["s3_key"])
+    except ObjectNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", "The file is no longer available.") from exc
+    mime = row["mime"] if row["mime"] in VIEWABLE_INLINE else "application/octet-stream"
+    safe = "".join(ch for ch in row["filename"] if ch.isalnum() or ch in "._- ")[:120] or "document"
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={
+            "Content-Disposition": f'inline; filename="{safe}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
+@router.get("/{doc_id}/text")
+async def get_text(doc_id: UUID, request: Request, user: CurrentUser) -> dict:
+    """The indexed text in reading order (used to show Word documents in the viewer)."""
+    pool = request.app.state.pool
+    if await docs_repo.get_visible(pool, str(doc_id), user.id) is None:
+        raise ApiException(404, "NOT_FOUND", "Document not found.")
+    rows = await docs_repo.list_visible_chunks(pool, str(doc_id), user.id)
+    return ok(
+        [
+            {
+                "chunk_no": r["chunk_no"],
+                "content": r["content"],
+                "heading_path": list(r["heading_path"] or []),
+                "page": r["page"],
+            }
+            for r in rows
+        ]
     )

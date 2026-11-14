@@ -15,7 +15,7 @@ from eagleeye_events import EventSink, cancel_key
 from eagleeye_events.names import CHAT_UPDATED, RUN_DONE, RUN_ERROR, RUN_STARTED
 from eagleeye_llm.gateway import LLMGateway
 
-from eagleeye_agents import persistence
+from eagleeye_agents import answer_cache, persistence
 from eagleeye_agents.budgets import BudgetTracker
 from eagleeye_agents.context import AgentSettings, RetrieverPort, RunContext
 from eagleeye_agents.control import CancelToken
@@ -49,6 +49,7 @@ class RunnerDeps:
     executor: Any = None  # eagleeye_sandbox AnalysisExecutor (None = analysis disabled)
     python_analysis: bool = True
     sandbox_runs_per_hour: int = 60
+    cache: Any = None  # eagleeye_core.app_cache.AppCache (None = no caching)
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ class Outcome:
     guard: dict | None
     citations: list[dict]
     cancelled: bool = False
+    cache_hit: bool = False
 
 
 async def _heartbeat_loop(pool: asyncpg.Pool, run_id: str) -> None:
@@ -83,6 +85,7 @@ def _parts(ctx: RunContext, outcome: Outcome) -> list[dict]:
             "route": outcome.route,
             "degraded": ctx.usage.degraded,
             "warnings": list(dict.fromkeys(ctx.warnings)),
+            "cached": outcome.cache_hit,
         }
     )
     return parts
@@ -127,6 +130,7 @@ async def _execute_graph(ctx: RunContext, initial: RunState) -> Outcome:
         final.get("route"),
         guard.to_dict() if guard is not None else None,
         final.get("citations", []),
+        cache_hit=bool(final.get("cache_hit")),
     )
 
 
@@ -178,6 +182,37 @@ def _build_context(deps: RunnerDeps, run: asyncpg.Record, sink: EventSink) -> Ru
         workspace=deps.workspace,
         python_analysis=deps.python_analysis,
         sandbox_runs_per_hour=deps.sandbox_runs_per_hour,
+        cache=deps.cache,
+    )
+
+
+async def _prepare_answer_cache(deps: RunnerDeps, ctx: RunContext, initial: RunState) -> None:
+    """Works out this run's answer-cache key when its answer could be reused or stored."""
+    if deps.cache is None or not answer_cache.can_look_up(initial):
+        return
+    try:
+        role = await persistence.load_user_role(deps.pool, ctx.user_id)
+        ctx.answer_key = await answer_cache.answer_key(
+            deps.pool,
+            ctx.user_id,
+            role,
+            initial["question"],
+            deps.prompts.versions(),
+            deps.model_ids,
+        )
+    except Exception:
+        logger.warning("answer cache key failed for run %s; not caching", ctx.run_id, exc_info=True)
+
+
+async def _store_answer(deps: RunnerDeps, ctx: RunContext, outcome: Outcome) -> None:
+    if outcome.cache_hit or deps.cache is None:
+        return
+    if not answer_cache.can_store(ctx, outcome.route, outcome.status, outcome.citations):
+        return
+    await deps.cache.put(
+        "answer",
+        ctx.answer_key,
+        {"text": ctx.text.value, "citations": outcome.citations, "cost_usd": ctx.usage.cost_usd},
     )
 
 
@@ -259,12 +294,15 @@ async def execute_run(
         question, history = await persistence.load_conversation(deps.pool, ctx.chat_id, run_id)
         doc_ids = [str(d) for d in (run["params"] or {}).get("doc_ids", [])]
         initial: RunState = {"question": question, "history": history, "doc_ids": doc_ids}
+        await _prepare_answer_cache(deps, ctx, initial)
         outcome = await _execute_graph(ctx, initial)
         # Title before persisting so its tokens/cost are included in the usage ledger.
         title = await maybe_title(
             deps.pool, deps.llm, ctx.chat_id, ctx.user_id, question, history, ctx.usage
         )
         message_id = await _persist(deps, ctx, outcome)
+        # only after the run is safely saved: a run that fails to persist is never reused
+        await _store_answer(deps, ctx, outcome)
         if title is not None:
             await sink.emit(CHAT_UPDATED, {"chat_id": ctx.chat_id, "title": title})
         await sink.emit(

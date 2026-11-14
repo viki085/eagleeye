@@ -101,15 +101,20 @@ async def _period(pool: asyncpg.Pool, span: timedelta, offset: timedelta) -> dic
         offset,
         list(TERMINAL),
     )
-    cost = await pool.fetchval(
+    ledger = await pool.fetchrow(
         """
-        SELECT coalesce(sum(cost_usd), 0) FROM usage_ledger
+        SELECT coalesce(sum(cost_usd), 0) AS cost, count(*) AS llm_calls,
+               coalesce(sum(tokens_in), 0) AS tokens_in,
+               coalesce(sum(tokens_out), 0) AS tokens_out,
+               coalesce(sum(cached_tokens), 0) AS cached_tokens
+          FROM usage_ledger
          WHERE created_at >= now() - $1::interval - $2::interval
            AND ($2::interval = interval '0' OR created_at < now() - $2::interval)
         """,
         span,
         offset,
     )
+    cost = ledger["cost"]
     safety = await pool.fetchval(
         """
         SELECT count(*) FROM security_events
@@ -131,6 +136,11 @@ async def _period(pool: asyncpg.Pool, span: timedelta, offset: timedelta) -> dic
         "cost_usd": _num(cost),
         "cost_per_request_usd": _num(cost / requests) if requests else None,
         "safety_events": safety,
+        "llm_calls": ledger["llm_calls"],
+        "tokens_in": int(ledger["tokens_in"]),
+        "tokens_out": int(ledger["tokens_out"]),
+        "cached_tokens": int(ledger["cached_tokens"]),
+        "cache_hit_rate": rate(int(ledger["cached_tokens"]), int(ledger["tokens_in"])),
     }
 
 
@@ -149,7 +159,9 @@ async def _series(pool: asyncpg.Pool, w: Window) -> list[dict[str, Any]]:
                        FILTER (WHERE status = ANY($4)) AS avg_duration_s
               FROM runs WHERE created_at >= now() - $1::interval GROUP BY 1
         ), l AS (
-            SELECT date_trunc($2::text, created_at) AS bucket, sum(cost_usd) AS cost_usd
+            SELECT date_trunc($2::text, created_at) AS bucket, sum(cost_usd) AS cost_usd,
+                   count(*) AS llm_calls, sum(tokens_in) AS tokens_in,
+                   sum(tokens_out) AS tokens_out, sum(cached_tokens) AS cached_tokens
               FROM usage_ledger WHERE created_at >= now() - $1::interval GROUP BY 1
         ), s AS (
             SELECT date_trunc($2::text, created_at) AS bucket, count(*) AS safety_events
@@ -159,6 +171,9 @@ async def _series(pool: asyncpg.Pool, w: Window) -> list[dict[str, Any]]:
         SELECT b.bucket, coalesce(r.requests, 0) AS requests, coalesce(r.users, 0) AS users,
                coalesce(r.failed, 0) AS failed, coalesce(r.succeeded, 0) AS succeeded,
                r.avg_duration_s, coalesce(l.cost_usd, 0) AS cost_usd,
+               coalesce(l.llm_calls, 0) AS llm_calls, coalesce(l.tokens_in, 0) AS tokens_in,
+               coalesce(l.tokens_out, 0) AS tokens_out,
+               coalesce(l.cached_tokens, 0) AS cached_tokens,
                coalesce(s.safety_events, 0) AS safety_events
           FROM b LEFT JOIN r USING (bucket) LEFT JOIN l USING (bucket) LEFT JOIN s USING (bucket)
          ORDER BY b.bucket
@@ -174,9 +189,37 @@ async def _series(pool: asyncpg.Pool, w: Window) -> list[dict[str, Any]]:
             "bucket": r["bucket"].isoformat(),
             "cost_usd": _num(r["cost_usd"]),
             "avg_duration_s": None if r["avg_duration_s"] is None else _num(r["avg_duration_s"]),
+            "tokens_in": int(r["tokens_in"]),
+            "tokens_out": int(r["tokens_out"]),
+            "cached_tokens": int(r["cached_tokens"]),
         }
         for r in rows
     ]
+
+
+BUDGET_ALERTS = (0.75, 0.9)  # alert ticks on the monthly spend bar
+
+
+async def _month(pool: asyncpg.Pool, budget_usd: float) -> dict[str, Any]:
+    """LLM spend in the current calendar month (UTC) against the organisation budget."""
+    row = await pool.fetchrow(
+        """
+        SELECT date_trunc('month', now() AT TIME ZONE 'UTC') AS month_start,
+               coalesce(sum(cost_usd), 0) AS spend
+          FROM usage_ledger
+         WHERE created_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+        """
+    )
+    spend = _num(row["spend"])
+    budget = max(float(budget_usd), 0.0)
+    return {
+        "month_start": row["month_start"].date().isoformat(),
+        "spend_usd": spend,
+        "budget_usd": budget,
+        "remaining_usd": round(max(budget - spend, 0.0), 2),
+        "used_fraction": round(spend / budget, 4) if budget else None,
+        "alerts": list(BUDGET_ALERTS),
+    }
 
 
 async def _cost_by_model(pool: asyncpg.Pool, span: timedelta) -> list[dict[str, Any]]:
@@ -301,7 +344,7 @@ async def _knowledge(pool: asyncpg.Pool) -> dict[str, Any]:
     return dict(row)
 
 
-async def overview(pool: asyncpg.Pool, w: Window) -> dict[str, Any]:
+async def overview(pool: asyncpg.Pool, w: Window, budget_usd: float = 0.0) -> dict[str, Any]:
     # sequential on purpose: one connection at a time keeps the console's load on the shared
     # database small (and works inside a single test transaction)
     current = await _period(pool, w.span, timedelta(0))
@@ -318,4 +361,5 @@ async def overview(pool: asyncpg.Pool, w: Window) -> dict[str, Any]:
         "step_trend": await _step_trend(pool, w),
         "step_change": await _step_change(pool, w.span),
         "knowledge": await _knowledge(pool),
+        "month": await _month(pool, budget_usd),
     }

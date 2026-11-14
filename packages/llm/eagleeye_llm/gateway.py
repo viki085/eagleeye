@@ -37,6 +37,7 @@ class Usage:
     cost_usd: float = 0.0
     model_id: str = ""
     degraded: bool = False  # answered by a fallback model
+    cached_tokens: int = 0  # part of tokens_in served from the provider's prompt cache
 
 
 @dataclass(frozen=True)

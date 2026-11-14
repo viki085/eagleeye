@@ -63,7 +63,8 @@ function contentSecurityPolicy(): string {
     "img-src": ["'self'", "data:", "blob:", "https://img.clerk.com"],
     "style-src": ["'self'", "'unsafe-inline'"],
     "font-src": ["'self'", "data:"],
-    "frame-src": ["'self'", "https://challenges.cloudflare.com"],
+    // blob: the document viewer shows PDFs fetched with the user's token from a blob URL
+    "frame-src": ["'self'", "blob:", "https://challenges.cloudflare.com"],
     "worker-src": ["'self'", "blob:"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],

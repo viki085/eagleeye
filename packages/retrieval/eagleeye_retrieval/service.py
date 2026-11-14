@@ -47,8 +47,10 @@ class Retriever:
         min_score: float = 0.25,
         keyword_fn: KeywordFn | None = None,
         hydrate_fn: HydrateFn | None = None,
+        cache: object | None = None,  # eagleeye_core.app_cache.AppCache for query rewrites
     ) -> None:
         self._llm = llm
+        self._cache = cache
         self._embedder = embedder
         self._stores = (enterprise_store, personal_store)
         self._top_k = top_k
@@ -65,7 +67,7 @@ class Retriever:
     ) -> RetrievalResult:
         """`rewrite=False` when the caller (e.g. the supervisor) already wrote the query."""
         if rewrite:
-            queries = await rewrite_query(self._llm, question, history)
+            queries = await rewrite_query(self._llm, question, history, self._cache)
         else:
             queries = [question[:MAX_QUERY_CHARS]]
         vectors = await self._embedder.embed(queries)

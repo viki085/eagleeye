@@ -175,10 +175,14 @@ async def insert_usage(
         return
     await pool.executemany(
         """
-        INSERT INTO usage_ledger (user_id, run_id, model_id, tokens_in, tokens_out, cost_usd)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO usage_ledger
+            (user_id, run_id, model_id, tokens_in, tokens_out, cost_usd, cached_tokens)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         """,
-        [(user_id, run_id, e.model_id, e.tokens_in, e.tokens_out, e.cost_usd) for e in entries],
+        [
+            (user_id, run_id, e.model_id, e.tokens_in, e.tokens_out, e.cost_usd, e.cached_tokens)
+            for e in entries
+        ],
     )
 
 

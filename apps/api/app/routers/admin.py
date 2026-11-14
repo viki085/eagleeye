@@ -8,15 +8,16 @@ import logging
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
+from eagleeye_core import app_cache
 from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
 from eagleeye_core.queues import AGENT_QUEUE, INGEST_QUEUE
 from eagleeye_core.switches import DESCRIPTIONS, SWITCHES, Switch, killed_switches, switch_key
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.repos import admin_metrics as metrics
-from app.repos import admin_overview
+from app.repos import admin_overview, app_settings
 from app.repos import runs as runs_repo
 from app.services.health_checks import check_all, check_databases
 from app.services.permissions import AdminUser
@@ -26,12 +27,16 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 OVERVIEW_CACHE_S = 60
 
-RangeParam = Annotated[Literal["24h", "7d", "30d"], Query()]
+RangeParam = Annotated[Literal["24h", "7d", "14d", "30d"], Query()]
 SortParam = Annotated[Literal["last_seen", "cost", "runs", "email"], Query()]
 
 
 class SwitchBody(BaseModel):
     killed: bool
+
+
+class BudgetBody(BaseModel):
+    budget_usd: float = Field(gt=0, le=app_settings.MAX_MONTHLY_BUDGET_USD)
 
 
 def _window(range_: str) -> metrics.Window:
@@ -48,15 +53,35 @@ async def _cached_overview(request: Request, range_: str) -> dict[str, Any]:
             return json.loads(hit)
     except Exception:
         logger.warning("overview cache read failed", exc_info=True)
+    pool, window = request.app.state.pool, _window(range_)
+    budget = await app_settings.monthly_budget(pool, get_settings().monthly_budget_usd)
     data = {
-        **await admin_overview.overview(request.app.state.pool, _window(range_)),
+        **await admin_overview.overview(pool, window, budget),
         "generated_at": datetime.now(UTC).isoformat(),
     }
+    await _add_caching(redis, data, window)
     try:
         await redis.set(key, json.dumps(data), ex=OVERVIEW_CACHE_S)
     except Exception:
         logger.warning("overview cache write failed", exc_info=True)
     return data
+
+
+async def _add_caching(redis: Any, data: dict[str, Any], window: metrics.Window) -> None:
+    """EagleEye's own cache (guard, rewrite, embedding, answer): totals for the period and a
+    hit rate per chart bucket. Without Redis the figures are simply absent (zeros)."""
+    now = datetime.now(UTC)
+    try:
+        hourly = await app_cache.read_stats(redis, now - window.span, now)
+    except Exception:
+        logger.warning("cache statistics unavailable", exc_info=True)
+        hourly = {}
+    data["caching"] = app_cache.total_stats(hourly)
+    buckets = [datetime.fromisoformat(p["bucket"]) for p in data.get("series", [])]
+    per_bucket = app_cache.bucket_stats(hourly, buckets, window.step)
+    for point, stats in zip(data.get("series", []), per_bucket, strict=True):
+        point["cache_lookups"] = stats["lookups"]
+        point["cache_hits"] = stats["hits"]
 
 
 async def _live(request: Request) -> dict[str, Any]:
@@ -169,6 +194,26 @@ async def set_switch(name: Switch, body: SwitchBody, request: Request, admin: Ad
         await redis.delete(switch_key(name))
     logger.warning("admin %s turned %s %s", admin.email, name, "OFF" if body.killed else "ON")
     return ok({"name": name, "killed": body.killed})
+
+
+@router.patch("/settings/monthly-budget")
+async def set_monthly_budget(body: BudgetBody, request: Request, admin: AdminUser) -> dict:
+    """The organisation's LLM budget per calendar month (the Overview's spend cards)."""
+    pool, redis = request.app.state.pool, request.app.state.redis
+    before = await app_settings.monthly_budget(pool, get_settings().monthly_budget_usd)
+    # audit first: if the audit write fails, the budget must not change unrecorded
+    await metrics.record_admin_action(
+        pool,
+        admin.id,
+        "monthly_budget_changed",
+        {"from_usd": before, "to_usd": round(body.budget_usd, 2)},
+    )
+    await app_settings.set_monthly_budget(pool, body.budget_usd, admin.id)
+    try:  # the Overview shows the new budget straight away, not after its 60 s cache
+        await redis.delete(*(f"admin:overview:{r}" for r in metrics.WINDOWS))
+    except Exception:
+        logger.warning("overview cache not cleared after budget change", exc_info=True)
+    return ok({"budget_usd": round(body.budget_usd, 2)})
 
 
 @router.post("/runs/clear-stuck")

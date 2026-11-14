@@ -149,3 +149,10 @@ def test_fallback_to_classic_model_gets_no_reasoning_effort() -> None:
 def test_real_pricing_table_prices_known_model() -> None:
     """Guards against LiteLLM API drift silently zeroing every cost (found in Phase 3 E2E)."""
     assert adapter.price("gpt-4o", 1000, 500, "gpt-4o") > 0
+
+
+def test_cached_tokens_read_from_openai_and_anthropic_usage() -> None:
+    assert adapter.cached_tokens(NS(prompt_tokens_details=NS(cached_tokens=1024))) == 1024
+    assert adapter.cached_tokens(NS(prompt_tokens_details=None, cache_read_input_tokens=300)) == 300
+    assert adapter.cached_tokens(NS(prompt_tokens=10)) == 0
+    assert adapter.cached_tokens(NS(prompt_tokens_details=NS(cached_tokens="bad"))) == 0

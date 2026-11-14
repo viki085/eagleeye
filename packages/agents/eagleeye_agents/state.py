@@ -21,3 +21,4 @@ class RunState(TypedDict, total=False):
     stop_reason: str  # budget breach reason → status BUDGET_EXCEEDED
     status: str
     citations: list[dict]
+    cache_hit: bool  # the answer was replayed from the answer cache

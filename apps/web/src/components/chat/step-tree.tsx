@@ -10,6 +10,7 @@ const KIND_ICON: Record<string, string> = {
   tool: "⚙",
   retrieval: "⌕",
   check: "✓",
+  cache: "↺",
 };
 
 const STATUS_CLASS: Record<StepView["status"], string> = {

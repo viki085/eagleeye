@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+from typing import Any
 
 from eagleeye_llm.gateway import ChatMessage, LLMGateway
 
@@ -51,11 +52,18 @@ def _format_history(history: list[ChatMessage]) -> str:
     return "\n".join(f"{m.role}: {m.content[:600]}" for m in turns)
 
 
-async def rewrite_query(llm: LLMGateway, question: str, history: list[ChatMessage]) -> list[str]:
+async def rewrite_query(
+    llm: LLMGateway, question: str, history: list[ChatMessage], cache: Any = None
+) -> list[str]:
     convo = _format_history(history)
     user = f"Conversation:\n{convo or '(none)'}\n\nLatest question:\n{question[:2000]}"
+    parts = (REWRITE_PROMPT, user)
+    if cache is not None:
+        hit = await cache.get("rewrite", parts)
+        if hit is not None and isinstance(hit.get("raw"), str):
+            return parse_rewrite(hit["raw"], question)
     try:
-        raw, _usage = await llm.complete(
+        raw, usage = await llm.complete(
             "fast",
             [
                 ChatMessage(role="system", content=REWRITE_PROMPT),
@@ -66,4 +74,6 @@ async def rewrite_query(llm: LLMGateway, question: str, history: list[ChatMessag
     except Exception:
         logger.warning("query rewrite failed; using the raw question", exc_info=True)
         return [question[:MAX_QUERY_CHARS]]
+    if cache is not None and not usage.degraded:
+        await cache.put("rewrite", parts, {"raw": raw, "cost_usd": usage.cost_usd})
     return parse_rewrite(raw, question)

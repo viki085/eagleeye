@@ -3,6 +3,7 @@
 import json
 import logging
 from collections.abc import Sequence
+from typing import Any
 
 from eagleeye_llm.gateway import ChatMessage, LLMGateway, Usage
 from pydantic import BaseModel, ValidationError
@@ -48,18 +49,28 @@ async def classify(
     history: Sequence[ChatMessage],
     doc_titles: Sequence[str],
     has_selection: bool,
+    cache: Any = None,  # eagleeye_core.app_cache.AppCache
 ) -> tuple[GuardVerdict, Usage]:
-    messages = [
-        ChatMessage("system", system_prompt),
-        ChatMessage("user", build_user_message(question, history, doc_titles, has_selection)),
-    ]
+    user = build_user_message(question, history, doc_titles, has_selection)
+    messages = [ChatMessage("system", system_prompt), ChatMessage("user", user)]
+    parts = (system_prompt, user)  # the verdict depends only on exactly this input
+    if cache is not None:
+        hit = await cache.get("guard", parts)
+        if hit is not None:
+            try:
+                return parse_verdict(hit["raw"]), Usage()
+            except (KeyError, json.JSONDecodeError, ValidationError, TypeError):
+                logger.warning("ignoring an unreadable cached guard verdict")
     last_error: Exception | None = None
     for attempt in range(MAX_ATTEMPTS):
         try:
             raw, usage = await llm.complete(
                 "fast", messages, max_tokens=120, json_mode=True, temperature=0
             )
-            return parse_verdict(raw), usage
+            verdict = parse_verdict(raw)
+            if cache is not None and not usage.degraded:
+                await cache.put("guard", parts, {"raw": raw, "cost_usd": usage.cost_usd})
+            return verdict, usage
         except (json.JSONDecodeError, ValidationError, TypeError) as exc:
             logger.warning("guard returned invalid JSON (attempt %d)", attempt + 1)
             last_error = exc

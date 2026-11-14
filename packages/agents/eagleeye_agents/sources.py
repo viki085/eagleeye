@@ -101,6 +101,10 @@ class SourceRegistry:
     def texts(self) -> list[str]:
         return [c.content for c in self._chunks.values()]
 
+    def scopes(self) -> set[str]:
+        """Scopes of every chunk shown to the model in this run (cited or not)."""
+        return {c.scope for c in self._chunks.values()}
+
     def citations_for(self, answer: str) -> list[Citation]:
         out: list[Citation] = []
         for n in cited_numbers(answer, self.numbers):

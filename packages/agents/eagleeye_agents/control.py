@@ -42,6 +42,7 @@ class UsageEntry:
     tokens_in: int
     tokens_out: int
     cost_usd: float
+    cached_tokens: int = 0
 
 
 class UsageMeter:
@@ -54,7 +55,11 @@ class UsageMeter:
             return
         self._entries.append(
             UsageEntry(
-                usage.model_id or "unknown", usage.tokens_in, usage.tokens_out, usage.cost_usd
+                usage.model_id or "unknown",
+                usage.tokens_in,
+                usage.tokens_out,
+                usage.cost_usd,
+                usage.cached_tokens,
             )
         )
         self._degraded = self._degraded or usage.degraded

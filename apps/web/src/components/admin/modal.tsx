@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 /** Native modal <dialog>: focus stays inside, Esc closes (unless `busy`), page behind is inert. */
-export function Modal({ open, title, subtitle, busy = false, onClose, children, wide = false }: {
+export function Modal({ open, title, subtitle, busy = false, onClose, children, wide = false, size }: {
   open: boolean;
   title: string;
   subtitle?: string;
@@ -11,7 +11,14 @@ export function Modal({ open, title, subtitle, busy = false, onClose, children, 
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  size?: "xl"; // document viewer
 }) {
+  const width =
+    size === "xl"
+      ? "w-[min(64rem,calc(100vw-2rem))]"
+      : wide
+        ? "w-[min(40rem,calc(100vw-2rem))]"
+        : "w-[min(28rem,calc(100vw-2rem))]";
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -28,10 +35,10 @@ export function Modal({ open, title, subtitle, busy = false, onClose, children, 
         if (!busy) onClose();
       }}
       // m-auto: Tailwind's reset removes the margin the browser uses to centre a modal dialog
-      className={`m-auto ${wide ? "w-[min(40rem,calc(100vw-2rem))]" : "w-[min(28rem,calc(100vw-2rem))]"} rounded-xl border border-black/10 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-black/50 dark:border-white/10 dark:bg-[#1a1a19] dark:text-neutral-100`}
+      className={`m-auto ${width} rounded-xl border border-black/10 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-black/50 dark:border-white/10 dark:bg-[#1a1a19] dark:text-neutral-100`}
     >
       {open && (
-        <div className="flex max-h-[85vh] flex-col">
+        <div className={`flex flex-col ${size === "xl" ? "max-h-[90vh]" : "max-h-[85vh]"}`}>
           <header className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-5 py-4 dark:border-white/10">
             <div>
               <h2 id="modal-title" className="text-sm font-semibold">{title}</h2>

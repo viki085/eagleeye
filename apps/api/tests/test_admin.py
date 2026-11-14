@@ -19,6 +19,12 @@ class FakePool:
             MEMBER.id: ("member", "active"),
         }
         self.actions: list[tuple] = []
+        self.settings: dict[str, str] = {}
+
+    async def fetchval(self, sql: str, *args: object):  # noqa: ANN201
+        if "FROM app_settings" in sql:
+            return self.settings.get(str(args[0]))
+        return None
 
     async def fetchrow(self, sql: str, *args: object):  # noqa: ANN201
         if "FROM users WHERE id" in sql:
@@ -29,6 +35,8 @@ class FakePool:
     async def execute(self, sql: str, *args: object) -> str:
         if "security_events" in sql:
             self.actions.append(args)
+        if "INSERT INTO app_settings" in sql:
+            self.settings[str(args[0])] = str(args[1])
         return "UPDATE 0"
 
 
@@ -41,9 +49,9 @@ def env(monkeypatch: pytest.MonkeyPatch) -> dict:
 
     overview_calls: list[str] = []
 
-    async def fake_overview(p, w):  # noqa: ANN001, ANN202
-        overview_calls.append(str(w.span))
-        return {"current": {"requests": 3}}
+    async def fake_overview(p, w, budget_usd=0.0):  # noqa: ANN001, ANN202
+        overview_calls.append(f"{w.span}|{budget_usd}")
+        return {"current": {"requests": 3}, "series": [], "budget": budget_usd}
 
     async def fake_counts(p, a, b):  # noqa: ANN001, ANN202
         return {"active": 2, "stuck": 0}
@@ -137,3 +145,43 @@ def test_me_reports_the_fresh_role_not_the_cached_one(env: dict) -> None:
     env["pool"].roles[MEMBER.id] = ("admin", "active")  # promoted in the database
     me = client.get("/v1/me").json()["data"]
     assert me["role"] == "admin" and me["can_manage_enterprise"] is True
+
+
+def test_overview_reports_app_cache_figures(env: dict) -> None:
+    from datetime import UTC, datetime
+
+    from eagleeye_core.app_cache import stats_key
+
+    env["app"].state.redis.data[stats_key(datetime.now(UTC))] = {
+        b"answer:lookups": b"4",
+        b"answer:hits": b"1",
+        b"answer:saved_usd": b"0.02",
+        b"guard:lookups": b"4",
+        b"guard:hits": b"3",
+    }
+    caching = _as(env, ADMIN).get("/v1/admin/overview?range=24h").json()["data"]["caching"]
+    assert caching["lookups"] == 8 and caching["hits"] == 4 and caching["hit_rate"] == 0.5
+    assert caching["saved_usd"] == 0.02
+    assert caching["by_kind"]["answer"] == {"lookups": 4, "hits": 1, "saved_usd": 0.02}
+
+
+def test_admin_changes_the_monthly_budget_and_it_is_audited(env: dict) -> None:
+    client = _as(env, ADMIN)
+    assert client.get("/v1/admin/overview?range=7d").json()["data"]["budget"] == 100.0
+    resp = client.patch("/v1/admin/settings/monthly-budget", json={"budget_usd": 250.456})
+    assert resp.status_code == 200 and resp.json()["data"]["budget_usd"] == 250.46
+    assert "admin:overview:7d" not in env["app"].state.redis.data  # cached overview dropped
+    assert client.get("/v1/admin/overview?range=7d").json()["data"]["budget"] == 250.46
+    category, detail = env["pool"].actions[-1][1], env["pool"].actions[-1][2]
+    assert category == "monthly_budget_changed" and detail == {"from_usd": 100.0, "to_usd": 250.46}
+
+
+@pytest.mark.parametrize("value", [0, -5, 2_000_000, "abc"])
+def test_invalid_budgets_are_rejected(env: dict, value: object) -> None:
+    resp = _as(env, ADMIN).patch("/v1/admin/settings/monthly-budget", json={"budget_usd": value})
+    assert resp.status_code == 422 and env["pool"].settings == {}
+
+
+def test_members_cannot_change_the_budget(env: dict) -> None:
+    resp = _as(env, MEMBER).patch("/v1/admin/settings/monthly-budget", json={"budget_usd": 5})
+    assert resp.status_code == 403 and env["pool"].settings == {}

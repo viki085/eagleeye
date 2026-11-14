@@ -44,7 +44,7 @@ export function StepLatencyTrend({ d, hourly }: { d: AdminOverview; hourly: bool
   );
 }
 
-const VERSUS = { "24h": "vs prev. 24 h", "7d": "vs prev. 7 days", "30d": "vs prev. 30 days" } as const;
+const VERSUS = { "24h": "vs prev. 24 h", "7d": "vs prev. 7 days", "14d": "vs prev. 14 days", "30d": "vs prev. 30 days" } as const;
 
 /** This period's mean per stage against the previous period, slowest first. */
 export function StepLatencyChange({ d }: { d: AdminOverview }) {

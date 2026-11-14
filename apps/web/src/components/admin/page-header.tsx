@@ -4,9 +4,10 @@ import { Icon } from "@/components/admin/icons";
 import type { AdminRange } from "@/lib/api";
 
 const RANGES: { value: AdminRange; label: string; long: string }[] = [
-  { value: "24h", label: "24H", long: "Last 24 hours" },
-  { value: "7d", label: "7D", long: "Last 7 days" },
-  { value: "30d", label: "30D", long: "Last 30 days" },
+  { value: "24h", label: "24h", long: "Last 24 hours" },
+  { value: "7d", label: "7d", long: "Last 7 days" },
+  { value: "14d", label: "14d", long: "Last 14 days" },
+  { value: "30d", label: "30d", long: "Last 30 days" },
 ];
 
 /** Report title, the period filter (segmented, as in BI tools) and a manual refresh. */
@@ -27,7 +28,7 @@ export function PageHeader({ title, description, range, onRange, onRefresh, refr
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {range && (
-          <div role="radiogroup" aria-label="Reporting period" className="flex rounded-lg border border-black/10 bg-white p-0.5 text-xs dark:border-white/10 dark:bg-[#1a1a19]">
+          <div role="radiogroup" aria-label="Reporting period" className="flex rounded-full bg-neutral-200/80 p-1 text-sm dark:bg-[#1a1a19]">
             {RANGES.map((r) => {
               const on = r.value === range;
               return (
@@ -39,10 +40,10 @@ export function PageHeader({ title, description, range, onRange, onRefresh, refr
                   aria-label={r.long}
                   title={r.long}
                   onClick={() => onRange(r.value)}
-                  className={`rounded-md px-3 py-1 font-semibold tracking-wide ${
+                  className={`rounded-full px-3.5 py-1 font-semibold ${
                     on
-                      ? "bg-[#2a78d6] text-white shadow-sm"
-                      : "text-neutral-600 hover:bg-black/[0.04] dark:text-neutral-400 dark:hover:bg-white/[0.06]"
+                      ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-white"
+                      : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
                   }`}
                 >
                   {r.label}

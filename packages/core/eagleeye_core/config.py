@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     sql_explain_max_rows: int = 5_000_000  # EXPLAIN estimate above this → rejected
     sql_max_concurrency: int = 4  # per source, in the gateway
     usage_limit_usd: float = 500.0  # lifetime LLM spend cap per user; new runs refused beyond it
+    # organisation-wide LLM budget per calendar month: the starting value; admins change it
+    # in the console (stored in app_settings), which then takes precedence
+    monthly_budget_usd: float = 100.0
+    # EagleEye's own cache (guard checks, query rewrites, search embeddings, repeated
+    # company-document answers); entries expire after app_cache_ttl_s
+    app_cache_enabled: bool = True
+    app_cache_ttl_s: int = 86400
 
     # Phase 5: data files, analysis sandbox, charts (C6). The sandbox is a Docker container
     # with no network; if Docker or the image is missing, analysis tools are not offered.

@@ -25,6 +25,13 @@ class FakeStore:
     async def delete(self, key: str) -> None:
         self.objects.pop(key, None)
 
+    async def get(self, key: str) -> bytes:
+        from eagleeye_core.storage import ObjectNotFoundError
+
+        if key not in self.objects:
+            raise ObjectNotFoundError(key)
+        return self.objects[key]
+
 
 class FakeQueue:
     def __init__(self) -> None:
@@ -99,6 +106,14 @@ class FakeDocs:
     async def get_visible_chunk(self, pool, doc_id, chunk_id, user_id):  # noqa: ANN001
         return None
 
+    async def list_visible_chunks(self, pool, doc_id, user_id):  # noqa: ANN001
+        if self.rows.get(doc_id, {}).get("status") != "READY":
+            return []
+        return [
+            {"chunk_no": 1, "content": "Second part", "heading_path": ["B"], "page": 2},
+            {"chunk_no": 0, "content": "First part", "heading_path": ["A"], "page": 1},
+        ][::-1]
+
 
 @pytest.fixture
 def env(monkeypatch: pytest.MonkeyPatch) -> dict:
@@ -111,6 +126,7 @@ def env(monkeypatch: pytest.MonkeyPatch) -> dict:
         "delete_document",
         "mark_failed",
         "get_visible_chunk",
+        "list_visible_chunks",
     ):
         monkeypatch.setattr(docs_repo, name, getattr(fake, name))
     audit: list[tuple[str, str, dict]] = []
@@ -283,3 +299,58 @@ def test_invalid_uuid_is_422_envelope(env: dict) -> None:
 def test_missing_chunk_is_404(env: dict) -> None:
     resp = env["client"].get(f"/v1/documents/{uuid.uuid4()}/chunks/{uuid.uuid4()}")
     assert resp.status_code == 404
+
+
+def _stored_doc(env: dict, *, scope: str, owner: str | None, mime: str, data: bytes) -> str:
+    doc_id = str(uuid.uuid4())
+    key = f"{scope}/{doc_id}/original"
+    env["state"].store.objects[key] = data
+    env["docs"].rows[doc_id] = {
+        "id": doc_id,
+        "scope": scope,
+        "owner_id": owner,
+        "uploaded_by": owner or OTHER_ID,
+        "s3_key": key,
+        "sha256": "s",
+        "mime": mime,
+        "filename": 'Policy "v2".pdf',
+        "status": "READY",
+    }
+    return doc_id
+
+
+def test_file_is_served_inline_to_anyone_who_can_see_it(env: dict) -> None:
+    doc_id = _stored_doc(
+        env, scope="enterprise", owner=None, mime="application/pdf", data=b"%PDF-1"
+    )
+    resp = env["client"].get(f"/v1/documents/{doc_id}/file")
+    assert resp.status_code == 200 and resp.content == b"%PDF-1"
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.headers["content-disposition"] == 'inline; filename="Policy v2.pdf"'
+    assert resp.headers["x-content-type-options"] == "nosniff"
+
+
+def test_file_of_another_users_personal_doc_is_404(env: dict) -> None:
+    doc_id = _stored_doc(env, scope="personal", owner=OTHER_ID, mime="text/plain", data=b"secret")
+    assert env["client"].get(f"/v1/documents/{doc_id}/file").status_code == 404
+    assert env["client"].get(f"/v1/documents/{doc_id}/text").status_code == 404
+
+
+def test_unviewable_types_are_sent_as_opaque_bytes(env: dict) -> None:
+    docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    doc_id = _stored_doc(env, scope="personal", owner=ME.id, mime=docx, data=b"PK")
+    resp = env["client"].get(f"/v1/documents/{doc_id}/file")
+    assert resp.headers["content-type"] == "application/octet-stream"
+
+
+def test_missing_object_is_404(env: dict) -> None:
+    doc_id = _stored_doc(env, scope="personal", owner=ME.id, mime="text/plain", data=b"x")
+    env["state"].store.objects.clear()
+    assert env["client"].get(f"/v1/documents/{doc_id}/file").status_code == 404
+
+
+def test_text_returns_chunks_in_reading_order(env: dict) -> None:
+    doc_id = _stored_doc(env, scope="enterprise", owner=None, mime="text/plain", data=b"x")
+    body = env["client"].get(f"/v1/documents/{doc_id}/text").json()["data"]
+    assert [c["content"] for c in body] == ["First part", "Second part"]
+    assert body[0]["heading_path"] == ["A"] and body[1]["page"] == 2

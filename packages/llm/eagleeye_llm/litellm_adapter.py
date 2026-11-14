@@ -241,7 +241,20 @@ class LiteLLMGateway:
         tokens_in = getattr(raw, "prompt_tokens", 0) or 0
         tokens_out = getattr(raw, "completion_tokens", 0) or 0
         cost = price(model, tokens_in, tokens_out, self._price_ref)
-        return Usage(tokens_in, tokens_out, round(cost, 6), model, degraded)
+        return Usage(tokens_in, tokens_out, round(cost, 6), model, degraded, cached_tokens(raw))
+
+
+def cached_tokens(raw: object) -> int:
+    """Prompt-cache hits: OpenAI reports prompt_tokens_details.cached_tokens, Anthropic
+    cache_read_input_tokens; missing or malformed fields count as 0."""
+    details = getattr(raw, "prompt_tokens_details", None)
+    value = getattr(details, "cached_tokens", None) if details is not None else None
+    if value is None:
+        value = getattr(raw, "cache_read_input_tokens", None)
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def is_reasoning_model(model: str) -> bool:

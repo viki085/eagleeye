@@ -1,4 +1,4 @@
-﻿"""Document metadata access. Visibility rules mirror eagleeye_retrieval.access."""
+"""Document metadata access. Visibility rules mirror eagleeye_retrieval.access."""
 
 import asyncpg
 
@@ -63,7 +63,7 @@ async def find_duplicate(
     )
 
 
-async def list_visible(pool: asyncpg.Pool, user_id: str, limit: int = 200) -> list[asyncpg.Record]:
+async def list_visible(pool: asyncpg.Pool, user_id: str, limit: int = 2000) -> list[asyncpg.Record]:
     return await pool.fetch(
         f"""
         SELECT {DOC_COLUMNS} FROM documents
@@ -128,6 +128,23 @@ async def get_visible_chunk(
           AND (c.scope = 'enterprise' OR (c.scope = 'personal' AND c.owner_id = $3::uuid))
         """,
         chunk_id,
+        doc_id,
+        user_id,
+    )
+
+
+async def list_visible_chunks(
+    pool: asyncpg.Pool, doc_id: str, user_id: str
+) -> list[asyncpg.Record]:
+    """All chunks of one READY document the user may see, in reading order (document viewer)."""
+    return await pool.fetch(
+        """
+        SELECT c.chunk_no, c.content, c.heading_path, c.page
+        FROM document_chunks c JOIN documents d ON d.id = c.document_id
+        WHERE d.id = $1 AND d.status = 'READY'
+          AND (c.scope = 'enterprise' OR (c.scope = 'personal' AND c.owner_id = $2::uuid))
+        ORDER BY c.chunk_no
+        """,
         doc_id,
         user_id,
     )

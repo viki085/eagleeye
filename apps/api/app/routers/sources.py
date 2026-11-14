@@ -1,4 +1,4 @@
-"""Data sources the caller's role may query — names and descriptions only (LLD §2.2)."""
+"""Data sources the caller's role may query: tables and columns, no data (LLD §2.2)."""
 
 from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
@@ -22,7 +22,22 @@ async def list_sources(request: Request, user: CurrentUser) -> dict:
                 "description": acc.source.description,
                 "can_see_pii": acc.grant.can_see_pii,
                 "tables": [
-                    {"name": t.key, "description": t.description, "row_estimate": t.row_estimate}
+                    {
+                        "name": t.key,
+                        "description": t.description,
+                        "row_estimate": t.row_estimate,
+                        "columns": [
+                            {
+                                "name": c.name,
+                                "type": c.data_type,
+                                "description": c.description,
+                                "pii": c.pii,
+                                # personal-data columns are masked in answers for this role
+                                "masked": c.pii and not acc.grant.can_see_pii,
+                            }
+                            for c in t.columns
+                        ],
+                    }
                     for t in acc.tables
                 ],
             }

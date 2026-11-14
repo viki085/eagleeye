@@ -23,9 +23,18 @@ class FakeRedis:
     async def expire(self, key: str, seconds: int) -> None:
         self._check()
 
-    async def delete(self, key: str) -> None:
+    async def delete(self, *keys: str) -> None:
         self._check()
-        self.data.pop(key, None)
+        for key in keys:
+            self.data.pop(key, None)
+
+    def pipeline(self) -> "FakePipeline":
+        return FakePipeline(self)
+
+    async def hgetall(self, key: str) -> dict:
+        self._check()
+        value = self.data.get(key)
+        return value if isinstance(value, dict) else {}
 
     async def exists(self, *keys: str) -> int:
         self._check()
@@ -47,3 +56,15 @@ class FakeRedis:
     async def llen(self, key: str) -> int:
         self._check()
         return 0
+
+
+class FakePipeline:
+    def __init__(self, redis: FakeRedis) -> None:
+        self.redis, self.ops = redis, []
+
+    def hgetall(self, key: str) -> "FakePipeline":
+        self.ops.append(key)
+        return self
+
+    async def execute(self) -> list:
+        return [await self.redis.hgetall(k) for k in self.ops]

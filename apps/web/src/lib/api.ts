@@ -180,10 +180,26 @@ export interface ArtifactPage {
   truncated: boolean;
 }
 
+export interface DataSourceColumn {
+  name: string;
+  type: string;
+  description: string;
+  pii: boolean;
+  masked: boolean; // personal data, hidden from answers for the caller's role
+}
+
 export interface DataSourceTable {
   name: string;
   description: string;
   row_estimate: number | null;
+  columns: DataSourceColumn[];
+}
+
+export interface DocumentChunkText {
+  chunk_no: number;
+  content: string;
+  heading_path: string[];
+  page: number | null;
 }
 
 export interface DataSource {
@@ -253,7 +269,7 @@ export class ApiError extends Error {
 
 // --- admin console -----------------------------------------------------------------------
 
-export type AdminRange = "24h" | "7d" | "30d";
+export type AdminRange = "24h" | "7d" | "14d" | "30d";
 
 export interface AdminSeriesPoint {
   bucket: string;
@@ -264,6 +280,12 @@ export interface AdminSeriesPoint {
   avg_duration_s: number | null;
   cost_usd: number;
   safety_events: number;
+  llm_calls: number;
+  tokens_in: number;
+  tokens_out: number;
+  cached_tokens: number;
+  cache_lookups: number; // EagleEye's own cache, per bucket
+  cache_hits: number;
 }
 
 export interface AdminPeriod {
@@ -281,6 +303,32 @@ export interface AdminPeriod {
   cost_usd: number;
   cost_per_request_usd: number | null;
   safety_events: number;
+  llm_calls: number;
+  tokens_in: number;
+  tokens_out: number;
+  cached_tokens: number;
+  cache_hit_rate: number | null;
+}
+
+export type AppCacheKind = "guard" | "rewrite" | "embedding" | "answer";
+
+/** EagleEye's own cache (guard checks, query rewrites, search embeddings, repeated answers). */
+export interface AdminCaching {
+  lookups: number;
+  hits: number;
+  hit_rate: number | null;
+  saved_usd: number;
+  by_kind: Record<AppCacheKind, { lookups: number; hits: number; saved_usd: number }>;
+}
+
+/** LLM spend in the current calendar month (UTC) against the organisation budget. */
+export interface AdminMonthSpend {
+  month_start: string; // ISO date, first of the month
+  spend_usd: number;
+  budget_usd: number;
+  remaining_usd: number;
+  used_fraction: number | null;
+  alerts: number[]; // fractions of the budget, e.g. [0.75, 0.9]
 }
 
 export interface AdminModelCost {
@@ -320,6 +368,8 @@ export interface AdminOverview {
   step_trend: { bucket: string; step: string; avg_ms: number; executions: number }[];
   step_change: { step: string; avg_ms: number | null; prev_avg_ms: number | null; executions: number }[];
   knowledge: { ready: number; indexing: number; failed: number; chunks: number };
+  month: AdminMonthSpend;
+  caching: AdminCaching;
   live: {
     databases: AdminDatabaseHealth;
     agents: { active: number; stuck: number };
@@ -495,6 +545,13 @@ export class ApiClient {
     });
   }
 
+  setMonthlyBudget(budgetUsd: number): Promise<{ budget_usd: number }> {
+    return this.request("/v1/admin/settings/monthly-budget", {
+      method: "PATCH",
+      body: JSON.stringify({ budget_usd: budgetUsd }),
+    });
+  }
+
   clearStuckRuns(): Promise<{ cleared: number }> {
     return this.request("/v1/admin/runs/clear-stuck", { method: "POST" });
   }
@@ -570,6 +627,20 @@ export class ApiClient {
 
   listDocuments(): Promise<DocumentSummary[]> {
     return this.request<DocumentSummary[]>("/v1/documents");
+  }
+
+  /** The original file for the viewer (fetched with the bearer token, shown from a blob URL). */
+  async getDocumentFile(documentId: string): Promise<Blob> {
+    const token = await this.getToken();
+    const resp = await fetch(`${API_URL}/v1/documents/${documentId}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) throw new ApiError(`Could not open the document (${resp.status})`, resp.status);
+    return resp.blob();
+  }
+
+  getDocumentText(documentId: string): Promise<DocumentChunkText[]> {
+    return this.request<DocumentChunkText[]>(`/v1/documents/${documentId}/text`);
   }
 
   uploadDocument(file: File, scope: DocumentScope): Promise<DocumentSummary> {

@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 import asyncpg
 
-Range = Literal["24h", "7d", "30d"]
+Range = Literal["24h", "7d", "14d", "30d"]
 TERMINAL = ("SUCCEEDED", "FAILED", "CANCELLED", "BUDGET_EXCEEDED")
 USER_SORTS = {
     "last_seen": "u.last_seen_at DESC NULLS LAST",
@@ -32,6 +32,7 @@ class Window:
 WINDOWS: dict[str, Window] = {
     "24h": Window(timedelta(hours=24), "hour", timedelta(hours=1)),
     "7d": Window(timedelta(days=7), "day", timedelta(days=1)),
+    "14d": Window(timedelta(days=14), "day", timedelta(days=1)),
     "30d": Window(timedelta(days=30), "day", timedelta(days=1)),
 }
 

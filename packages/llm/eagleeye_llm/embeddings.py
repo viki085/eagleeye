@@ -48,3 +48,31 @@ class LiteLLMEmbedder:
                     )
             vectors.extend(batch_vectors)
         return vectors
+
+
+class CachingEmbedder:
+    """Query embeddings through EagleEye's cache: identical text and model → same vector.
+    Used for searches only (ingestion embeds new text and gains nothing from it)."""
+
+    def __init__(self, inner: Embedder, cache: Any, model: str) -> None:
+        self._inner = inner
+        self._cache = cache
+        self._model = model
+
+    @property
+    def dim(self) -> int:
+        return self._inner.dim
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        found: dict[int, list[float]] = {}
+        for i, text in enumerate(texts):
+            hit = await self._cache.get("embedding", (self._model, self.dim, text))
+            if hit is not None and len(hit.get("v", [])) == self.dim:
+                found[i] = [float(x) for x in hit["v"]]
+        missing = [i for i in range(len(texts)) if i not in found]
+        if missing:
+            fresh = await self._inner.embed([texts[i] for i in missing])
+            for i, vec in zip(missing, fresh, strict=True):
+                found[i] = vec
+                await self._cache.put("embedding", (self._model, self.dim, texts[i]), {"v": vec})
+        return [found[i] for i in range(len(texts))]
