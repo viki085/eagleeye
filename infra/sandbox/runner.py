@@ -26,8 +26,9 @@ import sys
 import traceback
 from pathlib import Path
 
-IN_DIR = Path("/work/in")
-OUT_DIR = Path("/work/out")
+# Docker mounts /work/in and /work/out; the Lambda handler points these at /tmp
+IN_DIR = Path(os.environ.get("SANDBOX_IN_DIR", "/work/in"))
+OUT_DIR = Path(os.environ.get("SANDBOX_OUT_DIR", "/work/out"))
 SAFE_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 MAX_STDOUT_CHARS = 4000
 MAX_ERROR_CHARS = 800

@@ -107,22 +107,24 @@ async def _check_gateway() -> list[ServiceHealth]:
 
 
 async def _check_sandbox() -> list[ServiceHealth]:
-    """Docker reachable and the analysis image built (C6 §4)."""
-    from eagleeye_sandbox.docker_executor import DockerExecutor
+    """The analysis sandbox is reachable: Docker and its image, or the Lambda function."""
+    from eagleeye_sandbox.factory import build_executor
 
     settings = get_settings()
     if not settings.enable_analysis:
         return []
     start = time.perf_counter()
-    if await DockerExecutor(settings.sandbox_image).available():
+    lam = settings.sandbox_backend == "lambda"
+    if await build_executor(
+        settings, settings.sandbox_mem_mb, settings.sandbox_timeout_s
+    ).available():
         return [ServiceHealth("analysis-sandbox", "up", _ms(start))]
-    return [
-        ServiceHealth(
-            "analysis-sandbox",
-            "down",
-            detail=f"Docker or image {settings.sandbox_image} unavailable",
-        )
-    ]
+    detail = (
+        f"Lambda function {settings.sandbox_lambda_function} unavailable"
+        if lam
+        else f"Docker or image {settings.sandbox_image} unavailable"
+    )
+    return [ServiceHealth("analysis-sandbox", "down", detail=detail)]
 
 
 def _ms(start: float) -> int:

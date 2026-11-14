@@ -97,6 +97,15 @@ class Settings(BaseSettings):
     enable_analysis: bool = True
     enable_python_analysis: bool = True  # false → DuckDB SQL only
     sandbox_image: str = "eagleeye-sandbox:1"
+    # "docker" (laptop: one container per run) or "lambda" (cloud: the sandbox function)
+    sandbox_backend: str = "docker"
+    sandbox_lambda_function: str = "eagleeye-sandbox"
+    sandbox_lambda_endpoint_url: str = ""  # a local Lambda emulator; empty = AWS Lambda
+    # (the local emulator always serves its function as "function": set SANDBOX_LAMBDA_FUNCTION)
+    sandbox_transfer_bucket: str = ""  # inputs/outputs in transit; empty = the artifacts bucket
+    # the S3 address the function itself can reach, for the links it is given (local
+    # emulator: the storage container's name); empty = the normal S3 endpoint
+    sandbox_transfer_endpoint_url: str = ""
     sandbox_mem_mb: int = 1024
     sandbox_timeout_s: int = 60
     sandbox_runs_per_hour: int = 60  # per user

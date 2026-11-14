@@ -1,17 +1,26 @@
 # Laptop override for compose.demo.yml: run the containerised services against the local stack
 # (Supabase on the host, and the redis / qdrant / seaweedfs / warehouse containers from
-# infra/docker-compose.yml) instead of their own Redis and an empty warehouse.
+# infra/docker-compose.yml) instead of their own Redis and an empty warehouse. Analysis runs in
+# the Lambda sandbox image through the local Lambda emulator, as it will on AWS.
 #
+#   docker build -f infra/sandbox/Dockerfile.lambda -t eagleeye-sandbox-lambda:1 infra/sandbox
 #   scripts\stop.cmd                       (stop the laptop API, gateway and workers first)
 #   docker compose -f infra/cloud/compose.demo.yml -f infra/cloud/compose.local.yml \
-#     --env-file .env up -d api gateway agent-worker ingest-worker
+#     --env-file .env up -d
 #
 # The repo's .env is read by Docker itself; only the local addresses are replaced here.
+x-local-lambda: &local-lambda
+  SANDBOX_BACKEND: lambda
+  SANDBOX_LAMBDA_ENDPOINT_URL: http://sandbox:8080
+  SANDBOX_LAMBDA_FUNCTION: function  # the emulator's name for its one function
+  SANDBOX_TRANSFER_ENDPOINT_URL: http://seaweedfs:8333  # links the function can reach
+
 services:
   api: &local
     env_file: ../../.env
     networks: [default, infra]
     environment:
+      <<: *local-lambda
       DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
@@ -31,6 +40,7 @@ services:
     <<: *local
     depends_on: !reset []
     environment:
+      <<: *local-lambda
       DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
@@ -45,6 +55,15 @@ services:
       QDRANT_URL: http://qdrant:6333
       S3_ENDPOINT_URL: http://seaweedfs:8333
       SERVICE: ingest-worker
+  # the analysis sandbox as on AWS Lambda: read-only root, non-root, memory cap
+  sandbox:
+    image: eagleeye-sandbox-lambda:1
+    user: "10001:10001"
+    read_only: true
+    tmpfs: ["/tmp:rw,size=512m,mode=1777"]
+    mem_limit: 2560m
+    networks: [infra]
+    restart: unless-stopped
   # the local stack already has these
   redis: { profiles: [cloud-only] }
   warehouse: { profiles: [cloud-only] }

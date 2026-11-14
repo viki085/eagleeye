@@ -32,7 +32,7 @@ from eagleeye_llm.litellm_adapter import LiteLLMGateway
 from eagleeye_retrieval.service import Retriever
 from eagleeye_retrieval.stores.pgvector_store import PgVectorPersonalStore
 from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_qdrant_client
-from eagleeye_sandbox.docker_executor import DockerExecutor
+from eagleeye_sandbox.factory import build_executor
 
 _lock = threading.Lock()
 _loop: asyncio.AbstractEventLoop | None = None
@@ -69,7 +69,7 @@ def _analysis(s: Settings, pool: asyncpg.Pool) -> tuple[PgDataWorkspace | None, 
         return None, None
     artifacts = S3ObjectStore.from_settings(s, s.artifacts_bucket)
     workspace = PgDataWorkspace(pool, build_object_store(), artifacts)
-    executor = DockerExecutor(s.sandbox_image, s.sandbox_mem_mb, s.sandbox_timeout_s)
+    executor = build_executor(s, s.sandbox_mem_mb, s.sandbox_timeout_s)
     return workspace, executor
 
 
@@ -96,7 +96,7 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         catalog = CatalogService(CatalogRepo(pool), embedder)
     workspace, executor = _analysis(s, pool)
     notebook_executor = (
-        DockerExecutor(s.sandbox_image, s.notebook_sandbox_mem_mb, s.notebook_sandbox_timeout_s)
+        build_executor(s, s.notebook_sandbox_mem_mb, s.notebook_sandbox_timeout_s)
         if executor is not None and s.enable_notebook_mode
         else None
     )

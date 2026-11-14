@@ -1,0 +1,23 @@
+# Analysis sandbox as an AWS Lambda container image (Phase 7A; C10 §2.4). Same runner and
+# packages as the Docker sandbox (Dockerfile); lambda_handler.py moves files in and out.
+#   docker build -f infra/sandbox/Dockerfile.lambda -t eagleeye-sandbox-lambda:1 infra/sandbox
+# Locally the base image's Runtime Interface Emulator serves the Lambda Invoke API on 8080:
+#   docker run -p 9000:8080 eagleeye-sandbox-lambda:1
+FROM public.ecr.aws/lambda/python:3.12
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    MPLBACKEND=Agg \
+    OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1
+
+COPY requirements.txt /opt/requirements.txt
+RUN pip install --no-cache-dir -r /opt/requirements.txt
+
+# matplotlib's font cache, built once here; the runner copies it to /tmp at run time
+RUN MPLCONFIGDIR=/opt/mplconfig python -c "import matplotlib.pyplot, seaborn" \
+    && chmod -R a+rX /opt/mplconfig
+
+COPY runner.py lambda_handler.py ${LAMBDA_TASK_ROOT}/
+CMD ["lambda_handler.handler"]
