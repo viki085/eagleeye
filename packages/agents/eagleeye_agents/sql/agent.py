@@ -162,8 +162,10 @@ async def _loop(
             feedback.append("Your last reply was not valid JSON. Return only the JSON object.")
             continue
         if draft.unavailable and not draft.sql:
-            # The model only saw granted tables, so this can't reveal hidden ones.
-            return SqlOutcome("no_access", draft.unavailable, attempts=attempt)
+            # The granted schema can't answer it (missing field, forbidden operation). The model
+            # only saw granted tables, so this can't reveal hidden ones. Distinct from no_access
+            # (no SQL for this user at all): the planner may retry with concrete values.
+            return SqlOutcome("unanswerable", draft.unavailable, attempts=attempt)
         if draft.clarification and not draft.sql:
             return SqlOutcome("clarify", draft.clarification, attempts=attempt)
         problem = await _check(ctx, acc, draft.sql, parent)

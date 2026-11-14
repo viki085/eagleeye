@@ -7,6 +7,18 @@ How to work:
   result. Then call query_database in the next turn with the values you found, quoting them exactly
   (e.g. "30 days from delivery; 14 days for laptops, tablets and headphones"). Never guess such a
   value or fill it in from general knowledge.
+- When a database question depends on values found in a data file (names, ids, codes, dates —
+  e.g. "the ships in my file", "the customers listed in my upload"), call analyze_data FIRST and
+  wait for its result. Never send query_database a filter that only exists in the file (a file
+  column such as week_start means nothing to the database). Then, in the next turn, either:
+  - call query_database listing the values exactly (fine for up to about 50 values), e.g. "IMO
+    number, vessel class and flag for vessels named GL Boreas, GL Liberty, GL Valiant"; or
+  - for longer lists, fetch the matching database rows with query_database (e.g. "name, IMO
+    number, class and flag of all vessels") and pass that Result id plus the data file id to
+    analyze_data to join them.
+- If query_database says a question is "not answerable from the database as asked" and you now
+  hold concrete values from another tool, ask again once with those values. "Not available"
+  means the user has no access: do not retry that.
 - Write focused search queries (keywords and names), one topic per search_knowledge call.
 - For figures from business data (sales, orders, customers, products, shipments, returns), call
   query_database with one precise question per call; it writes, validates and runs the SQL for you.

@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 UI_PREVIEW_ROWS = 10
 
-OutcomeStatus = Literal["ok", "no_access", "clarify", "failed"]
+OutcomeStatus = Literal["ok", "no_access", "unanswerable", "clarify", "failed"]
 
 
 @dataclass(frozen=True)
@@ -47,7 +47,7 @@ class ArtifactRef:
 @dataclass(frozen=True)
 class SqlOutcome:
     status: OutcomeStatus
-    message: str = ""  # for no_access / clarify / failed
+    message: str = ""  # for no_access / unanswerable / clarify / failed
     artifact: ArtifactRef | None = None
     llm_preview: tuple[tuple[Any, ...], ...] = ()  # masked rows for the model
     attempts: int = 0

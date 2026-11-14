@@ -246,3 +246,29 @@ def test_masked_preview_regex_catches_aliased_pii() -> None:
     cols = [{"name": "contact"}, {"name": "phone_number"}, {"name": "n"}]
     rows = [["x@y.com", "+1 555 123 4567", 3]]
     assert masked_preview(cols, rows, set()) == (("***", "***", 3),)
+
+
+async def test_schema_gaps_are_unanswerable_not_access_denied() -> None:
+    """A question the granted schema can't answer (e.g. a column that only exists in the user's
+    file) is reported so the planner may retry with concrete values; "Not available" stays
+    reserved for users without access."""
+    from eagleeye_agents.sql.agent import run_sql_agent
+    from eagleeye_agents.tools.query_database import outcome_text
+
+    reason = "No week_start column exists in the accessible schema."
+    llm = FakeLLM([draft(sql="", unavailable=reason)])
+    ctx, _, _ = make_ctx(llm)
+    gateway = enable_sql(ctx)
+    outcome = await run_sql_agent(ctx, "ships whose week_start is 2024-01-01", None, None)
+    assert outcome.status == "unanswerable" and gateway.calls == []
+    text = outcome_text(outcome)
+    assert text.startswith("Not answerable from the database as asked: " + reason)
+    assert "listing those values explicitly" in text and "Not available" not in text
+
+
+def test_planner_is_told_to_query_files_before_the_database() -> None:
+    from eagleeye_agents.prompts.loader import load_prompts
+
+    supervisor = load_prompts().text("supervisor")
+    assert "call analyze_data FIRST and" in supervisor
+    assert "ask again once with those values" in supervisor

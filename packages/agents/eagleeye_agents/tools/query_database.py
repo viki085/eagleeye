@@ -46,6 +46,13 @@ async def register_artifact(ctx: "RunContext", outcome: SqlOutcome) -> None:
 
 def outcome_text(outcome: SqlOutcome) -> str:
     if outcome.status != "ok" or outcome.artifact is None:
+        if outcome.status == "unanswerable":
+            return (
+                f"Not answerable from the database as asked: {outcome.message}\n"
+                "If the question depends on values from a data file, a document or an earlier "
+                "result (names, ids, dates), ask again listing those values explicitly, or "
+                "fetch the matching rows and join them with analyze_data."
+            )
         prefix = {"clarify": "Clarification needed", "no_access": "Not available"}.get(
             outcome.status, "Query failed"
         )
