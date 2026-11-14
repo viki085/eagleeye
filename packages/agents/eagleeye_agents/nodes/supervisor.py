@@ -12,6 +12,7 @@ from eagleeye_agents.budgets import LoopVerdict
 from eagleeye_agents.context import RunContext
 from eagleeye_agents.nodes.answer import conversation
 from eagleeye_agents.nodes.guard import Node
+from eagleeye_agents.references import planner_note
 from eagleeye_agents.sources import neutralise
 from eagleeye_agents.state import RunState
 from eagleeye_agents.streaming import stream_turn
@@ -32,7 +33,10 @@ REPEAT_HINT = (
 
 def _system_prompt(ctx: RunContext) -> str:
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    return f"{ctx.prompts.text('supervisor')}\n\nCurrent time: {now}"
+    note = planner_note(ctx.references)
+    return f"{ctx.prompts.text('supervisor')}\n\nCurrent time: {now}" + (
+        f"\n\n{note}" if note else ""
+    )
 
 
 def make_supervisor_node(ctx: RunContext, registry: ToolRegistry) -> Node:

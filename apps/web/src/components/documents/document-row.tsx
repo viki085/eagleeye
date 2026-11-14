@@ -1,6 +1,7 @@
 "use client";
 
 import type { DocumentStatus, DocumentSummary } from "@/lib/api";
+import { documentToken, FILE_REF_MIME } from "@/lib/file-refs";
 
 const STAGE_LABEL: Record<DocumentStatus, string> = {
   UPLOADING: "Uploading",
@@ -30,7 +31,15 @@ interface DocumentRowProps {
 export function DocumentRow({ doc, canDelete, onOpen, onDelete, selection }: DocumentRowProps) {
   const ready = doc.status === "READY";
   return (
-    <li className="group rounded-lg px-2 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/60">
+    <li
+      draggable={ready}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(FILE_REF_MIME, documentToken(doc));
+        e.dataTransfer.setData("text/plain", documentToken(doc));
+        e.dataTransfer.effectAllowed = "copy";
+      }}
+      className={`group rounded-lg px-2 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 ${ready ? "cursor-grab active:cursor-grabbing" : ""}`}
+    >
       <div className="flex items-start gap-2">
         {selection && (
           <input

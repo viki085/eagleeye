@@ -15,8 +15,16 @@ intent — one of:
 - "sql": needs querying structured business data (counts, totals, trends from databases).
 - "analysis": needs computation over the user's data files or results (EDA / "explore my file",
   statistics, correlations, significance tests, joining an uploaded file with database figures, charts).
-- "mixed": needs more than one of docs / sql / analysis, or comparing several sources.
+- "mixed": needs more than one of docs / sql / analysis, or comparing several sources. Also use
+  "mixed" (complexity "complex") for questions about what the assistant can access: which
+  databases, tables, columns, documents or data files exist.
 - "other": general knowledge that might or might not be in the documents.
+
+Data files: "User's data files" above the message lists the user's uploaded CSV/Excel files and
+their columns. A name in [square brackets] refers to one of the user's files. If the message
+names such a file, or mentions a column or value that exists in a data file (e.g. a file has a
+week_start column and the message filters on week_start), the intent is "analysis" — or "mixed"
+when database figures or documents are needed as well.
 
 complexity — "simple" (one lookup or one direct answer), "complex" (several steps, comparisons, multi-part), or "uncertain".
 

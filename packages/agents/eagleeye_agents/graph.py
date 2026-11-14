@@ -1,10 +1,10 @@
 """guard ─┬─ blocked ────────────────────────────────► finalize
-          └─ route ─┬─ simple ──► simple ─────────────► finalize
-                    ├─ rag / rag_auto ─► answer_cache ─┬─ hit ──► END (replayed answer)
-                    │                                  └─ miss ─► rag ──► finalize
-                    ├─ sql ─► sql (SQL sub-agent) ────► finalize
-                    └─ supervisor ─► answer_cache ─┬─ hit ──► END
-                                                   └─ miss ─► supervisor ⇄ tools ─► finalize
+└─ route ─┬─ simple ──► simple ─────────────► finalize
+          ├─ rag / rag_auto ─► answer_cache ─┬─ hit ──► END (replayed answer)
+          │                                  └─ miss ─► rag ──► finalize
+          ├─ sql ─► sql (SQL sub-agent) ────► finalize
+          └─ supervisor ─► answer_cache ─┬─ hit ──► END
+                                         └─ miss ─► supervisor ⇄ tools ─► finalize
 """
 
 from typing import Any
@@ -63,9 +63,7 @@ def build_graph(ctx: RunContext, registry: ToolRegistry | None = None) -> Any:
     g.add_node("finalize", make_finalize_node(ctx))
     g.add_node("answer_cache", make_answer_cache_node(ctx))
     g.add_edge(START, "guard")
-    g.add_conditional_edges(
-        "guard", _after_guard, ["finalize", "simple", "answer_cache", "sql"]
-    )
+    g.add_conditional_edges("guard", _after_guard, ["finalize", "simple", "answer_cache", "sql"])
     g.add_conditional_edges("answer_cache", _after_cache, [END, "rag", "supervisor"])
     g.add_edge("simple", "finalize")
     g.add_edge("rag", "finalize")

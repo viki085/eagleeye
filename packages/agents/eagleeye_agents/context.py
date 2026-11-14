@@ -85,6 +85,8 @@ class RunContext:
     charts: list[dict[str, Any]] = field(default_factory=list)  # chart event payloads, in order
     cache: Any = None  # eagleeye_core.app_cache.AppCache (None = no caching)
     answer_key: tuple | None = None  # set when this run's answer may be reused or stored
+    data_files: list[Any] = field(default_factory=list)  # the user's READY data files
+    references: list[Any] = field(default_factory=list)  # references.FileRef named as [file]
     budget: BudgetTracker = field(init=False)
 
     def __post_init__(self) -> None:

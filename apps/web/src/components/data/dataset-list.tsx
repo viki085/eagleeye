@@ -2,6 +2,7 @@
 
 import { EmptyNote } from "@/components/documents/panel-section";
 import type { DatasetStatus, DatasetSummary } from "@/lib/api";
+import { datasetToken, FILE_REF_MIME } from "@/lib/file-refs";
 
 interface DatasetListProps {
   datasets: readonly DatasetSummary[];
@@ -33,7 +34,16 @@ export function DatasetList({ datasets, onProfile, onDelete }: DatasetListProps)
       {datasets.map((d) => (
         <li
           key={d.id}
-          className="group flex items-start justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800/60"
+          draggable={d.status === "READY"}
+          onDragStart={(e) => {
+            e.dataTransfer.setData(FILE_REF_MIME, datasetToken(d));
+            e.dataTransfer.setData("text/plain", datasetToken(d));
+            e.dataTransfer.effectAllowed = "copy";
+          }}
+          title={d.status === "READY" ? "Drag into the message box to refer to this file" : undefined}
+          className={`group flex items-start justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 ${
+            d.status === "READY" ? "cursor-grab active:cursor-grabbing" : ""
+          }`}
         >
           <div className="min-w-0">
             <p className="truncate text-sm text-neutral-800 dark:text-neutral-200" title={d.filename}>

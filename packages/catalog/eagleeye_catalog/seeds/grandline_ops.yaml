@@ -267,7 +267,9 @@ tables:
   finance.bunker_purchases:
     enabled: true
     sensitivity: internal
-    description: Ship fuel (bunker) purchases.
+    description: >-
+      Ship fuel (bunker) purchases. The average price paid is weighted by quantity:
+      SUM(price_usd_per_mt * quantity_mt) / SUM(quantity_mt), never a plain AVG of prices.
     columns:
       fuel_grade: "'VLSFO', 'HSFO' or 'LNG'."
       quantity_mt: Quantity in metric tonnes.
@@ -365,6 +367,10 @@ metrics:
   - name: volume (TEU)
     description: Cargo volume in TEU, excluding cancelled bookings.
     definition_sql: SUM(b.teu) FROM commercial.bookings b WHERE b.status <> 'cancelled'
+  - name: average fuel price paid
+    description: Average bunker price per tonne actually paid, weighted by the tonnes bought.
+    definition_sql: >-
+      SUM(b.price_usd_per_mt * b.quantity_mt) / SUM(b.quantity_mt) FROM finance.bunker_purchases b
   - name: days sales outstanding
     description: Average days between invoice date and payment for paid invoices.
     definition_sql: AVG(i.paid_date - i.invoice_date) FROM finance.invoices i WHERE i.status = 'paid'

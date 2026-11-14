@@ -2,6 +2,8 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 
+import { FILE_REF_MIME, insertToken } from "@/lib/file-refs";
+
 const MAX_HEIGHT_PX = 320; // beyond this the box scrolls
 
 interface ComposerProps {
@@ -15,6 +17,23 @@ interface ComposerProps {
 export function Composer({ disabled, onSend, running = false, onStop, contextNote = null }: ComposerProps) {
   const [text, setText] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
+  const [dropping, setDropping] = useState(false);
+  const pendingCaret = useRef<number | null>(null);
+
+  const isFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes(FILE_REF_MIME);
+
+  function onDrop(e: React.DragEvent<HTMLTextAreaElement>): void {
+    setDropping(false);
+    const token = e.dataTransfer.getData(FILE_REF_MIME);
+    if (!token) return; // anything else (plain text) keeps the browser's own behaviour
+    e.preventDefault();
+    const el = e.currentTarget;
+    const caret = document.activeElement === el ? el.selectionStart : text.length;
+    const next = insertToken(text, caret, token);
+    pendingCaret.current = next.caret;
+    setText(next.text);
+    el.focus();
+  }
 
   // grow with the content (new lines and long wrapped lines), up to MAX_HEIGHT_PX
   useLayoutEffect(() => {
@@ -23,6 +42,10 @@ export function Composer({ disabled, onSend, running = false, onStop, contextNot
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
     el.style.overflowY = el.scrollHeight > MAX_HEIGHT_PX ? "auto" : "hidden";
+    if (pendingCaret.current !== null) {
+      el.setSelectionRange(pendingCaret.current, pendingCaret.current);
+      pendingCaret.current = null;
+    }
   }, [text]);
 
   const submit = () => {
@@ -39,6 +62,14 @@ export function Composer({ disabled, onSend, running = false, onStop, contextNot
           ref={box}
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onDragOver={(e) => {
+            if (!isFileDrag(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+            setDropping(true);
+          }}
+          onDragLeave={() => setDropping(false)}
+          onDrop={onDrop}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -48,7 +79,7 @@ export function Composer({ disabled, onSend, running = false, onStop, contextNot
           rows={1}
           placeholder="Message EagleEye…"
           aria-label="Message"
-          className="max-h-80 flex-1 resize-none rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-900"
+          className={`max-h-80 flex-1 resize-none rounded-xl ${dropping ? "ring-2 ring-blue-400 ring-offset-1 dark:ring-offset-neutral-950" : ""} border border-neutral-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-500 dark:border-neutral-700 dark:bg-neutral-900`}
         />
         {running && onStop ? (
           <button

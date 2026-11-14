@@ -7,7 +7,7 @@ from eagleeye_llm.gateway import Usage
 
 from eagleeye_agents.context import RunContext
 from eagleeye_agents.errors import GuardUnavailableError
-from eagleeye_agents.guard.classifier import classify
+from eagleeye_agents.guard.classifier import classify, describe_data_file
 from eagleeye_agents.guard.rules import check_rules
 from eagleeye_agents.guard.verdict import GuardVerdict, unavailable
 from eagleeye_agents.router import choose_route
@@ -33,6 +33,9 @@ async def _verdict(ctx: RunContext, state: RunState) -> tuple[GuardVerdict, Usag
             [d.title for d in docs],
             bool(state.get("doc_ids")),
             cache=ctx.cache,
+            data_files=[
+                describe_data_file(f.title, [c["name"] for c in f.columns]) for f in ctx.data_files
+            ],
         )
     except GuardUnavailableError as exc:
         return unavailable(str(exc)), Usage()
@@ -60,6 +63,8 @@ def make_guard_node(ctx: RunContext) -> Node:
         async with ctx.steps.step("guard", "safety & intent", question) as step:
             verdict, step.usage = await _verdict(ctx, state)
             route = choose_route(verdict, bool(state.get("doc_ids")), ctx.sql_available)
+            if ctx.references and route not in ("blocked", "supervisor"):
+                route = "supervisor"  # the user named files: plan with them explicitly
             step.status = "error" if verdict.source == "error" else "ok"
             step.output_summary = f"{verdict.safe} · {verdict.intent} · {route}"
         await ctx.sink.emit(

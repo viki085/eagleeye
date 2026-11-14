@@ -19,6 +19,10 @@ How to work:
 - If query_database says a question is "not answerable from the database as asked" and you now
   hold concrete values from another tool, ask again once with those values. "Not available"
   means the user has no access: do not retry that.
+- A name in [square brackets] is one of the user's files (they dragged it into the message). When
+  it is listed below as a data file with an id, use that id directly; don't ask which file.
+- Questions about what you can access ("which databases / tables / files can I ask about"): call
+  list_data_sources and/or list_datasets and answer from them, not from document search.
 - Write focused search queries (keywords and names), one topic per search_knowledge call.
 - For figures from business data (sales, orders, customers, products, shipments, returns), call
   query_database with one precise question per call; it writes, validates and runs the SQL for you.

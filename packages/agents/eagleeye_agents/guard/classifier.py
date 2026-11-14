@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 2
 MAX_TITLES = 20
 MAX_TURN_CHARS = 400
+MAX_FILE_COLUMNS = 12
 
 
 class _GuardJson(BaseModel):
@@ -30,16 +31,29 @@ def parse_verdict(raw: str) -> GuardVerdict:
 
 
 def build_user_message(
-    question: str, history: Sequence[ChatMessage], doc_titles: Sequence[str], has_selection: bool
+    question: str,
+    history: Sequence[ChatMessage],
+    doc_titles: Sequence[str],
+    has_selection: bool,
+    data_files: Sequence[str] = (),
 ) -> str:
     turns = [m for m in history if m.role in ("user", "assistant")][-2:]
     convo = "\n".join(f"{m.role}: {m.content[:MAX_TURN_CHARS]}" for m in turns) or "(none)"
     titles = ", ".join(t[:80] for t in doc_titles[:MAX_TITLES]) or "(none)"
     selection = "yes" if has_selection else "no"
+    files = ""
+    if data_files:
+        files = "User's data files: " + "; ".join(f[:300] for f in data_files[:MAX_TITLES]) + "\n"
     return (
-        f"User's documents: {titles}\nDocuments selected for this question: {selection}\n\n"
+        f"User's documents: {titles}\n{files}Documents selected for this question: {selection}\n\n"
         f"Earlier turns:\n{convo}\n\n<latest_message>\n{question}\n</latest_message>"
     )
+
+
+def describe_data_file(title: str, columns: Sequence[str]) -> str:
+    """'voyage utilisation by week (columns: week_start, vessel, …)' for the classifier."""
+    cols = ", ".join(columns[:MAX_FILE_COLUMNS]) + (" …" if len(columns) > MAX_FILE_COLUMNS else "")
+    return f"{title} (columns: {cols})"
 
 
 async def classify(
@@ -50,8 +64,9 @@ async def classify(
     doc_titles: Sequence[str],
     has_selection: bool,
     cache: Any = None,  # eagleeye_core.app_cache.AppCache
+    data_files: Sequence[str] = (),
 ) -> tuple[GuardVerdict, Usage]:
-    user = build_user_message(question, history, doc_titles, has_selection)
+    user = build_user_message(question, history, doc_titles, has_selection, data_files)
     messages = [ChatMessage("system", system_prompt), ChatMessage("user", user)]
     parts = (system_prompt, user)  # the verdict depends only on exactly this input
     if cache is not None:

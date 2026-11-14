@@ -15,7 +15,7 @@ from eagleeye_events import EventSink, cancel_key
 from eagleeye_events.names import CHAT_UPDATED, RUN_DONE, RUN_ERROR, RUN_STARTED
 from eagleeye_llm.gateway import LLMGateway
 
-from eagleeye_agents import answer_cache, persistence
+from eagleeye_agents import answer_cache, persistence, references
 from eagleeye_agents.budgets import BudgetTracker
 from eagleeye_agents.context import AgentSettings, RetrieverPort, RunContext
 from eagleeye_agents.control import CancelToken
@@ -186,6 +186,27 @@ def _build_context(deps: RunnerDeps, run: asyncpg.Record, sink: EventSink) -> Ru
     )
 
 
+async def _prepare_files(deps: RunnerDeps, ctx: RunContext, question: str) -> None:
+    """The user's data files (for the classifier) and any [file name] they referred to."""
+    if deps.workspace is not None:
+        try:
+            ctx.data_files = list(await deps.workspace.list_datasets(ctx.user_id))
+        except Exception:
+            logger.warning("data files unavailable for run %s", ctx.run_id, exc_info=True)
+    names = references.tokens(question)
+    if not names:
+        return
+    refs = references.resolve_datasets(names, ctx.data_files)
+    find_docs = getattr(ctx.store, "documents_named", None)
+    if find_docs is not None:
+        try:
+            for d in await find_docs(ctx.user_id, names):
+                refs.append(references.FileRef("document", d["id"], d["title"], scope=d["scope"]))
+        except Exception:
+            logger.warning("document references unavailable for run %s", ctx.run_id, exc_info=True)
+    ctx.references = references.dedupe(refs)
+
+
 async def _prepare_answer_cache(deps: RunnerDeps, ctx: RunContext, initial: RunState) -> None:
     """Works out this run's answer-cache key when its answer could be reused or stored."""
     if deps.cache is None or not answer_cache.can_look_up(initial):
@@ -294,6 +315,7 @@ async def execute_run(
         question, history = await persistence.load_conversation(deps.pool, ctx.chat_id, run_id)
         doc_ids = [str(d) for d in (run["params"] or {}).get("doc_ids", [])]
         initial: RunState = {"question": question, "history": history, "doc_ids": doc_ids}
+        await _prepare_files(deps, ctx, question)
         await _prepare_answer_cache(deps, ctx, initial)
         outcome = await _execute_graph(ctx, initial)
         # Title before persisting so its tokens/cost are included in the usage ledger.

@@ -95,7 +95,9 @@ COMMENTS_BAD = ("Vessel arrived several days late with little notice.",
 def survey(late: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
     s = late.sample(n=min(50_000, len(late)), random_state=5).reset_index(drop=True)
     delay = s["delay_hours"].astype(float).clip(lower=0).fillna(0)
-    base = 8.4 - 0.025 * delay + rng.normal(0, 1.4, len(s))
+    # loyalty differs by segment: big contract customers are happiest, spot shippers least
+    segment_base = s["segment"].map({"strategic": 8.9, "key": 8.5, "sme": 8.0, "spot": 7.3})
+    base = segment_base.fillna(8.0) - 0.025 * delay + rng.normal(0, 1.4, len(s))
     nps = np.clip(np.rint(base), 0, 10).astype(int)
     comment = np.where(nps >= 8, rng.choice(COMMENTS_GOOD, len(s)),
                        np.where(nps <= 5, rng.choice(COMMENTS_BAD, len(s)), ""))

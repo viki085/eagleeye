@@ -15,7 +15,10 @@ looks like.
    - `data/documents/`: personal documents (a Word file of meeting notes and a text file of
      supplier call notes)
    - `data/data-files/`: data files for analysis (CSV and Excel)
-   A question that needs a file says which one in **[brackets]**.
+   A question that needs a file names it in **[brackets]**. You don't have to type the name:
+   **drag the file from the right-hand panel into the message box** and it appears as
+   `[file name]`. You can also just describe the file ("my survey file"); EagleEye knows your
+   files and their columns and works out which sources a question needs.
 4. Watch the panel under each answer: it shows the steps EagleEye took (safety check, document
    search, SQL, analysis code, checks). Click a numbered citation to see the passage it came from.
 
@@ -110,10 +113,11 @@ An instant profile: 50,000 responses, column types, ranges and missing values (t
 is often empty).
 
 **19. [customer_survey_2026.csv] "Calculate the Net Promoter Score for each customer segment and chart it."**
-NPS = % promoters (9-10) - % detractors (0-6), one bar per segment.
+NPS = % promoters (9-10) - % detractors (0-6), one bar per segment: strategic customers about
++40, key +25, SME +3, spot -28.
 
 **20. [customer_survey_2026.csv] "Is the difference in likelihood-to-recommend between strategic and SME customers statistically significant? Use Welch's t-test."**
-Runs the test in Python and reports the means and the p-value.
+Runs the test in Python and reports the means and the p-value (clearly significant).
 
 **21. [vessel_fuel_and_emissions.csv] "Is there a correlation between average speed and carbon intensity? Show a scatter chart."**
 Pearson correlation plus a scatter chart of speed against grams of CO2 per TEU-km.
@@ -123,9 +127,10 @@ Real public data (US EIA): 2024 high about USD 93.12, 2025 average about USD 69.
 
 ## 6. Combining sources
 
-**23. [voyage_utilisation_by_week.csv] "Get the ships' identification number, vessel class and flag for all ships with week_start 2024-01-01. Use my data file and the databases."**
-Reads your file first (8 ships), then looks them up in the database: a table of 8 ships with IMO
-number, class and flag.
+**23. [voyage_utilisation_by_week.csv] "Get the identification number, vessel class and flag for all ships with week_start 2024-01-01."**
+EagleEye notices that week_start is a column in your file, reads the file first (8 ships), then
+looks them up in the database: a table of 8 ships with IMO number, class and flag. You don't need
+to say "use my file and the database".
 
 **24. [account-review-notes-hunt-williams-francis.docx] "According to my account review notes, who am I meeting and what are their concerns? Then get their 2025 TEU by trade lane and their 2025 claims by type."**
 Your personal notes (reefer claims, reliability, demurrage charges) plus database figures:

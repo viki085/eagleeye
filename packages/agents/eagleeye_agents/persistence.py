@@ -216,6 +216,22 @@ class PgRunStore:
             for r in rows
         ]
 
+    async def documents_named(self, user_id: str, names: list[str]) -> list[dict[str, Any]]:
+        """READY documents the user may see whose title or file name matches (case-insensitive)."""
+        if not names:
+            return []
+        rows = await self._pool.fetch(
+            """
+            SELECT id, title, scope FROM documents
+            WHERE status = 'READY' AND (scope = 'enterprise' OR owner_id = $1::uuid)
+              AND (lower(title) = ANY($2::text[]) OR lower(filename) = ANY($2::text[]))
+            ORDER BY scope DESC, created_at DESC LIMIT 20
+            """,
+            user_id,
+            [n.lower() for n in names],
+        )
+        return [{"id": str(r["id"]), "title": r["title"], "scope": r["scope"]} for r in rows]
+
     async def record_security_event(
         self, user_id: str, run_id: str, kind: str, category: str, detail: dict[str, Any]
     ) -> None:
