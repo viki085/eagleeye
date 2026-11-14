@@ -11,7 +11,7 @@ from gateway import service as gw
 from gateway.artifacts import to_parquet
 from gateway.executor import QueryResult, _max_plan_rows, jsonable, unique_names
 
-SOURCE = SourceInfo("s1", "acme", "", "postgres", "WAREHOUSE_DSN", max_rows=100)
+SOURCE = SourceInfo("s1", "grandline_ops", "", "postgres", "WAREHOUSE_DSN", max_rows=100)
 TABLES = [
     TableInfo(
         "sales",

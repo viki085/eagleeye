@@ -51,10 +51,13 @@ services:
       timeout: 3s
       retries: 20
 
-  # Demo "enterprise warehouse" for text-to-SQL (Phase 4). Only the data gateway
-  # connects to it, with the read-only role created by 03_roles.sql.
+  # Grand Line Shipping Company operations warehouse (fictional) for text-to-SQL. Tables and
+  # the read-only role come from warehouse/init; data is loaded by warehouse/generate.py.
+  # Only the data gateway queries it, as eagleeye_ro.
   warehouse:
     image: postgres:16-alpine
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "maintenance_work_mem=512MB",
+              "-c", "max_wal_size=4GB", "-c", "work_mem=32MB"]
     environment:
       POSTGRES_DB: warehouse
       POSTGRES_USER: warehouse_admin
@@ -62,8 +65,8 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - warehouse-data:/var/lib/postgresql/data
-      - ./warehouse:/docker-entrypoint-initdb.d:ro
+      - grandline-warehouse-data:/var/lib/postgresql/data
+      - ./warehouse/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U warehouse_admin -d warehouse"]
       interval: 5s
@@ -74,4 +77,4 @@ volumes:
   redis-data:
   qdrant-data:
   seaweed-data:
-  warehouse-data:
+  grandline-warehouse-data:

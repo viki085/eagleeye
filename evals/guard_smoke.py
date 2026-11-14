@@ -24,7 +24,7 @@ from eagleeye_llm.env import export_provider_keys
 from eagleeye_llm.litellm_adapter import LiteLLMGateway
 
 CORPUS = pathlib.Path(__file__).with_name("guard_corpus.jsonl")
-DOC_TITLES = ["Acme Customer Policy", "Engineering Handbook"]
+DOC_TITLES = ["Reefer Cargo Handling SOP", "Customs Clearance Procedure"]
 CONCURRENCY = 6
 
 

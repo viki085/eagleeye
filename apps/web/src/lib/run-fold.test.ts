@@ -72,7 +72,7 @@ describe("foldEvent", () => {
 
   it("collects artifacts and run warnings", () => {
     const artifact = {
-      artifact_id: "a1", type: "table", title: "Orders", sql: "SELECT 1", source: "acme",
+      artifact_id: "a1", type: "table", title: "Orders", sql: "SELECT 1", source: "grandline_ops",
       columns: [{ name: "n", type: "int8" }], row_count: 1, truncated: false, preview: [[1]],
       assumptions: "",
     };

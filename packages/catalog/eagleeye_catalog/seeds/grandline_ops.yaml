@@ -1,0 +1,444 @@
+# Curated catalog for the Grand Line Shipping Company operations warehouse (C5 §2).
+# Grand Line is fictional. Onboarding merges this with live introspection: introspection supplies
+# types, keys and row counts; this file supplies meaning, sensitivity and access.
+# Tables not listed here are imported DISABLED until a data admin enables them.
+
+source:
+  name: grandline_ops
+  description: >-
+    Grand Line Shipping Company operations warehouse: container shipping network (ports,
+    vessels, services, voyages, port calls), customers, contracts and bookings, containers and
+    tracking, invoices, claims, fuel, emissions, trucking, warehousing and HR (Jan 2024 - Oct 2026).
+    All money is in USD and all timestamps are UTC.
+  engine: postgres
+  dsn_env: WAREHOUSE_DSN
+  schemas: [network, commercial, equipment, finance, operations, hr]
+  max_rows: 10000
+  timeout_s: 15
+
+# Members and knowledge admins see everything except HR, without personal data (names, emails,
+# phone numbers, salaries are masked). Data admins and admins see all tables including PII.
+grants:
+  member:
+    pii: false
+    tables: &business_tables
+      - network.trade_lanes
+      - network.ports
+      - network.vessels
+      - network.services
+      - network.service_rotations
+      - network.voyages
+      - network.port_calls
+      - commercial.customers
+      - commercial.contracts
+      - commercial.rate_cards
+      - commercial.bookings
+      - commercial.booking_containers
+      - equipment.containers
+      - equipment.tracking_events
+      - finance.invoices
+      - finance.invoice_lines
+      - finance.bunker_purchases
+      - finance.claims
+      - operations.delay_incidents
+      - operations.voyage_emissions
+      - operations.subcontractors
+      - operations.trucking_jobs
+      - operations.warehouses
+      - operations.inventory_snapshots
+  knowledge_admin: {tables: *business_tables, pii: false}
+  data_admin: {tables: null, pii: true}
+  admin: {tables: null, pii: true}
+
+tables:
+  network.trade_lanes:
+    enabled: true
+    sensitivity: public
+    description: Trade lanes Grand Line serves. Every service belongs to one lane.
+    columns:
+      lane_code: "Lane code: AEU (Asia - North Europe), AMD (Asia - Mediterranean), TPW (Transpacific, Asia - US West Coast), AUE (Asia - US East Coast), ECS (Asia - East Coast South America), TAT (Transatlantic), AMI (Asia - Middle East and India), IAS (Intra-Asia)."
+      name: Lane name.
+
+  network.ports:
+    enabled: true
+    sensitivity: public
+    description: Real container ports identified by UN/LOCODE, with region and coordinates.
+    columns:
+      port_code: UN/LOCODE, e.g. 'NLRTM' (Rotterdam), 'CNSHA' (Shanghai), 'SGSIN' (Singapore), 'USLAX' (Los Angeles).
+      name: Port name.
+      country_code: ISO 2-letter country code.
+      country: Country name.
+      region: "Region: 'Asia', 'Europe', 'North America', 'Latin America', 'Middle East', 'Africa', 'Oceania'."
+      latitude: Latitude in degrees.
+      longitude: Longitude in degrees.
+
+  network.vessels:
+    enabled: true
+    sensitivity: internal
+    description: >-
+      Container ships operated by Grand Line, owned or chartered. Vessels with in_fleet_to set
+      left the fleet on that date (for example extra ships chartered during the Red Sea diversion).
+    columns:
+      vessel_id: Vessel identifier.
+      imo_number: IMO ship identification number.
+      name: Vessel name, e.g. 'GL Aurora'.
+      vessel_class: "Size class: 'Feeder', 'Panamax', 'Post-Panamax', 'Neo-Panamax'."
+      teu_capacity: Nominal capacity in TEU (twenty-foot equivalent units).
+      reefer_plugs: Number of power points for refrigerated containers.
+      built_year: Year the ship was built.
+      flag: Flag state.
+      fuel_type: "'VLSFO', 'HSFO with scrubber', 'LNG dual-fuel' or 'Methanol dual-fuel'."
+      ownership: "'owned' or 'chartered'."
+      daily_charter_cost_usd: Daily charter hire in USD (chartered ships only).
+      in_fleet_from: Date the ship joined the fleet.
+      in_fleet_to: Date the ship left the fleet (null = still in the fleet).
+
+  network.services:
+    enabled: true
+    sensitivity: public
+    description: Weekly liner services (loops) and the lane each serves.
+    columns:
+      service_code: "Service code: AEX, AMX, TPX, AUX, ESX, TAX, MEX, IAX."
+      name: Service name.
+      lane_code: Trade lane of the service.
+      frequency_days: Days between departures (7 = weekly).
+      round_trip_days: Days for one ship to complete the loop.
+      nominal_vessel_teu: Typical ship size on the service, in TEU.
+
+  network.service_rotations:
+    enabled: true
+    sensitivity: public
+    description: Port order of each service, separately for the headhaul and backhaul direction.
+    columns:
+      direction: "'headhaul' (main cargo direction, e.g. Asia to Europe) or 'backhaul'."
+      seq: Position of the port in the rotation (1 = first port).
+      days_from_previous: Planned sailing days from the previous port.
+
+  network.voyages:
+    enabled: true
+    sensitivity: internal
+    description: >-
+      One row per voyage: one ship sailing one direction of a service. routing =
+      'cape_of_good_hope' means the voyage avoided the Red Sea and sailed round Africa
+      (Asia - Europe and Asia - Mediterranean voyages departing Jan 2024 - Jun 2025).
+    columns:
+      voyage_number: Voyage number, e.g. 'AEX 2412W' (service, year, week, direction letter).
+      direction: "'headhaul' or 'backhaul'."
+      routing: "'standard' or 'cape_of_good_hope'."
+      departure_date: Departure date from the first port.
+      status: "'completed', 'in_progress' or 'scheduled'."
+
+  network.port_calls:
+    enabled: true
+    sensitivity: internal
+    description: >-
+      Each port a voyage calls at, with scheduled and actual times. A call is on time when
+      actual_arrival is no more than 24 hours after scheduled_arrival. Actual times are null for
+      calls that have not happened yet. container_moves = containers loaded plus discharged.
+    columns:
+      seq: Position of the call in the voyage (1 = departure port).
+      scheduled_arrival: Planned arrival time (UTC).
+      actual_arrival: Actual arrival time (UTC); null if not yet arrived.
+      scheduled_departure: Planned departure time (UTC).
+      actual_departure: Actual departure time (UTC).
+      container_moves: Containers loaded plus discharged at this call.
+
+  commercial.customers:
+    enabled: true
+    sensitivity: internal
+    description: Shipper accounts. Segment is strategic, key, sme (small and medium) or spot.
+    columns:
+      name: Customer company name.
+      industry: Customer industry.
+      country: Customer country.
+      segment: "'strategic', 'key', 'sme' or 'spot'."
+      credit_limit_usd: Approved credit limit in USD.
+      payment_terms_days: Days allowed to pay an invoice (0 = prepaid).
+      account_manager_id: Employee who manages the account (hr.employees.employee_id).
+      contact_name: {description: Main contact person., pii: true}
+      contact_email: {description: Main contact email address., pii: true}
+      contact_phone: {description: Main contact phone number., pii: true}
+      created_date: Date the account was opened.
+
+  commercial.contracts:
+    enabled: true
+    sensitivity: internal
+    description: >-
+      Annual service contracts per customer and lane. Transpacific and Asia - US East Coast
+      contracts run May to April; other lanes run January to December.
+    columns:
+      contract_number: Contract number, e.g. 'GLC-2025-01234'.
+      contract_type: "'fixed' (rate fixed for the term) or 'index_linked'."
+      committed_teu: Volume the customer committed to ship in the term, in TEU.
+      status: "'active' or 'expired'."
+
+  commercial.rate_cards:
+    enabled: true
+    sensitivity: confidential
+    description: Contracted base ocean freight rate per container, by contract, port pair and container type.
+    columns:
+      container_type: "'20DV', '40DV', '40HC' (40ft high cube) or '40RF' (40ft reefer)."
+      base_rate_usd: Base ocean freight per container in USD, excluding surcharges.
+
+  commercial.bookings:
+    enabled: true
+    sensitivity: internal
+    description: >-
+      One row per booking (a customer's shipment on one voyage). Revenue questions should
+      exclude status = 'cancelled'. freight_revenue_usd is ocean freight only; surcharges are on
+      finance.invoice_lines. teu = container_count converted to TEU (40ft = 2 TEU).
+    columns:
+      booking_number: Booking number, e.g. 'GLS250012345'.
+      contract_id: Contract the booking was priced under (null = spot booking).
+      voyage_id: Voyage carrying the cargo (null for cancelled bookings).
+      origin_port: Port of loading.
+      destination_port: Port of discharge.
+      booking_date: Date the booking was made.
+      cargo_ready_date: Date the cargo was ready for pickup.
+      commodity: Cargo description, e.g. 'Consumer electronics', 'Frozen meat', 'Lithium-ion batteries'.
+      incoterm: Trade term agreed between buyer and seller, e.g. 'FOB', 'CIF', 'DAP'.
+      is_reefer: True for refrigerated cargo.
+      is_hazardous: True for dangerous goods.
+      container_count: Number of containers.
+      teu: Twenty-foot equivalent units.
+      status: "'confirmed' (not yet sailed), 'shipped' (at sea), 'delivered' or 'cancelled'."
+      rolled_count: Times the cargo was rolled to a later voyage because the ship was full.
+      freight_revenue_usd: Ocean freight revenue in USD.
+
+  commercial.booking_containers:
+    enabled: true
+    sensitivity: internal
+    description: The physical containers used for each booking.
+    columns:
+      container_number: ISO 6346 container number, e.g. 'GLSU1234567'.
+      gross_weight_kg: Verified gross mass in kg.
+      seal_number: Seal number (null where it was not recorded - a known data-quality gap).
+      vgm_submitted: Whether the verified gross mass was submitted before loading.
+      temperature_setpoint_c: Reefer temperature setting in Celsius (null for dry containers).
+
+  equipment.containers:
+    enabled: true
+    sensitivity: internal
+    description: Container fleet, owned or leased.
+    columns:
+      container_type: "'20DV', '40DV', '40HC', '20RF', '40RF', '20TK' (tank), '40OT' (open top)."
+      ownership: "'owned' or 'leased'."
+      lessor: Leasing company for leased units.
+      status: "'in_service', 'damaged' or 'off_hire'."
+
+  equipment.tracking_events:
+    enabled: true
+    sensitivity: internal
+    description: >-
+      Container milestones for the last 90 days only (older events are archived under the data
+      retention policy). Event order: GATE_OUT_EMPTY, GATE_IN_FULL, LOADED, DISCHARGED,
+      GATE_OUT_FULL, EMPTY_RETURN.
+    columns:
+      event_type: Milestone name.
+      event_time: When it happened (UTC).
+      voyage_id: Voyage for LOADED and DISCHARGED events.
+
+  finance.invoices:
+    enabled: true
+    sensitivity: confidential
+    description: One invoice per shipped booking. amount_usd is the sum of its invoice lines.
+    columns:
+      invoice_number: Invoice number, e.g. 'GLI-2025-0001234'.
+      amount_usd: Invoice total in USD.
+      status: "'paid', 'open' (not yet due), 'overdue', 'disputed' or 'written_off'."
+      paid_date: Date paid (null if unpaid).
+
+  finance.invoice_lines:
+    enabled: true
+    sensitivity: confidential
+    description: Charges on each invoice.
+    columns:
+      charge_code: "OFR ocean freight, BAF bunker adjustment, THC terminal handling, DOC documentation, PSS peak season surcharge, CTG contingency (Red Sea) surcharge, ETS EU emissions surcharge, DGS dangerous goods surcharge, DND demurrage and detention."
+      amount_usd: Charge amount in USD.
+
+  finance.bunker_purchases:
+    enabled: true
+    sensitivity: confidential
+    description: Ship fuel (bunker) purchases.
+    columns:
+      fuel_grade: "'VLSFO', 'HSFO' or 'LNG'."
+      quantity_mt: Quantity in metric tonnes.
+      price_usd_per_mt: Price per metric tonne in USD.
+
+  finance.claims:
+    enabled: true
+    sensitivity: confidential
+    description: Customer cargo claims and their settlement.
+    columns:
+      claim_type: "'Cargo damage', 'Shortage', 'Delay', 'Contamination', 'Theft', 'Reefer temperature deviation'."
+      claimed_amount_usd: Amount claimed by the customer.
+      settled_amount_usd: Amount paid (settled claims only).
+      status: "'open', 'settled' or 'rejected'."
+      root_cause: Root cause where investigated.
+
+  operations.delay_incidents:
+    enabled: true
+    sensitivity: internal
+    description: Logged schedule disruptions of 18 hours or more at a port call, with cause and severity.
+    columns:
+      incident_number: Incident number, e.g. 'INC-2024-00123'.
+      cause: "'Port congestion', 'Adverse weather', 'Mechanical failure', 'Labour strike', 'Customs inspection hold', 'Berth unavailability', 'Red Sea diversion via Cape of Good Hope'."
+      severity: "'minor' (< 24 h), 'moderate' (24-48 h), 'major' (48-120 h), 'critical' (> 120 h)."
+      delay_hours: Hours behind schedule.
+
+  operations.voyage_emissions:
+    enabled: true
+    sensitivity: internal
+    description: Fuel, CO2 and EU ETS allowances per completed voyage.
+    columns:
+      distance_nm: Distance sailed in nautical miles.
+      fuel_consumed_mt: Fuel burned in metric tonnes.
+      co2_tonnes: CO2 emitted in tonnes.
+      teu_carried: TEU carried on the voyage.
+      co2_grams_per_teu_km: Carbon intensity, grams of CO2 per TEU-kilometre.
+      eu_ets_allowances: EU Emissions Trading System allowances due (1 allowance = 1 tonne CO2).
+
+  operations.subcontractors:
+    enabled: true
+    sensitivity: internal
+    description: Trucking, rail, depot and terminal subcontractors.
+    columns:
+      service_type: "'trucking', 'rail', 'depot' or 'terminal'."
+      performance_rating: Rating from 1 to 5.
+
+  operations.trucking_jobs:
+    enabled: true
+    sensitivity: internal
+    description: Inland trucking arranged by Grand Line before loading (pre_carriage) or after discharge (on_carriage).
+    columns:
+      leg: "'pre_carriage' or 'on_carriage'."
+      inland_city: Inland pickup or delivery city.
+      cost_usd: Cost charged by the subcontractor.
+
+  operations.warehouses:
+    enabled: true
+    sensitivity: public
+    description: Grand Line logistics centres.
+
+  operations.inventory_snapshots:
+    enabled: true
+    sensitivity: internal
+    description: Weekly stock held for customers in Grand Line logistics centres (Sundays).
+
+  hr.employees:
+    enabled: true
+    sensitivity: restricted
+    description: Employees. Restricted to data admins; names, emails and salaries are personal data.
+    columns:
+      full_name: {description: Employee name., pii: true}
+      email: {description: Work email address., pii: true}
+      salary_usd: {description: Annual base salary in USD., pii: true}
+      department: Department.
+      job_title: Job title.
+      office: Office location.
+      hire_date: Date hired.
+      manager_id: Employee id of the manager.
+      status: "'active' or 'left'."
+
+metrics:
+  - name: schedule reliability (on-time rate)
+    description: Share of port calls (excluding the departure port) arriving within 24 hours of schedule.
+    definition_sql: >-
+      AVG(CASE WHEN pc.actual_arrival <= pc.scheduled_arrival + INTERVAL '24 hours' THEN 1.0 ELSE 0 END)
+      FROM network.port_calls pc WHERE pc.seq > 1 AND pc.actual_arrival IS NOT NULL
+  - name: vessel utilisation
+    description: TEU carried on a voyage divided by the ship's TEU capacity.
+    definition_sql: >-
+      e.teu_carried::numeric / v2.teu_capacity FROM operations.voyage_emissions e
+      JOIN network.voyages v ON v.voyage_id = e.voyage_id JOIN network.vessels v2 ON v2.vessel_id = v.vessel_id
+  - name: freight revenue per TEU
+    description: Ocean freight revenue divided by TEU, excluding cancelled bookings.
+    definition_sql: SUM(b.freight_revenue_usd) / SUM(b.teu) FROM commercial.bookings b WHERE b.status <> 'cancelled'
+  - name: volume (TEU)
+    description: Cargo volume in TEU, excluding cancelled bookings.
+    definition_sql: SUM(b.teu) FROM commercial.bookings b WHERE b.status <> 'cancelled'
+  - name: days sales outstanding
+    description: Average days between invoice date and payment for paid invoices.
+    definition_sql: AVG(i.paid_date - i.invoice_date) FROM finance.invoices i WHERE i.status = 'paid'
+  - name: claims ratio
+    description: Settled claim amounts as a share of ocean freight revenue in the same period.
+    definition_sql: SUM(c.settled_amount_usd) / SUM(b.freight_revenue_usd)
+  - name: carbon intensity
+    description: Grams of CO2 per TEU-kilometre, averaged over voyages weighted by TEU carried.
+    definition_sql: SUM(e.co2_tonnes) * 1e6 / SUM(e.teu_carried * e.distance_nm * 1.852) FROM operations.voyage_emissions e
+
+examples:
+  - question: What was schedule reliability by trade lane in 2024?
+    sql: |
+      SELECT s.lane_code,
+             ROUND(AVG(CASE WHEN pc.actual_arrival <= pc.scheduled_arrival + INTERVAL '24 hours'
+                            THEN 1.0 ELSE 0 END), 3) AS on_time_rate
+      FROM network.port_calls pc
+      JOIN network.voyages v ON v.voyage_id = pc.voyage_id
+      JOIN network.services s ON s.service_code = v.service_code
+      WHERE pc.seq > 1 AND pc.actual_arrival IS NOT NULL
+        AND pc.scheduled_arrival >= TIMESTAMPTZ '2024-01-01' AND pc.scheduled_arrival < TIMESTAMPTZ '2025-01-01'
+      GROUP BY s.lane_code
+      ORDER BY on_time_rate
+  - question: Monthly TEU volume and freight revenue per TEU on Asia - North Europe in 2025
+    sql: |
+      SELECT date_trunc('month', b.cargo_ready_date) AS month,
+             SUM(b.teu) AS teu,
+             ROUND(SUM(b.freight_revenue_usd) / SUM(b.teu), 0) AS revenue_per_teu
+      FROM commercial.bookings b
+      JOIN network.services s ON s.service_code = b.service_code
+      WHERE s.lane_code = 'AEU' AND b.status <> 'cancelled'
+        AND b.cargo_ready_date >= DATE '2025-01-01' AND b.cargo_ready_date < DATE '2026-01-01'
+      GROUP BY 1
+      ORDER BY 1
+  - question: Top 10 customers by freight revenue in 2025
+    sql: |
+      SELECT c.name, c.segment, SUM(b.freight_revenue_usd) AS freight_revenue, SUM(b.teu) AS teu
+      FROM commercial.bookings b
+      JOIN commercial.customers c ON c.customer_id = b.customer_id
+      WHERE b.status <> 'cancelled'
+        AND b.cargo_ready_date >= DATE '2025-01-01' AND b.cargo_ready_date < DATE '2026-01-01'
+      GROUP BY c.name, c.segment
+      ORDER BY freight_revenue DESC
+      LIMIT 10
+  - question: How many delay incidents of each cause were logged per year?
+    sql: |
+      SELECT EXTRACT(YEAR FROM d.started_at) AS year, d.cause, COUNT(*) AS incidents,
+             ROUND(AVG(d.delay_hours), 1) AS avg_delay_hours
+      FROM operations.delay_incidents d
+      GROUP BY 1, 2
+      ORDER BY 1, incidents DESC
+  - question: Reefer temperature claims and amounts paid by month in 2025
+    sql: |
+      SELECT date_trunc('month', c.filed_date) AS month, COUNT(*) AS claims,
+             SUM(c.settled_amount_usd) AS settled_usd
+      FROM finance.claims c
+      WHERE c.claim_type = 'Reefer temperature deviation'
+        AND c.filed_date >= DATE '2025-01-01' AND c.filed_date < DATE '2026-01-01'
+      GROUP BY 1
+      ORDER BY 1
+  - question: Average vessel utilisation by service for completed voyages in 2026
+    sql: |
+      SELECT v.service_code, v.direction,
+             ROUND(AVG(e.teu_carried::numeric / vs.teu_capacity), 3) AS avg_utilisation
+      FROM operations.voyage_emissions e
+      JOIN network.voyages v ON v.voyage_id = e.voyage_id
+      JOIN network.vessels vs ON vs.vessel_id = v.vessel_id
+      WHERE v.departure_date >= DATE '2026-01-01'
+      GROUP BY v.service_code, v.direction
+      ORDER BY v.service_code, v.direction
+  - question: Overdue invoice amount by customer segment
+    sql: |
+      SELECT c.segment, COUNT(*) AS overdue_invoices, SUM(i.amount_usd) AS overdue_usd
+      FROM finance.invoices i
+      JOIN commercial.customers c ON c.customer_id = i.customer_id
+      WHERE i.status = 'overdue'
+      GROUP BY c.segment
+      ORDER BY overdue_usd DESC
+  - question: Average bunker price per tonne by quarter and fuel grade
+    sql: |
+      SELECT date_trunc('quarter', b.purchase_date) AS quarter, b.fuel_grade,
+             ROUND(SUM(b.price_usd_per_mt * b.quantity_mt) / SUM(b.quantity_mt), 2) AS avg_price_per_mt
+      FROM finance.bunker_purchases b
+      GROUP BY 1, 2
+      ORDER BY 1, 2

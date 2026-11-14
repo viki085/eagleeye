@@ -54,8 +54,9 @@ uv run --package eagleeye-agent-worker celery -A agent_worker.celery_app worker 
 # 5. Ingest worker (separate terminal; --pool=solo is required on Windows)
 uv run --package eagleeye-ingest-worker celery -A ingest_worker.celery_app worker --pool=solo -Q ingest -l info -n ingest@%h
 
-# 6. Data gateway (separate terminal) + one-time catalog onboarding of the demo warehouse
-uv run --package eagleeye-catalog python -m eagleeye_catalog.cli onboard acme_warehouse
+# 6. Data gateway (separate terminal) + one-time load and onboarding of the Grand Line warehouse
+uv run --no-project --with numpy==2.1.3 --with pandas==2.2.3 --with faker==33.1.0 --with asyncpg==0.30.0 python infra/warehouse/generate.py --if-empty
+uv run --package eagleeye-catalog python -m eagleeye_catalog.cli onboard grandline_ops
 uv run --package eagleeye-data-gateway uvicorn gateway.main:app --app-dir apps/data-gateway --port 8100
 
 # 7. Web

@@ -7,7 +7,9 @@ from eagleeye_catalog.render import MAX_CHARS, render_context
 from eagleeye_catalog.seed import load_seed, merge
 from eagleeye_catalog.service import CatalogService
 
-SOURCE = SourceInfo("s1", "acme", "Acme sales", "postgres", "WAREHOUSE_DSN", max_rows=500)
+SOURCE = SourceInfo(
+    "s1", "grandline_ops", "Grand Line operations", "postgres", "WAREHOUSE_DSN", max_rows=500
+)
 ORDERS = TableInfo(
     "sales",
     "orders",
@@ -47,19 +49,26 @@ def test_build_policy_carries_pii_and_limits() -> None:
 
 
 def test_seed_merge_applies_meaning_and_disables_unknown_tables() -> None:
-    seed = load_seed("acme_warehouse")
+    seed = load_seed("grandline_ops")
     raw = [
         TableInfo(
-            "sales", "customers", (ColumnInfo("email", "text"), ColumnInfo("segment", "text"))
+            "commercial",
+            "customers",
+            (ColumnInfo("contact_email", "text"), ColumnInfo("segment", "text")),
         ),
-        TableInfo("sales", "brand_new", (ColumnInfo("x", "integer"),)),
+        TableInfo("commercial", "brand_new", (ColumnInfo("x", "integer"),)),
     ]
     merged = {t.key: t for t in merge(raw, seed)}
-    customers = merged["sales.customers"]
+    customers = merged["commercial.customers"]
     assert customers.enabled and customers.description
-    assert next(c for c in customers.columns if c.name == "email").pii is True
-    assert merged["sales.brand_new"].enabled is False
-    assert {g.role for g in seed.grants} == {"member", "knowledge_admin", "data_admin", "admin"}
+    assert next(c for c in customers.columns if c.name == "contact_email").pii is True
+    assert merged["commercial.brand_new"].enabled is False
+    grants = {g.role: g for g in seed.grants}
+    assert set(grants) == {"member", "knowledge_admin", "data_admin", "admin"}
+    # members never reach HR and never see personal data; data admins see everything
+    assert "hr.employees" not in (grants["member"].allowed_tables or ())
+    assert grants["member"].can_see_pii is False
+    assert grants["data_admin"].allowed_tables is None and grants["data_admin"].can_see_pii
 
 
 def test_render_marks_pii_and_includes_samples() -> None:
@@ -155,7 +164,7 @@ async def test_schema_context_filters_examples_and_metrics_by_policy() -> None:
 
 async def test_resolve_source_by_name_or_single() -> None:
     svc = CatalogService(FakeStore(Grant("member", None, False)))
-    assert (await svc.resolve_source("member", None)).source.name == "acme"
+    assert (await svc.resolve_source("member", None)).source.name == "grandline_ops"
     assert await svc.resolve_source("member", "other") is None
 
 

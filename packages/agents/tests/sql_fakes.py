@@ -8,7 +8,7 @@ from eagleeye_catalog.models import ColumnInfo, Grant, SchemaContext, SourceInfo
 from eagleeye_catalog.policy import build_policy
 from eagleeye_catalog.service import SourceAccess
 
-SOURCE = SourceInfo("src-1", "acme_warehouse", "Acme sales", "postgres", "WAREHOUSE_DSN")
+SOURCE = SourceInfo("src-1", "grandline_ops", "Grand Line operations", "postgres", "WAREHOUSE_DSN")
 TABLES = (
     TableInfo(
         "sales",

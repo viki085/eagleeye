@@ -31,6 +31,8 @@ ROOT = Path(__file__).resolve().parent.parent
 LOGS = ROOT / "logs"
 COMPOSE = ROOT / "infra" / "docker-compose.yml"
 WINDOWS = os.name == "nt"
+GENERATOR_DEPS = ["--with", "numpy==2.1.3", "--with", "pandas==2.2.3", "--with", "faker==33.1.0",
+                  "--with", "asyncpg==0.30.0"]
 
 
 def exe(name: str) -> str:
@@ -270,9 +272,14 @@ def cmd_start(args: argparse.Namespace) -> int:
     if not args.skip_infra:
         start_infra()
     if args.onboard:
-        say("Onboarding the demo warehouse into the catalog (one-time)")
-        run_logged(["uv", "run", "--package", "eagleeye-catalog", "python", "-m", "eagleeye_catalog.cli",
-                    "onboard", "acme_warehouse"], "onboard.log")
+        say("Loading the Grand Line warehouse (first run takes a few minutes) and onboarding it")
+        if run_logged(["uv", "run", "--no-project", *GENERATOR_DEPS, "python",
+                       "infra/warehouse/generate.py", "--if-empty"], "warehouse-generate.log") != 0:
+            sys.exit("Loading the warehouse failed; see logs/warehouse-generate.log")
+        if run_logged(["uv", "run", "--package", "eagleeye-catalog", "python", "-m",
+                       "eagleeye_catalog.cli", "onboard", "grandline_ops"], "onboard.log") != 0:
+            sys.exit("Catalog onboarding failed; see logs/onboard.log")
+        ok("Grand Line warehouse loaded and onboarded")
     results: dict[str, bool] = {}
     for group, title, timeout in ((("api", "gateway"), "API and data gateway", 90),
                                   (("agent", "ingest"), "agent and ingest workers", 90),
@@ -322,7 +329,7 @@ def main() -> int:
     sub = ap.add_subparsers(dest="command", required=True)
     p = sub.add_parser("start", help="start everything and wait until healthy")
     p.add_argument("--skip-infra", action="store_true", help="Docker and Supabase are already up")
-    p.add_argument("--onboard", action="store_true", help="one-time catalog onboarding of the demo warehouse")
+    p.add_argument("--onboard", action="store_true", help="one-time load and catalog onboarding of the Grand Line warehouse")
     p.set_defaults(func=cmd_start)
     p = sub.add_parser("stop", help="safe shutdown (finishes in-flight work first)")
     p.add_argument("--infra", action="store_true", help="also stop Docker services and Supabase")

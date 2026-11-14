@@ -142,7 +142,7 @@ class UpExecutor:
 
 class OneSourceCatalog:
     async def accessible_sources(self, role):  # noqa: ANN001, ANN201
-        return ["acme"]
+        return ["grandline_ops"]
 
 
 @pytest.mark.parametrize(

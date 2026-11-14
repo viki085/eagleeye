@@ -1,6 +1,6 @@
 """Onboard a data source into the catalog (idempotent).
 
-uv run --package eagleeye-catalog python -m eagleeye_catalog.cli onboard acme_warehouse
+uv run --package eagleeye-catalog python -m eagleeye_catalog.cli onboard grandline_ops
 """
 
 import argparse
@@ -106,7 +106,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="eagleeye_catalog")
     sub = parser.add_subparsers(dest="cmd", required=True)
     onboard_cmd = sub.add_parser("onboard", help="introspect + curate + embed a data source")
-    onboard_cmd.add_argument("seed", help="seed name (e.g. acme_warehouse) or path to a YAML file")
+    onboard_cmd.add_argument("seed", help="seed name (e.g. grandline_ops) or path to a YAML file")
     args = parser.parse_args()
     summary = asyncio.run(onboard(args.seed))
     sys.stdout.write(json.dumps(summary, indent=2) + "\n")

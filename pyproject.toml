@@ -24,6 +24,12 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP", "S"]
 ignore = ["S101"]
 
+[tool.ruff.lint.per-file-ignores]
+# offline data generators and operator scripts: long reference-data lines, fixed SQL and URLs
+"infra/warehouse/**" = ["E501", "S608", "B905", "UP017", "B007"]
+"data/**" = ["E501", "S608", "S310", "S324", "B905"]
+"scripts/**" = ["E501", "S310"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
