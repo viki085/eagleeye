@@ -272,3 +272,46 @@ def test_planner_is_told_to_query_files_before_the_database() -> None:
     supervisor = load_prompts().text("supervisor")
     assert "call analyze_data FIRST and" in supervisor
     assert "ask again once with those values" in supervisor
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "The difference is significant (*p* < 0.001).",
+        "NPS = (promoters - detractors) / responses × 100; Key scored 24.85.",
+        "There were 3 complaints per 100 bookings.",
+        "Welch's *t* = 50.42, *p* < **0.001**; NPS on the −100 to +100 scale.",
+        "Key scored an NPS of 24.85.",  # the analysis returned the share 0.2485
+    ],
+)
+def test_conventions_and_formula_constants_are_not_flagged(answer: str) -> None:
+    assert unverified_figures(answer, [0.2485, 3.0, 50.42], "") == []
+
+
+def test_invented_figures_are_still_flagged() -> None:
+    assert unverified_figures("Key scored an NPS of 31.70.", [0.2485, 24.85], "") == ["31.70"]
+
+
+async def test_query_constants_count_as_evidence() -> None:
+    from eagleeye_agents.sql.types import ArtifactRef, SqlOutcome
+    from eagleeye_agents.tools.query_database import register_artifact
+
+    ctx, _, _ = make_ctx(FakeLLM())
+    artifact = ArtifactRef(
+        "a1",
+        "Reliability",
+        "SELECT 1 WHERE x <= y + INTERVAL '24 hours'",
+        "src",
+        (),
+        1,
+        False,
+        (),
+        assumptions="On time = within 24 hours of schedule.",
+    )
+    await register_artifact(ctx, SqlOutcome("ok", artifact=artifact, llm_preview=((0.3057,),)))
+    assert (
+        unverified_figures(
+            "On time means within 24 hours; reliability 30.57%.", ctx.numeric_evidence, ""
+        )
+        == []
+    )

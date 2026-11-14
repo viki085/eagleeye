@@ -1,7 +1,8 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// enterprise: no sign-up route; accounts are created by admins in the console
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/status"]);
+// enterprise: no sign-up route; accounts are created by admins in the console.
+// /demo is the public demo sign-in (shared demo credentials, shown only when configured).
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/demo", "/api/demo-login", "/status"]);
 
 export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {

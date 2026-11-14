@@ -19,6 +19,17 @@ export const CATEGORICAL_DARK = [
 ] as const;
 
 /**
+ * Sequential (magnitude, e.g. a numeric colour column in a bubble chart): one blue hue from
+ * the same reference ramps. Low values recede toward the surface: light steps on white, dark
+ * steps on the dark surface; both ends clear 2:1 against their surface.
+ */
+export const SEQUENTIAL_LIGHT = ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"] as const;
+export const SEQUENTIAL_DARK = ["#184f95", "#2a78d6", "#6da7ec", "#cde2fb"] as const;
+
+const SURFACE_LIGHT = "#ffffff";
+const SURFACE_DARK = "#0a0a0a";
+
+/**
  * Status palette (fixed, never themed): reserved for state, never reused as a series colour,
  * and always paired with a label or legend so colour is not the only cue.
  */
@@ -65,7 +76,7 @@ export function chartConfig(dark: boolean): Record<string, unknown> {
     padding: 4,
     autosize: { type: "fit-x", contains: "padding" },
     view: { stroke: null },
-    range: { category: palette },
+    range: { category: palette, ramp: [...(dark ? SEQUENTIAL_DARK : SEQUENTIAL_LIGHT)] },
     axis: {
       labelColor: ink.muted,
       titleColor: ink.secondary,
@@ -88,6 +99,9 @@ export function chartConfig(dark: boolean): Record<string, unknown> {
       titleFontSize: 11,
       orient: "top",
       symbolType: "circle",
+      // size legends have no colour scale: their circles wear muted ink
+      symbolFillColor: ink.muted,
+      symbolOpacity: 0.6,
     },
     title: { color: ink.primary, fontSize: 13, fontWeight: 600, anchor: "start" },
     // thin marks: 2px lines, ≥8px markers, rounded bar ends, a gap between adjacent bars
@@ -96,6 +110,10 @@ export function chartConfig(dark: boolean): Record<string, unknown> {
     area: { color: first },
     line: { color: first, strokeWidth: 2 },
     point: { color: first, size: 64, filled: true },
+    // bubbles: a 1.5px surface ring keeps overlapping circles apart
+    circle: { color: first, stroke: dark ? SURFACE_DARK : SURFACE_LIGHT, strokeWidth: 1.5 },
+    // the fitted trend line is reference ink, not a series
+    style: { trend: { color: ink.muted, stroke: ink.muted } },
     // text marks (value labels, donut centre) wear text ink, never a series colour
     text: { color: ink.primary, font: FONT },
     arc: { stroke: dark ? "#1a1a19" : "#ffffff", strokeWidth: 2 },

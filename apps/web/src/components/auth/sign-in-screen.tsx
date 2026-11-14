@@ -6,15 +6,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { BrandPanel } from "@/components/auth/brand-panel";
+import { BrandIcon } from "@/components/brand/brand-icon";
 import { friendlyAuthError, safeRedirect } from "@/lib/sign-in";
 
 type Step = "identify" | "password" | "code" | "trust";
 
+// Muted antique gold palette (matches the EagleEye emblem): accent #9E8253, hover #B0925E,
+// light text accent #C5A368. Matte: no gradients or glow beyond a soft focus ring.
+const FOCUS = "outline-none focus-visible:ring-4 focus-visible:ring-[#9E8253]/25";
 const FIELD =
-  "w-full rounded-lg border border-black/15 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#2a78d6] focus:ring-4 focus:ring-[#2a78d6]/15 dark:border-white/15 dark:bg-[#0d0d0d]";
+  "w-full rounded-lg border border-black/15 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-neutral-400 hover:border-[#9E8253]/50 focus:border-[#9E8253] focus:ring-4 focus:ring-[#9E8253]/20 dark:border-white/15 dark:bg-[#0d0d0e] dark:placeholder:text-neutral-500 dark:hover:border-[#9E8253]/50 dark:focus:border-[#9E8253]";
 const PRIMARY =
-  "flex w-full items-center justify-center rounded-lg bg-[#2a78d6] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f68c0] disabled:cursor-not-allowed disabled:opacity-60";
-const LINK = "text-xs font-medium text-[#2a78d6] hover:underline underline-offset-2 dark:text-[#6ea6ec]";
+  `flex w-full items-center justify-center rounded-lg bg-[#9E8253] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#B0925E] active:bg-[#8C7349] disabled:cursor-not-allowed disabled:bg-[#9E8253]/45 disabled:text-white/70 ${FOCUS}`;
+const SECONDARY =
+  `flex w-full items-center justify-center gap-2.5 rounded-lg border border-black/15 bg-white px-3 py-2.5 text-sm font-medium transition hover:border-[#9E8253]/60 hover:bg-[#9E8253]/[0.05] disabled:opacity-60 dark:border-white/15 dark:bg-transparent dark:hover:border-[#9E8253]/60 dark:hover:bg-[#C5A368]/[0.06] ${FOCUS}`;
+const LINK = `rounded text-xs font-medium text-[#7d6540] underline-offset-2 hover:underline dark:text-[#C5A368] ${FOCUS}`;
 const NO_ORG = "Your account isn't set up in your organisation yet. Contact your administrator.";
 
 function messageOf(err: unknown): string {
@@ -189,20 +195,19 @@ export function SignInScreen() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f3f3f0] dark:bg-[#0d0d0d]">
+    <div className="flex min-h-screen bg-[#f3f3f0] dark:bg-[#0b0b0c]">
       <BrandPanel />
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-[400px]">
           <div className="mb-8 flex items-center gap-2 lg:hidden">
-            <span aria-hidden="true" className="grid h-8 w-8 place-items-center rounded-lg bg-[#2a78d6] text-sm font-bold text-white">E</span>
+            <BrandIcon size={36} />
             <span className="text-lg font-semibold tracking-tight">EagleEye</span>
           </div>
-          <div className="rounded-2xl border border-black/[0.08] bg-white p-7 shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-[#1a1a19]">
+          <div className="rounded-2xl border border-[rgba(197,163,104,0.35)] bg-white p-7 shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:border-[rgba(197,163,104,0.25)] dark:bg-[#141517] dark:shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
             {step === "identify" && (
               <>
                 <Header title="Sign in" subtitle="Continue with Google, or use your username or work email." />
-                <button type="button" onClick={() => void google()} disabled={busy}
-                  className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-black/15 bg-white px-3 py-2.5 text-sm font-medium hover:bg-black/[0.03] disabled:opacity-60 dark:border-white/15 dark:bg-transparent dark:hover:bg-white/[0.05]">
+                <button type="button" onClick={() => void google()} disabled={busy} className={SECONDARY}>
                   <GoogleMark /> Continue with Google
                 </button>
                 <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-[0.12em] text-neutral-400">
@@ -262,7 +267,7 @@ export function SignInScreen() {
               </>
             )}
 
-            {notice && !error && <p role="status" className="mt-4 rounded-lg bg-[#2a78d6]/[0.08] px-3 py-2 text-xs text-[#1d5fae] dark:text-[#8ab8f0]">{notice}</p>}
+            {notice && !error && <p role="status" className="mt-4 rounded-lg border border-[rgba(197,163,104,0.25)] bg-[#9E8253]/[0.08] px-3 py-2 text-xs text-[#6b5636] dark:text-[#d6bd8f]">{notice}</p>}
             {error && <p role="alert" className="mt-4 rounded-lg bg-[#d03b3b]/10 px-3 py-2 text-xs text-[#b42f2f] dark:text-[#e66767]">{error}</p>}
             {step === "identify" && clerk.session?.status === "pending" && (
               <button type="button" onClick={() => void startOver()} className={`${LINK} mt-3`}>

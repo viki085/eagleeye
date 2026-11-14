@@ -9,6 +9,9 @@ SAFE_FALLBACK = (
     "Please rephrase your request."
 )
 MIN_LEAK_LINE_CHARS = 40
+# Parts of a prompt meant to be said to users (e.g. what EagleEye can do) are wrapped in
+# <!-- public --> ... <!-- /public --> and excluded from the leak check.
+_PUBLIC = re.compile(r"<!--\s*public\s*-->.*?<!--\s*/public\s*-->", re.DOTALL)
 
 _SECRETS: list[tuple[str, re.Pattern[str]]] = [
     ("openai_key", re.compile(r"\bsk-(?:proj-|ant-)?[A-Za-z0-9_-]{20,}")),
@@ -31,7 +34,7 @@ def _leaked_prompt_lines(answer: str, system_prompts: Iterable[str]) -> list[str
     flat_answer = " ".join(answer.split()).lower()
     leaks: list[str] = []
     for prompt in system_prompts:
-        for line in prompt.splitlines():
+        for line in _PUBLIC.sub("", prompt).splitlines():
             flat = " ".join(line.split()).lower().lstrip("- ")
             if len(flat) >= MIN_LEAK_LINE_CHARS and flat in flat_answer:
                 leaks.append(flat[:60])

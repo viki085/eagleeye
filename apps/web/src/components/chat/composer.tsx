@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { FILE_REF_MIME, insertToken } from "@/lib/file-refs";
 
@@ -12,13 +12,22 @@ interface ComposerProps {
   running?: boolean;
   onStop?: () => void;
   contextNote?: string | null;
+  /** Text put into the box from outside (e.g. a suggested question); `id` makes repeats count. */
+  draft?: { text: string; id: number } | null;
 }
 
-export function Composer({ disabled, onSend, running = false, onStop, contextNote = null }: ComposerProps) {
+export function Composer({ disabled, onSend, running = false, onStop, contextNote = null, draft = null }: ComposerProps) {
   const [text, setText] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
   const [dropping, setDropping] = useState(false);
   const pendingCaret = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!draft) return;
+    pendingCaret.current = draft.text.length;
+    setText(draft.text);
+    box.current?.focus();
+  }, [draft]);
 
   const isFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes(FILE_REF_MIME);
 

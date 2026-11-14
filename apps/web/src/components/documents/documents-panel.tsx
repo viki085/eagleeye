@@ -28,6 +28,7 @@ export interface CurrentUser {
   id: string;
   canManageEnterprise: boolean;
   isAdmin: boolean;
+  isDemo?: boolean;
 }
 
 interface DocumentsPanelProps {

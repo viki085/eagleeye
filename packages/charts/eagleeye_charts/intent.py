@@ -30,7 +30,22 @@ class ChartIntent(BaseModel):
         "compare side by side (e.g. ['revenue', 'target']). Omit to count rows.",
     )
     color: str | None = Field(
-        default=None, max_length=100, description="Optional category column: one series per value."
+        default=None,
+        max_length=100,
+        description="Optional category column: one series per value. In a scatter it may also "
+        "be a numeric column, shown as a colour gradient (e.g. average delay).",
+    )
+    size: str | None = Field(
+        default=None,
+        max_length=100,
+        description="scatter only: numeric column for bubble size (e.g. claims, volume). Use it "
+        "to show a third measure.",
+    )
+    label: str | None = Field(
+        default=None,
+        max_length=100,
+        description="scatter only: column naming each point (e.g. lane, customer); written "
+        "beside the points when there are few of them.",
     )
     aggregate: Aggregate | None = Field(
         default=None, description="How to combine y per x. Default: sum (count when y is omitted)."

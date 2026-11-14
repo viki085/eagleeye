@@ -33,15 +33,16 @@ const pct1 = (v: number | null): string => (v === null ? "—" : `${(v * 100).to
 const LABEL = "truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500";
 
 /** One metric card: label (with optional explanation or action), headline figure, chart. */
-function Cell({ label, info, action, value, children }: {
+function Cell({ label, info, action, value, children, className = "" }: {
   label: string;
+  className?: string;
   info?: string;
   action?: ReactNode;
   value?: ReactNode;
   children?: ReactNode;
 }) {
   return (
-    <section aria-label={label} className={`${CARD} flex min-w-0 flex-col gap-2 p-4`}>
+    <section aria-label={label} className={`${CARD} flex min-w-0 flex-col gap-2 p-4 ${className}`}>
       <header className="flex items-center justify-between gap-2">
         <h3 className={LABEL}>{label}</h3>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -151,42 +152,42 @@ function SpendCell({ d, api, onBudgetChanged }: { d: AdminOverview; api: ApiClie
   const width = Math.min(100, (m.used_fraction ?? 0) * 100);
   const alerts = m.alerts.map((a) => `${Math.round(a * 100)}%`).join(" and ");
   return (
-    <div className="relative">
-      <Cell
-        label={`${month} spend`}
-        info={`LLM spend this calendar month (UTC) against the organisation's monthly budget. Alert marks at ${alerts}.`}
-        action={<BudgetEditor api={api} current={m.budget_usd} onSaved={onBudgetChanged} />}
+    <Cell
+      label={`${month} spend`}
+      info={`LLM spend this calendar month (UTC) against the organisation's monthly budget. Alert marks at ${alerts}.`}
+      action={<BudgetEditor api={api} current={m.budget_usd} onSaved={onBudgetChanged} />}
+    >
+      <div className="mt-1 flex items-baseline justify-between gap-2 text-sm">
+        <span className="font-medium text-neutral-800 dark:text-neutral-200">Organisation</span>
+        <span className="tabular-nums text-neutral-800 dark:text-neutral-200">
+          {money(m.spend_usd)} / {money(m.budget_usd)}
+        </span>
+      </div>
+      <div
+        role="meter"
+        aria-label={`${month} spend against budget`}
+        aria-valuemin={0}
+        aria-valuemax={m.budget_usd}
+        aria-valuenow={m.spend_usd}
+        aria-valuetext={`${money(m.spend_usd)} of ${money(m.budget_usd)}, ${BUDGET_TEXT[state].toLowerCase()}`}
+        className="relative mt-2 h-5 overflow-hidden rounded-md bg-neutral-200 dark:bg-neutral-800"
       >
-        <div className="mt-1 flex items-baseline justify-between gap-2 text-sm">
-          <span className="font-medium text-neutral-800 dark:text-neutral-200">Organisation</span>
-          <span className="tabular-nums text-neutral-800 dark:text-neutral-200">
-            {money(m.spend_usd)} / {money(m.budget_usd)}
-          </span>
-        </div>
-        <div
-          role="meter"
-          aria-label={`${month} spend against budget`}
-          aria-valuemin={0}
-          aria-valuemax={m.budget_usd}
-          aria-valuenow={m.spend_usd}
-          aria-valuetext={`${money(m.spend_usd)} of ${money(m.budget_usd)}, ${BUDGET_TEXT[state].toLowerCase()}`}
-          className="relative mt-2 h-5 overflow-hidden rounded-md bg-neutral-200 dark:bg-neutral-800"
-        >
-          <div className={`h-full rounded-md ${BUDGET_FILL[state]}`} style={{ width: `${Math.max(width, width > 0 ? 2 : 0)}%` }} />
-          {m.alerts.map((a) => (
-            <span
-              key={a}
-              title={`Alert at ${Math.round(a * 100)}% (${money(a * m.budget_usd)})`}
-              className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded bg-neutral-500 dark:bg-neutral-300"
-              style={{ left: `${a * 100}%` }}
-            />
-          ))}
-        </div>
-        <p className="mt-1 text-[11px] text-neutral-500">
-          {BUDGET_TEXT[state]} · {m.used_fraction === null ? "no budget set" : `${(m.used_fraction * 100).toFixed(1)}% used`}
-        </p>
-      </Cell>
-    </div>
+        <div className={`h-full rounded-md ${BUDGET_FILL[state]}`} style={{ width: `${Math.max(width, width > 0 ? 2 : 0)}%` }} />
+        {m.alerts.map((a) => (
+          <span
+            key={a}
+            title={`Alert at ${Math.round(a * 100)}% (${money(a * m.budget_usd)})`}
+            className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded bg-neutral-500 dark:bg-neutral-300"
+            style={{ left: `${a * 100}%` }}
+          />
+        ))}
+      </div>
+      <p className="mt-1 text-[11px] text-neutral-500">
+        {BUDGET_TEXT[state]} · {m.used_fraction === null
+          ? "no budget set"
+          : `${(m.used_fraction * 100).toFixed(1)}% used · ${money(m.remaining_usd)} left`}
+      </p>
+    </Cell>
   );
 }
 
@@ -216,8 +217,8 @@ function CachingCell({ d, labels }: { d: AdminOverview; labels: readonly string[
 
 /**
  * Usage at a glance (metric content and chart styles after the OpenAI platform dashboard), as
- * six cards matching the rest of the console: tokens, responses, cache hit rate, monthly spend
- * against the admin-set budget, budget remaining and model calls.
+ * five cards matching the rest of the console: tokens, responses, cache hit rate, monthly spend
+ * against the admin-set budget (with what is left) and model calls.
  */
 export function UsageGlance({ d, hourly, api, onBudgetChanged }: {
   d: AdminOverview;
@@ -254,12 +255,8 @@ export function UsageGlance({ d, hourly, api, onBudgetChanged }: {
       </Cell>
       <CachingCell d={d} labels={labels} />
       <SpendCell d={d} api={api} onBudgetChanged={onBudgetChanged} />
-      <Cell label="Budget remaining" value={money(d.month.remaining_usd)}>
-        <p className="text-[11px] text-neutral-500">
-          Left of this month&apos;s {money(d.month.budget_usd)} LLM budget · change it with the pencil on the spend card
-        </p>
-      </Cell>
-      <Cell label="Model calls" value={count(cur.llm_calls)}>
+      {/* five cards: the last spans the leftover columns so every row is full */}
+      <Cell label="Model calls" value={count(cur.llm_calls)} className="sm:col-span-2 xl:col-span-2">
         <GlanceLines
           ariaLabel="Model calls over the period"
           labels={labels}

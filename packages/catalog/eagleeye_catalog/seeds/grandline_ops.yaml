@@ -195,6 +195,10 @@ tables:
       cargo_ready_date - the reporting date used in all Grand Line reports - unless the question
       asks when bookings were made (booking_date). freight_revenue_usd is ocean freight only;
       surcharges are on finance.invoice_lines. teu = container_count converted to TEU (40ft = 2 TEU).
+      A booking's arrival at its destination is the port call of its voyage at that port:
+      JOIN network.port_calls pc ON pc.voyage_id = bookings.voyage_id
+      AND pc.port_code = bookings.destination_port (on time = actual_arrival within 24 hours of
+      scheduled_arrival). Its departure is the same join on origin_port.
     columns:
       booking_number: Booking number, e.g. 'GLS250012345'.
       contract_id: Contract the booking was priced under (null = spot booking).

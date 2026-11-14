@@ -168,3 +168,48 @@ class ClerkAdmin:
             return
         logger.warning("clerk delete user failed: %s %s", resp.status_code, resp.text[:300])
         raise ClerkError(502, "Could not remove the sign-in account. Try again.")
+
+    async def find_by_username(self, username: str) -> dict | None:
+        resp = await self._request("GET", f"/users?username={quote(username)}&limit=1")
+        if resp.status_code != 200:
+            logger.warning("clerk username lookup failed: %s %s", resp.status_code, resp.text[:300])
+            raise ClerkError(502, "Could not check the sign-in service. Try again.")
+        users = resp.json()
+        return users[0] if users else None
+
+    async def ensure_password_user(self, username: str, email: str, password: str) -> str:
+        """The shared demo sign-in: a username + password account (reused if it exists, its
+        password reset). The demo password is public and short on purpose, so Clerk's
+        breached-password and strength checks are skipped for this account only."""
+        existing = await self.find_by_username(username)
+        if existing:
+            await self.set_password(existing["id"], password)
+            return existing["id"]
+        resp = await self._request(
+            "POST",
+            "/users",
+            json={
+                "username": username,
+                "email_address": [email],
+                "password": password,
+                "skip_password_checks": True,
+                "first_name": "Demo",
+                "last_name": "Visitor",
+            },
+        )
+        if resp.status_code in (200, 201):
+            return resp.json()["id"]
+        logger.warning("clerk demo user create failed: %s %s", resp.status_code, resp.text[:500])
+        raise ClerkError(502, f"Could not create the demo sign-in account ({resp.status_code}).")
+
+    async def set_password(self, clerk_user_id: str, password: str) -> None:
+        """Puts the demo password back (a visitor could have changed it), so the shared
+        account is never locked."""
+        resp = await self._request(
+            "PATCH",
+            f"/users/{quote(clerk_user_id)}",
+            json={"password": password, "skip_password_checks": True},
+        )
+        if resp.status_code != 200:
+            logger.warning("clerk set password failed: %s %s", resp.status_code, resp.text[:300])
+            raise ClerkError(502, "Could not reset the demo password.")

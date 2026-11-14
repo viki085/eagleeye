@@ -204,3 +204,34 @@ def test_cancel_finished_run_is_noop(env: Env) -> None:
 def test_cancel_other_users_run_is_404(env: Env) -> None:
     env.run_status = None
     assert env.client.post(f"/v1/runs/{RUN_ID}/cancel").status_code == 404
+
+
+def test_demo_account_has_its_own_cap_and_message(env: Env) -> None:
+    from dataclasses import replace
+
+    demo = replace(ME, is_demo=True, usage_limit_usd=1.0)
+    env.client.app.dependency_overrides[get_current_user] = lambda: demo
+    env.spent_usd = 0.99
+    assert _send(env).status_code == 202
+    env.spent_usd = 1.0
+    resp = _send(env)
+    assert resp.status_code == 429
+    assert "demo's $1 budget" in resp.json()["error"]["message"]
+
+
+def test_usage_endpoint_reports_the_users_own_limit(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dataclasses import replace
+
+    async def totals(pool, user_id):  # noqa: ANN001
+        return usage_repo.UsageTotals(0.25, 10, 5, 1)
+
+    async def daily(pool, user_id):  # noqa: ANN001
+        return []
+
+    monkeypatch.setattr(usage_repo, "totals", totals)
+    monkeypatch.setattr(usage_repo, "daily", daily)
+    capped = replace(ME, usage_limit_usd=1.0)
+    env.client.app.dependency_overrides[get_current_user] = lambda: capped
+    assert env.client.get("/v1/me/usage").json()["data"]["limit_usd"] == 1.0

@@ -144,7 +144,9 @@ async def test_step_trend_and_change_cover_major_steps_only(conn: asyncpg.Connec
     )
     steps = [
         (run, "guard", "safety & intent", 1200),
-        (run, "tool", "query_database", 4000),
+        # far above any real step, so "slower than the previous period" holds whatever real
+        # runs the local database already holds
+        (run, "tool", "query_database", 50_000_000),
         (run, "retrieval", "find tables", 800),  # sub-step: excluded
         (old_run, "tool", "query_database", 2000),
     ]

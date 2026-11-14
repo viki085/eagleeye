@@ -25,6 +25,13 @@ class AuthedUser:
     email: str
     display_name: str | None
     role: str
+    is_demo: bool = False
+    usage_limit_usd: float | None = None  # None = the organisation default
+
+
+def usage_limit_for(user: "AuthedUser", default: float) -> float:
+    """The user's lifetime LLM spend cap: their own, else the organisation default."""
+    return default if user.usage_limit_usd is None else user.usage_limit_usd
 
 
 def derive_issuer(publishable_key: str) -> str:
@@ -121,6 +128,7 @@ async def get_current_user(
             await rate_limit.hit(
                 redis, Limit("user", settings.rate_limit_general_per_min), cached.id
             )
+        await _note_demo(request, cached, claims)
         return cached
 
     from app.repos import users as users_repo  # local import avoids cycle
@@ -138,11 +146,33 @@ async def get_current_user(
         email=row["email"],
         display_name=row["display_name"],
         role=row["role"],
+        is_demo=bool(row.get("is_demo", False)),
+        usage_limit_usd=_float_or_none(row.get("usage_limit_usd")),
     )
     _user_cache.put(clerk_user_id, user)
     if redis is not None:
         await rate_limit.hit(redis, Limit("user", settings.rate_limit_general_per_min), user.id)
+    await _note_demo(request, user, claims)
     return user
+
+
+def _float_or_none(value: object) -> float | None:
+    return None if value is None else float(value)  # type: ignore[arg-type]
+
+
+async def _note_demo(request: Request, user: AuthedUser, claims: dict) -> None:
+    """Demo account only: email the owner on each new sign-in session."""
+    if not user.is_demo:
+        return
+    from app.services import demo_login  # local import keeps auth light for everyone else
+
+    await demo_login.note_request(
+        getattr(request.app.state, "redis", None),
+        get_settings(),
+        claims,
+        request.client.host if request.client else "unknown",
+        request.headers.get("user-agent", ""),
+    )
 
 
 CurrentUser = Annotated[AuthedUser, Depends(get_current_user)]

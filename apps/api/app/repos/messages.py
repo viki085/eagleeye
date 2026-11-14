@@ -3,9 +3,7 @@ import asyncpg
 from app.repos.chats import next_msg_no
 
 
-async def list_messages(
-    pool: asyncpg.Pool, chat_id: str, limit: int = 200
-) -> list[asyncpg.Record]:
+async def list_messages(pool: asyncpg.Pool, chat_id: str, limit: int = 200) -> list[asyncpg.Record]:
     return await pool.fetch(
         """
         SELECT id, msg_no, role, parts, run_id, created_at

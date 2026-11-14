@@ -18,7 +18,6 @@ from eagleeye_datasets.profile import kind_of
 from eagleeye_charts.intent import (
     HISTOGRAM_BINS,
     MAX_MEASURES,
-    MAX_POINTS,
     ChartError,
     ChartIntent,
 )
@@ -45,6 +44,8 @@ class Resolved:
     aggregate: str
     measures: tuple[str, ...] = ()  # ≥ 2 → one series per measure (no color column)
     x_sql: str = ""  # expression for x; text months/dates are cast to DATE
+    size: str | None = None  # scatter: numeric column for bubble size
+    label: str | None = None  # scatter: column naming each point
 
     @property
     def multi(self) -> bool:
@@ -119,6 +120,7 @@ def resolve(
     color = _find(intent.color, columns) if intent.color else None
     if len(measures) > 1 and color:
         raise ChartError("Use either several y columns or a color column, not both.")
+    size, point_label = _scatter_extras(columns, kinds, intent)
     if len(measures) > 1 and intent.type in ("scatter", "histogram"):
         raise ChartError(f"A {intent.type} takes a single y column.")
     aggregate = intent.aggregate or ("sum" if y else "count")
@@ -136,7 +138,20 @@ def resolve(
             f"A {intent.type} chart needs a date or numeric x; '{x}' is {kinds[x]}. "
             "Use a bar chart."
         )
-    return Resolved(x, y, color, kinds, aggregate, measures, x_sql)
+    return Resolved(x, y, color, kinds, aggregate, measures, x_sql, size, point_label)
+
+
+def _scatter_extras(
+    columns: list[dict[str, str]], kinds: dict[str, str], intent: ChartIntent
+) -> tuple[str | None, str | None]:
+    """The bubble size and point label columns, which only a scatter takes."""
+    for option in ("size", "label"):
+        if getattr(intent, option) and intent.type != "scatter":
+            raise ChartError(f"'{option}' is only for scatter charts.")
+    size = _find(intent.size, columns) if intent.size else None
+    if size and kinds[size] != "numeric":
+        raise ChartError(f"size column '{size}' is {kinds[size]}, not numeric.")
+    return size, (_find(intent.label, columns) if intent.label else None)
 
 
 def open_table(parquet: bytes) -> duckdb.DuckDBPyConnection:
@@ -194,20 +209,6 @@ def month_labels(values: list[Any]) -> bool:
         if isinstance(v, datetime) and (v.hour or v.minute or v.second):
             return False
     return True
-
-
-def scatter_points(
-    con: duckdb.DuckDBPyConnection, r: Resolved
-) -> tuple[list[tuple[float, float, Any]], int]:
-    x, y = quote(r.x), quote(r.y or "")
-    series = f"{quote(r.color)}::VARCHAR" if r.color else "NULL"
-    where = f"{x} IS NOT NULL AND {y} IS NOT NULL"
-    total = con.execute(f"SELECT COUNT(*) FROM t WHERE {where}").fetchone()[0]  # noqa: S608
-    rows = con.execute(
-        f"SELECT {x}::DOUBLE, {y}::DOUBLE, {series} FROM t WHERE {where} "  # noqa: S608
-        f"USING SAMPLE reservoir({MAX_POINTS} ROWS) REPEATABLE (42)"
-    ).fetchall()
-    return [(float(a), float(b), s) for a, b, s in rows], total
 
 
 def histogram(con: duckdb.DuckDBPyConnection, r: Resolved) -> list[tuple[float, float, int]]:

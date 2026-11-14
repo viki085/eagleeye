@@ -18,6 +18,14 @@
   --viz-muted-bar: #9ec5f4;
   --status-warning: #fab219;
   --status-critical: #d03b3b;
+
+  /* Brand: muted antique gold (sign-in, account menu, Clerk's profile modal). */
+  --brand-gold: #9e8253;
+  --clerk-surface: #ffffff;
+  --clerk-text: #171717;
+  --clerk-muted-text: #6b6b66;
+  --clerk-input: #ffffff;
+  --clerk-border: rgba(197, 163, 104, 0.35);
   color-scheme: light;
 }
 
@@ -29,6 +37,12 @@
   --viz-output: #d95926;
   --viz-accent: #3987e5;
   --viz-muted-bar: #1c5cab;
+
+  --clerk-surface: #141517;
+  --clerk-text: #ededed;
+  --clerk-muted-text: #9a9893;
+  --clerk-input: #0d0d0e;
+  --clerk-border: rgba(197, 163, 104, 0.25);
   color-scheme: dark;
 }
 

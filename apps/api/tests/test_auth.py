@@ -21,9 +21,7 @@ def test_derive_issuer_handles_padding_variants() -> None:
 
 
 def _user(uid: str = "u1") -> AuthedUser:
-    return AuthedUser(
-        id=uid, clerk_user_id="ck_1", email="a@b.c", display_name=None, role="member"
-    )
+    return AuthedUser(id=uid, clerk_user_id="ck_1", email="a@b.c", display_name=None, role="member")
 
 
 def test_ttl_cache_returns_within_ttl() -> None:

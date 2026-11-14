@@ -41,6 +41,8 @@ async def register_artifact(ctx: "RunContext", outcome: SqlOutcome) -> None:
         return
     ctx.numeric_evidence.extend(numbers_in(v for row in outcome.llm_preview for v in row))
     ctx.numeric_evidence.append(float(outcome.artifact.row_count))
+    # the query's own constants are facts the answer may restate ("within 24 hours", "> 50 TEU")
+    ctx.numeric_evidence.extend(numbers_in([outcome.artifact.sql, outcome.artifact.assumptions]))
     await emit_artifact(ctx, outcome.artifact)
 
 

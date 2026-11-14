@@ -4,7 +4,7 @@ from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
 from fastapi import APIRouter, Request
 
-from app.auth import CurrentUser
+from app.auth import CurrentUser, usage_limit_for
 from app.repos import usage as usage_repo
 from app.repos.users import fresh_role
 from app.services.permissions import can_manage_enterprise
@@ -27,6 +27,8 @@ async def me(request: Request, user: CurrentUser) -> dict:
             "role": role,
             # the UI hides enterprise upload/delete when false; the API enforces it regardless
             "can_manage_enterprise": can_manage_enterprise(effective),
+            # shared public demo account: the UI shows the demo banner and suggested questions
+            "is_demo": user.is_demo,
         }
     )
 
@@ -38,7 +40,7 @@ async def my_usage(request: Request, user: CurrentUser) -> dict:
     days = await usage_repo.daily(pool, user.id)
     return ok(
         {
-            "limit_usd": get_settings().usage_limit_usd,
+            "limit_usd": usage_limit_for(user, get_settings().usage_limit_usd),
             "cost_usd": round(totals.cost_usd, 6),
             "tokens_in": totals.tokens_in,
             "tokens_out": totals.tokens_out,

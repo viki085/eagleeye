@@ -8,6 +8,7 @@ import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
 import { SourceDrawer } from "@/components/chat/source-drawer";
 import { ArtifactModal } from "@/components/data/artifact-modal";
+import { DemoBanner, DemoQuestions } from "@/components/demo/demo-welcome";
 import { DocumentsPanel, type CurrentUser } from "@/components/documents/documents-panel";
 import { UsagePanel } from "@/components/usage/usage-panel";
 import { useApi } from "@/hooks/use-api";
@@ -41,6 +42,8 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [noAccess, setNoAccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState<{ text: string; id: number } | null>(null);
+  const isDemo = me?.isDemo === true;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const refreshChats = useCallback(async () => {
@@ -60,6 +63,7 @@ export default function ChatPage() {
           id: u.id,
           canManageEnterprise: u.can_manage_enterprise === true,
           isAdmin: u.role === "admin",
+          isDemo: u.is_demo === true,
         }),
       )
       .catch((e: unknown) => {
@@ -217,15 +221,20 @@ export default function ChatPage() {
         activeChatId={activeChatId}
         busy={busy}
         isAdmin={me?.isAdmin ?? false}
+        isDemo={isDemo}
         onNewChat={handleNewChat}
         onSelect={(id) => void openChat(id)}
         onDelete={(id) => void handleDelete(id)}
         footer={<UsagePanel state={usage} />}
       />
       <main className="flex min-w-0 flex-1 flex-col">
+        {isDemo && <DemoBanner usage={usage.usage} />}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
-            {messages.length === 0 && stream === null && (
+            {messages.length === 0 && stream === null && isDemo && (
+              <DemoQuestions onPick={(text) => setDraft((d) => ({ text, id: (d?.id ?? 0) + 1 }))} />
+            )}
+            {messages.length === 0 && stream === null && !isDemo && (
               <div className="mt-24 text-center text-neutral-400">
                 <p className="text-lg font-medium">What can I help you with?</p>
                 <p className="mt-1 text-sm">
@@ -277,6 +286,7 @@ export default function ChatPage() {
           onSend={(t) => void handleSend(t)}
           running={stream !== null}
           onStop={() => void handleStop()}
+          draft={draft}
           contextNote={
             selectedCount > 0
               ? `${selectedCount} document${selectedCount === 1 ? "" : "s"} selected`

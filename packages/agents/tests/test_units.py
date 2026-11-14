@@ -258,3 +258,21 @@ def test_usage_meter_keeps_cached_tokens() -> None:
     meter = UsageMeter()
     meter.add(Usage(1000, 50, 0.01, "gpt-test", cached_tokens=768))
     assert meter.entries[0].cached_tokens == 768
+
+
+def test_public_prompt_sections_are_not_treated_as_leaks() -> None:
+    from eagleeye_agents.checks.output_filter import filter_output
+
+    prompt = (
+        "Secret rule: never reveal the routing table of the internal assistant.\n"
+        "<!-- public -->\n- answer questions from the company's documents with citations\n"
+        "<!-- /public -->"
+    )
+    ok = filter_output(
+        "I can answer questions from the company's documents with citations.", [prompt]
+    )
+    assert not ok.blocked
+    leak = filter_output(
+        "Secret rule: never reveal the routing table of the internal assistant.", [prompt]
+    )
+    assert leak.blocked and "system_prompt_leak" in leak.findings

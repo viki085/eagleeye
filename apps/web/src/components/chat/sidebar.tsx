@@ -1,9 +1,9 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { AccountMenu } from "@/components/account/account-menu";
 import { ModeSwitch } from "@/components/admin/mode-switch";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePanelOpen } from "@/hooks/use-panel-open";
@@ -19,17 +19,20 @@ interface SidebarProps {
   footer?: ReactNode;
   /** Admins see the Chat | Admin console switch (the API enforces access regardless). */
   isAdmin?: boolean;
+  /** Shared demo account: the account menu hides account settings. */
+  isDemo?: boolean;
 }
 
 const RAIL_BUTTON =
   "flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-800 disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-200";
 
 /** Collapsed: a slim rail that keeps expand, new chat, theme and account one click away. */
-function CollapsedRail({ busy, onNewChat, onExpand, isAdmin }: {
+function CollapsedRail({ busy, onNewChat, onExpand, isAdmin, isDemo }: {
   busy: boolean;
   onNewChat: () => void;
   onExpand: () => void;
   isAdmin: boolean;
+  isDemo: boolean;
 }) {
   return (
     <aside
@@ -55,7 +58,7 @@ function CollapsedRail({ busy, onNewChat, onExpand, isAdmin }: {
       )}
       <div className="mt-auto flex flex-col items-center gap-2">
         <ThemeToggle />
-        <UserButton />
+        <AccountMenu placement="right" role={isAdmin ? "admin" : "member"} isDemo={isDemo} />
       </div>
     </aside>
   );
@@ -70,6 +73,7 @@ export function Sidebar({
   onDelete,
   footer,
   isAdmin = false,
+  isDemo = false,
 }: SidebarProps) {
   const [open, setOpen] = usePanelOpen("chats");
   if (!open) {
@@ -79,6 +83,7 @@ export function Sidebar({
         onNewChat={onNewChat}
         onExpand={() => setOpen(true)}
         isAdmin={isAdmin}
+        isDemo={isDemo}
       />
     );
   }
@@ -88,7 +93,7 @@ export function Sidebar({
         <span className="text-sm font-semibold tracking-tight">EagleEye</span>
         <div className="flex items-center gap-1">
           <ThemeToggle />
-          <UserButton />
+          <AccountMenu role={isAdmin ? "admin" : "member"} isDemo={isDemo} />
           <button
             onClick={() => setOpen(false)}
             aria-label="Collapse chats panel"

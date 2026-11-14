@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 
@@ -12,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import AsyncQdrantClient
 
 from app.db import create_pool
+from app.demo import reset_loop
 from app.errors import install_error_handlers
 from app.request_context import RequestIdLogFilter, RequestIdMiddleware
 from app.routers import (
@@ -85,9 +88,13 @@ async def lifespan(app: FastAPI):
         settings.artifacts_bucket,
     )
     await _prepare_storage(app)
+    demo_reset = asyncio.create_task(reset_loop.run_forever(state, settings))
     try:
         yield
     finally:
+        demo_reset.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await demo_reset
         await state.qdrant.close()
         await state.redis.aclose()
         await state.pool.close()

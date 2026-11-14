@@ -1,6 +1,5 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -16,6 +15,8 @@ import { UsersTab } from "@/components/admin/users-tab";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useApi } from "@/hooks/use-api";
 import { ApiError, type AdminRange } from "@/lib/api";
+import { AccountMenu } from "@/components/account/account-menu";
+import { BrandIcon } from "@/components/brand/brand-icon";
 
 // A failed check (rate limit, API down) is an error with a retry, never "Not authorised":
 // only a real non-admin role (or a 403) means denied.
@@ -30,7 +31,7 @@ function TopBar() {
     <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-black/[0.08] bg-white px-4 dark:border-white/10 dark:bg-[#1a1a19]">
       <div className="flex min-w-0 items-center gap-3">
         <span className="flex items-center gap-2">
-          <span aria-hidden="true" className="grid h-6 w-6 place-items-center rounded-md bg-[#2a78d6] text-[11px] font-bold text-white">E</span>
+          <BrandIcon size={24} className="!rounded-md" />
           <span className="hidden text-sm font-semibold tracking-tight sm:inline">EagleEye</span>
         </span>
         <span aria-hidden="true" className="hidden h-5 w-px bg-black/10 sm:block dark:bg-white/10" />
@@ -45,7 +46,7 @@ function TopBar() {
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />
-        <UserButton />
+        <AccountMenu role="admin" />
       </div>
     </header>
   );

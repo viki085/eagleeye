@@ -40,9 +40,14 @@ class FakeRedis:
         self._check()
         return sum(1 for k in keys if k in self.data)
 
-    async def set(self, key: str, value: str, ex: int | None = None) -> None:
+    async def set(
+        self, key: str, value: str, ex: int | None = None, nx: bool = False
+    ) -> bool | None:
         self._check()
+        if nx and key in self.data:
+            return None  # like Redis: SET NX on an existing key does nothing
         self.data[key] = value
+        return True
 
     async def get(self, key: str) -> str | None:
         self._check()

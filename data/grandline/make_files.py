@@ -106,7 +106,8 @@ def survey(late: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
         "response_id": np.arange(1, len(s) + 1),
         "booking_number": s["booking_number"], "customer": s["customer"], "segment": s["segment"],
         "trade_lane": s["lane_code"],
-        "response_date": pd.to_datetime(s["cargo_ready_date"]) + pd.to_timedelta(rng.integers(25, 60, len(s)), unit="D"),
+        # surveys go out after delivery; nothing is answered after the data's "today"
+        "response_date": (pd.to_datetime(s["cargo_ready_date"]) + pd.to_timedelta(rng.integers(25, 60, len(s)), unit="D")).clip(upper=pd.Timestamp("2026-11-13")),
         "likelihood_to_recommend_0_10": nps,
         "booking_ease_1_5": np.clip(np.rint(rng.normal(4.1, 0.7, len(s))), 1, 5).astype(int),
         "communication_1_5": np.clip(np.rint(3.9 - 0.006 * delay + rng.normal(0, 0.8, len(s))), 1, 5).astype(int),

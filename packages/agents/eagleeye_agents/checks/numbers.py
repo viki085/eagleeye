@@ -28,6 +28,13 @@ _STAT_CONSTANT = re.compile(
     r"|\bp\s*[<>≤≥]\s*0?\.(?:10|05|01|001)\b",
     re.IGNORECASE,
 )
+# Formula constants: "(promoters − detractors) ÷ responses × 100", "per 100 bookings".
+# ...and score scales: "on the −100 to +100 scale".
+_FORMULA_CONSTANT = re.compile(
+    r"(?:[×x]|\btimes)\s*100\b|\bper\s+100\b|[-−]\s*100\s*(?:to|–|-)\s*\+?\s*100\b",
+    re.IGNORECASE,
+)
+_EMPHASIS = re.compile(r"\*+")  # markdown bold/italic: "*p* < **0.001**"
 _NUMBER = re.compile(
     r"(?<![\w.])([-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*"
     r"(%|percent\b|k\b|m\b|bn\b|b\b|thousand\b|million\b|billion\b)?",
@@ -48,8 +55,8 @@ class Figure:
 
 
 def extract_figures(text: str) -> list[Figure]:
-    clean = _WORD_DATE.sub(" ", _DATE.sub(" ", _CITATION.sub(" ", text)))
-    clean = _STAT_CONSTANT.sub(" ", clean)
+    clean = _WORD_DATE.sub(" ", _DATE.sub(" ", _CITATION.sub(" ", _EMPHASIS.sub("", text))))
+    clean = _FORMULA_CONSTANT.sub(" ", _STAT_CONSTANT.sub(" ", clean))
     figures: list[Figure] = []
     for match in _NUMBER.finditer(clean):
         raw, unit = match.group(1), (match.group(2) or "").lower()
@@ -91,7 +98,8 @@ def _ignorable(f: Figure, question_values: set[float]) -> bool:
 def _matches(f: Figure, evidence: list[float]) -> bool:
     value = f.value * f.scale
     rounding = 0.5 * (10**-f.decimals) * f.scale
-    candidates = [value, value / 100] if f.percent else [value]
+    # a share may be quoted as a percentage with or without the % sign: 40.21 for 0.4021
+    candidates = [value, value / 100]
     for e in evidence:
         for c in candidates:
             # magnitudes, not signs: "below target by €90,380.83" and "−€90,380.83" both

@@ -7,7 +7,7 @@ from eagleeye_core.envelope import ok
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app.auth import CurrentUser
+from app.auth import AuthedUser, CurrentUser, usage_limit_for
 from app.errors import ApiException
 from app.repos import chats as chats_repo
 from app.repos import documents as docs_repo
@@ -22,6 +22,10 @@ router = APIRouter(prefix="/chats", tags=["chats"])
 MAX_MESSAGE_CHARS = 8000
 MAX_SELECTED_DOCS = 20
 STILL_ANSWERING = "Still answering the previous message in this chat."
+DEMO_BUDGET_USED = (
+    "The demo's $1 budget for AI answers has been used up, so it can't answer new questions. "
+    "Thanks for trying EagleEye!"
+)
 
 
 class RenameBody(BaseModel):
@@ -94,7 +98,7 @@ async def send_message(
                 422, "VALIDATION_ERROR", "Some selected documents are unavailable or not ready."
             )
 
-    await _admit_run(pool, chat_id, user.id)
+    await _admit_run(pool, chat_id, user)
     try:
         async with pool.acquire() as conn, conn.transaction():
             run_id = await runs_repo.create_run(conn, chat_id, user.id, {"doc_ids": doc_ids})
@@ -113,8 +117,9 @@ async def send_message(
     return ok({"run_id": run_id})
 
 
-async def _admit_run(pool: asyncpg.Pool, chat_id: str, user_id: str) -> None:
+async def _admit_run(pool: asyncpg.Pool, chat_id: str, user: AuthedUser) -> None:
     """One active run per chat, a few per user (C3 §7). Orphaned runs are failed first."""
+    user_id = user.id
     await runs_repo.fail_stale_runs(pool, user_id)
     if await runs_repo.has_active_run(pool, chat_id):
         raise ApiException(409, "CONFLICT", STILL_ANSWERING)
@@ -123,9 +128,9 @@ async def _admit_run(pool: asyncpg.Pool, chat_id: str, user_id: str) -> None:
         raise ApiException(
             429, "RATE_LIMITED", "Too many answers in progress. Wait for one to finish."
         )
-    if await usage_repo.total_cost(pool, user_id) >= settings.usage_limit_usd:
-        raise ApiException(
-            429,
-            "QUOTA_EXCEEDED",
-            f"You've reached your ${settings.usage_limit_usd:,.0f} usage limit.",
+    limit = usage_limit_for(user, settings.usage_limit_usd)
+    if await usage_repo.total_cost(pool, user_id) >= limit:
+        message = (
+            DEMO_BUDGET_USED if user.is_demo else f"You've reached your ${limit:,.0f} usage limit."
         )
+        raise ApiException(429, "QUOTA_EXCEEDED", message)

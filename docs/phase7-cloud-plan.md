@@ -52,7 +52,7 @@ So the plan keeps the production architecture (the same containers, the same aut
 - One EC2 machine runs the API, data gateway, both workers, Redis and the demo warehouse database with Docker Compose, using the same images as scale mode.
 - It is **stopped by default**. A stopped machine costs only its disk (about $1.60 per month).
 - When a visitor opens the app while it is asleep, the web app shows "Demo is asleep — Start demo". That calls a small AWS Lambda which starts the machine. It is ready in about 2 minutes.
-- The machine **stops itself after 45 minutes with no requests**. A nightly safety rule also stops it if it is still running, and the wake Lambda refuses to start it beyond 6 hours of running time per day.
+- The machine **stops itself 30 minutes after the last request from anyone**. This is separate from each visitor's own 30-minute allowance (below): with several visitors at once, the machine stays up until the last one leaves. A nightly safety rule also stops it if it is still running, and the wake Lambda refuses to start it beyond 6 hours of running time per day.
 - All features work, including data-file analysis and charts.
 
 **Analysis sandbox on Lambda** (both cloud modes; Docker stays for the laptop)
@@ -65,18 +65,31 @@ So the plan keeps the production architecture (the same containers, the same aut
 - Large data files go through S3 with single-use links that expire. The function's own role has no S3 permissions, and the only S3 location reachable from its subnet is our bucket.
 - It runs hundreds of analyses at once with no servers, costs about $0.0002 per 10-second run, and nothing when idle.
 
-**Demo access without an account**
-- The sign-in page gets a **"Try the demo" button**. One click signs the visitor in as a shared demo user. No username or password is shown or needed.
-- How: a server route on Vercel asks Clerk for a single-use sign-in token for the demo user (valid 60 seconds), and the page signs in with it. The demo account has no password, so there is nothing to leak or change.
-- Your own admin sign-in (username or Google) stays as it is.
-- The demo user is a normal member: no admin console, no user management, no kill switches, no enterprise document changes.
-- Because the account is shared and public:
-  - a banner says "Shared public demo — don't upload private files";
-  - **every time the machine starts, demo data is wiped and re-seeded** with a sample document, a sample CSV and suggested questions, so each session starts clean;
-  - smaller upload limits for the demo user (5 MB per file, 10 files);
-  - a **daily model-spend cap for the demo user** (default $2 per day). When it is reached the app says the demo budget for today is used up. This protects your OpenAI bill, which is real money and not AWS credit;
-  - the existing limits still apply (20 messages per minute, limited answers at once).
-- The button is controlled by a setting and is off by default, so a company deployment never has it.
+**Demo access** (a first version is already built and running locally; Phase 7 adds the per-visitor rules)
+
+Already built (November 2026):
+- A separate public page, **`/demo`**, shows the shared credentials (`demouser1` / `EagleEye-demo-2026`) with Copy and "Fill them in for me". The normal `/sign-in` page is unchanged.
+- `apps/web/src/app/api/demo-login/route.ts` checks the credentials and returns a 60-second single-use Clerk sign-in ticket for the demo user only, so Clerk's new-device email code (Device Trust) is never needed and stays on for real accounts.
+- `users.is_demo` and `users.usage_limit_usd`; the demo account is a normal member (no admin console, no enterprise changes).
+- Demo-only UI: a gold DEMO banner, suggested questions on the empty chat screen (one click fills the message box), the four Trial data files seeded, "Manage account" hidden.
+- One email to the owner per new demo sign-in session (Gmail SMTP; `DEMO_NOTIFY_EMAIL`, `SMTP_USERNAME`, `SMTP_PASSWORD`).
+- `python -m app.demo setup|reset`, plus a daily idle-time reset that restores the password and seed files.
+- A $1 lifetime cap for the whole account. **Phase 7 replaces it** with the rules below.
+
+Phase 7 rules (decided):
+- **A visitor is identified by IP address.** Each IP gets an **allowance of $0.50 of AI answers and 30 minutes of use per 24 hours**, counted from that IP's first demo sign-in.
+- **Time counts while the visitor has the app open.** The countdown sends a heartbeat every minute; signing out or closing the tab pauses it.
+- **Signing back in the same day resumes the remaining time and budget.** A new Clerk session from the same IP attaches to the same allowance.
+- **When the time or the budget runs out**, new questions are refused with "Your demo time (or budget) for today is used up. You can try again after 14:32 tomorrow", the screen shows that message, and the Clerk session is signed out. An answer already in progress finishes. The budget is checked before each answer, so a visitor can overshoot by at most one answer (a few cents).
+- **All visitors together: at most $2 per day** (UTC). When reached: "The demo has reached today's limit. Please try again tomorrow."
+- **Each visitor sees only their own chats and uploads.** Chats, documents and data files the demo account creates are tagged with the allowance; lists and every lookup filter by it. The four seed files are shared and cannot be deleted by visitors. Visitors' data is deleted when their allowance window ends, which replaces the daily wipe (the reset still restores the password).
+- **The banner drops the money figure and shows a countdown** ("18 min left", highlighted in the last 5 minutes).
+- **Where it lives:** the allowance records are in **Supabase** (always on), not in Redis on the demo machine, because the machine is off most of the time. The `/demo` sign-in route and the wake route both check the IP **before** signing in or starting the machine, so a locked-out IP cannot wake it. They use a database role that can only call one function, `demo_gate(ip)`, which returns "allowed" or "available again at ...".
+- **The real IP:** on Vercel, from Vercel's own forwarded-for header; on the API behind CloudFront, from `CloudFront-Viewer-Address`, trusted only for requests that came through CloudFront. A client-sent `X-Forwarded-For` is never trusted. IPv6 addresses are grouped by their /64 prefix (they rotate within it).
+- **Why not AWS for this:** AWS WAF can limit requests per IP over 1-10 minutes but knows nothing about dollars, minutes of use or 24-hour lockouts, and costs about $6-8 a month. The app already knows each answer's cost, the session and the real IP.
+- **Accepted limits of IP identity:** recruiters behind one office network share one allowance; a VPN or phone network gives a new one. The $2 daily total and the OpenAI monthly hard limit bound the cost either way.
+- The existing limits still apply (20 messages per minute, limited answers at once, upload size limits).
+- Everything is controlled by settings and off by default, so a company deployment never has it.
 
 **Scale mode** (the load test and the video)
 - Terraform creates a load balancer and ECS Fargate services for the API, agent worker, ingest worker, data gateway, Redis and demo warehouse.
@@ -178,12 +191,11 @@ Tests are written first for each code change.
    - `infra/sandbox/lambda_handler.py` and a Lambda variant of the sandbox image, wrapping the existing `runner.py`.
    - `SANDBOX_BACKEND` setting; `apps/agent-worker/agent_worker/runtime.py` and `apps/api/app/services/health_checks.py` pick the implementation from it.
    - The existing sandbox test suite (`packages/sandbox/tests/test_container.py`) is run against both implementations, including the escape attempts (network, file writes, time and memory limits).
-3. **Demo access**
-   - Migration: `users.is_demo`.
-   - Web: "Try the demo" button on the sign-in page and `apps/web/src/app/api/demo-login/route.ts`, which creates the single-use Clerk sign-in token. Shown only when `NEXT_PUBLIC_DEMO_LOGIN` is on. The shared-demo banner.
-   - API: demo upload limits and the daily spend cap (`DEMO_DAILY_BUDGET_USD`), checked where the existing usage limit is checked (`apps/api/app/repos/usage.py`, `routers/chats.py`).
-   - `scripts/demo_reset.py`: wipes the demo user's chats, documents (with their vectors and stored files) and data files, then re-seeds the samples. Run on every machine start.
-   - Tests: the demo user cannot reach admin routes; caps are enforced; the route is absent when the setting is off.
+3. **Demo visitor allowances** (builds on the demo account already in place)
+   - Migration: `demo_allowances` (IP key, window start, seconds used, dollars spent), `demo_sessions` (Clerk session id -> allowance, last heartbeat), an allowance column on chats, documents and datasets, and the `demo_gate(ip)` function with a role that may only execute it. Remove the $1 lifetime cap.
+   - API: attach each demo request to its allowance (from the Clerk session id and the CloudFront viewer IP); record each answer's cost against it; refuse new answers when the allowance or the $2 daily total is used up; `GET /v1/demo/visit` (time and budget left; also the heartbeat); filter chats, documents and data files by allowance; block deleting seed files; sign out the Clerk session at expiry; delete expired visitors' data.
+   - Web: `/api/demo-login` calls `demo_gate` first; banner countdown without the money figure; an "allowance used up" screen with the time it becomes available again.
+   - Tests: two visitors at once each get $0.50 and see only their own chats; re-sign-in resumes; time pauses when signed out; the 24-hour lockout and its end; the $2 daily total; a spoofed `X-Forwarded-For` is ignored; IPv6 /64 grouping; an answer in progress at expiry still finishes; seed files can't be deleted.
 4. **Settings and adapters** (`packages/core/eagleeye_core/config.py` and callers)
    - S3: empty endpoint and keys mean "real S3 with the machine's role"; add `AWS_REGION`. The existing guard against local default keys stays.
    - `QDRANT_API_KEY`, passed in `apps/api/app/main.py`, `apps/agent-worker/agent_worker/runtime.py`, `apps/ingest-worker/ingest_worker/pipeline.py`.
@@ -193,7 +205,7 @@ Tests are written first for each code change.
 5. **Logs:** JSON log lines with the request ID, for CloudWatch. This closes the item deferred in C9.
 6. **Wake and sleep**
    - API: record the time of the last request in Redis.
-   - Web: `apps/web/src/app/api/wake/route.ts` (signed-in users only, which includes demo visitors) calls the wake Lambda with a shared secret; an "asleep / starting" screen polls `/v1/health/live`.
+   - Web: `apps/web/src/app/api/wake/route.ts` (signed-in users only, which includes demo visitors) calls the wake Lambda with a shared secret (demo visitors only when their IP passes `demo_gate`); an "asleep / starting" screen polls `/v1/health/live`.
 7. **Load-test switches** (security-sensitive; reviewed with the security-reviewer agent)
    - A stub model behind the existing LLM gateway port, modelled on `packages/agents/tests/fakes.py::FakeLLM`: canned guard verdicts, optional one search step, text streamed at a realistic speed. Stub embeddings too.
    - A second token verifier for synthetic users, signed with a key generated for the test.
@@ -203,7 +215,7 @@ Tests are written first for each code change.
 9. **CI** (`.github/workflows/ci.yml`): ruff, Python unit tests, web lint, type check, vitest and production build, gitleaks.
 10. **Optional, local, a few cents of LLM cost:** run `evals/sql_eval.py` against the SQL golden set and record the accuracy figure, which closes roadmap milestone 3.
 
-**Verify:** `/verify`; build all images; run the demo stack locally from `compose.demo.yml` against the local Supabase and confirm a document question, a database question and a data-file analysis all work (analysis with the Docker sandbox; the Lambda sandbox is first exercised for real in 7B); the demo button signs in and the reset script leaves a clean seeded account; `APP_ENV=local` refuses the load-test switches. Commit `feat: phase 7a cloud-ready containers and CI`. **Stop.**
+**Verify:** `/verify`; build all images; run the demo stack locally from `compose.demo.yml` against the local Supabase and confirm a document question, a database question and a data-file analysis all work (analysis with the Docker sandbox; the Lambda sandbox is first exercised for real in 7B); the `/demo` sign-in works, two simulated visitors from different IPs each get their own allowance and chats, and a used-up IP is refused at sign-in; `APP_ENV=local` refuses the load-test switches. Commit `feat: phase 7a cloud-ready containers and CI`. **Stop.**
 
 ### 7B — Demo environment live
 
@@ -216,8 +228,8 @@ Tests are written first for each code change.
 5. **Keep-alive job:** weekly ping of Supabase and Qdrant.
 
 **Verify (parity checklist, in a browser against the Vercel address):**
-- In a private browser window with no account: "Try the demo" signs in with one click; the asleep screen appears; Start demo brings the app up in about 2 minutes; the machine stops itself 45 minutes after the last request.
-- As the demo user: the seeded samples are there; the admin console is refused; the daily cap message appears when the cap is set to a few cents; after a restart, anything the previous visitor uploaded is gone.
+- In a private browser window with no account: `/demo` signs in; the asleep screen appears; Start demo brings the app up in about 2 minutes; the machine stops itself 30 minutes after the last request.
+- As a demo visitor: the seed files and suggested questions are there; the admin console is refused; the countdown runs and pauses after sign-out; with the allowance set to a few cents, the "used up" screen appears, the session is signed out, and the same IP is refused at `/demo` and cannot wake the machine; a second visitor (another network, e.g. a phone) gets a fresh allowance and doesn't see the first visitor's chats.
 - The Lambda sandbox passes the escape tests in the cloud (no network, no credentials of any use, limits enforced).
 - As admin: sign in; ask a document question with citations; a database question; upload a CSV and get a chart; open the admin console; kill switches work.
 - Streaming works through CloudFront for an answer longer than 60 seconds.
@@ -252,7 +264,7 @@ Commit `feat: phase 7c autoscaling stack and load test`. **Stop.**
 1. **Load-test size.** My recommendation: one ramp to 2,000 (about $13), falling back to 500 if the vCPU quota increase is refused.
 2. **GitHub repo:** private (default in this plan) or public.
 3. **Optional SQL accuracy check** in 7A: include or skip.
-4. **Demo daily spend cap:** $2 per day by default. Also set a monthly hard limit in your OpenAI account as a backstop.
+4. **Demo limits (decided):** $0.50 and 30 minutes per IP per 24 hours, resumable the same day; $2 per day for all visitors together; per-visitor chats; countdown in the banner. Also set a monthly hard limit in your OpenAI account (for example $20) as a backstop.
 
 ## Risks
 
@@ -263,8 +275,9 @@ Commit `feat: phase 7c autoscaling stack and load test`. **Stop.**
 | Free Supabase or Qdrant project suspended or too slow under load | Weekly keep-alive; separate load-test project; temporary Postgres fallback; reindex command |
 | Something is left running and drains the credit | Free plan cannot bill a card; budget alerts; idle stop, nightly stop, 4-hour auto-destroy |
 | Load-test sign-in or stub model enabled outside a test | Startup refuses them unless `APP_ENV=loadtest`; tests; security review; separate database |
-| Anyone with the link can wake the demo and use the model | Running time capped at 6 hours per day and stopped when idle (at most about $0.60 of credit per day); demo model spend capped per day; OpenAI monthly hard limit as a backstop |
-| Visitors see each other's chats and uploads in the shared demo account | Banner; data wiped and re-seeded at every start; small upload limits. Separate accounts per visitor were ruled out because Clerk development mode caps users at 500 |
+| Anyone with the link can wake the demo and use the model | Per-IP allowance ($0.50, 30 minutes per 24 hours) checked before sign-in and before waking the machine; $2 per day for all visitors; machine running time capped at 6 hours per day and stopped when idle; OpenAI monthly hard limit as a backstop |
+| Visitors see each other's chats and uploads in the shared demo account | Chats, documents and data files are tagged with the visitor's allowance and filtered by it; visitors' data is deleted when their window ends; banner. Separate Clerk accounts per visitor were ruled out because Clerk development mode caps users at 500 |
+| IP is a weak identity (shared office networks, VPNs, rotating IPv6) | Accepted for a portfolio demo; IPv6 grouped by /64; the $2 daily total and the OpenAI hard limit bound the cost |
 | The demo sign-in is left on in a real deployment | Off by default; a separate setting on web and API; covered by a test and the security review |
 | Analysis code escapes or leaks data from the Lambda sandbox | No internet route; function role has no permissions; S3 reachable only for our bucket through expiring single-use links; existing code checks still run first; escape tests run in the cloud |
 | CloudFront cuts long answer streams | Read timeout raised; the stream already sends heartbeats and resumes with `Last-Event-ID`; tested in 7B |

@@ -10,8 +10,6 @@ from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import Any
 
-from eagleeye_datasets.names import quote
-
 from eagleeye_charts.aggregate import (
     Resolved,
     grouped,
@@ -21,11 +19,11 @@ from eagleeye_charts.aggregate import (
     numeric_text_columns,
     open_table,
     resolve,
-    scatter_points,
 )
 from eagleeye_charts.bars import build_bar
 from eagleeye_charts.downsample import lttb
 from eagleeye_charts.intent import MAX_POINTS, Chart, ChartError, ChartIntent
+from eagleeye_charts.scatter import build_scatter
 from eagleeye_charts.spec import (
     MAX_EVIDENCE_VALUES,
     OTHER,
@@ -42,7 +40,6 @@ from eagleeye_charts.spec import (
 __all__ = ["OTHER", "assert_safe", "build_chart"]
 
 POINT_MARK_MAX = 60
-SCATTER_MAX_SERIES = 3  # every colour pair meets in a scatter; only 3 slots stay distinct
 
 
 def _xnum(value: Any) -> float:
@@ -100,37 +97,6 @@ def _series(rows: list[Row], r: Resolved, intent: ChartIntent) -> Chart:
     return Chart(make_spec(intent, summary, data, mark, enc, 280), summary, values, tuple(notes))
 
 
-def _scatter(con: Any, r: Resolved, intent: ChartIntent) -> Chart:
-    points, total = scatter_points(con, r)
-    if not points:
-        raise ChartError("No rows have both x and y values.")
-    notes: list[str] = []
-    use_color = bool(r.color) and len({p[2] for p in points}) <= SCATTER_MAX_SERIES
-    if r.color and not use_color:
-        notes.append(f"'{r.color}' has too many values to colour by; points are shown plain.")
-    if total > len(points):
-        notes.append(f"Showing a random sample of {len(points):,} of {total:,} points.")
-    x, y = f"{quote(r.x)}::DOUBLE", f"{quote(r.y or '')}::DOUBLE"
-    corr = con.execute(f"SELECT CORR({x}, {y}) FROM t").fetchone()[0]  # noqa: S608
-    data = [{"x": a, "y": b, "series": s if use_color else None} for a, b, s in points]
-    enc: dict[str, Any] = {
-        "x": {"field": "x", "type": "quantitative", "title": r.x, "scale": {"zero": False}},
-        "y": {"field": "y", "type": "quantitative", "title": r.y, "scale": {"zero": False}},
-    }
-    if use_color:
-        enc["color"] = {"field": "series", "type": "nominal", "title": r.color}
-    mark = {"type": "point", "tooltip": True, "filled": True, "opacity": 0.6, "size": 60}
-    summary = f"{r.y} against {r.x}: {total:,} points."
-    values: list[float] = [float(total)]
-    if corr is not None:
-        summary += f" Pearson correlation r = {corr:.2f}."
-        values.append(round(corr, 2))
-    summary = " ".join([summary, *notes])
-    return Chart(
-        make_spec(intent, summary, data, mark, enc, 320), summary, tuple(values), tuple(notes)
-    )
-
-
 def _histogram(con: Any, r: Resolved, intent: ChartIntent) -> Chart:
     bins = histogram(con, r)
     data = [{"x": a, "x2": b, "y": n} for a, b, n in bins]
@@ -159,7 +125,7 @@ def build_chart(parquet: bytes, columns: list[dict[str, str]], intent: ChartInte
         if intent.type == "histogram":
             return _histogram(con, r, intent)
         if intent.type == "scatter":
-            return _scatter(con, r, intent)
+            return build_scatter(con, r, intent)
         rows = grouped(con, r)
         if not rows:
             raise ChartError("There is no data to plot for these columns.")

@@ -110,6 +110,22 @@ class Settings(BaseSettings):
     )
     clerk_issuer: str = ""  # optional pin, e.g. https://xxx.clerk.accounts.dev
 
+    # Shared public demo account (users.is_demo). Its credentials are public on purpose;
+    # the account is a normal member with its own spend cap, reset every day.
+    demo_username: str = "demouser1"
+    demo_password: str = ""  # set to enable `python -m app.demo setup`; shown on the sign-in page
+    demo_email: str = "demouser1+clerk_test@example.com"
+    demo_usage_limit_usd: float = 1.0  # lifetime LLM spend cap for the demo account
+    demo_files_dir: str = "Trial/data/data-files"  # seeded into the account on setup/reset
+    demo_reset_hours: float = 24.0  # 0 = never reset automatically
+    # one email per new demo sign-in session (empty = no notifications)
+    demo_notify_email: str = ""
+    demo_notify_max_per_hour: int = 20  # flood guard if someone scripts sign-ins
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 465  # implicit TLS
+    smtp_username: str = ""  # e.g. your Gmail address
+    smtp_password: str = ""  # a Google app password, never your account password
+
     @model_validator(mode="after")
     def _no_local_secrets_when_deployed(self) -> "Settings":
         if self.app_env != "local" and (

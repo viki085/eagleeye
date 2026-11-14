@@ -74,6 +74,8 @@ export interface Me {
   role: string;
   /** May add/delete enterprise documents (the API enforces this regardless of the UI). */
   can_manage_enterprise: boolean;
+  /** The shared public demo account: demo banner, suggested questions, no account settings. */
+  is_demo?: boolean;
 }
 
 export interface ArtifactColumn {
