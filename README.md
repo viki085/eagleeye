@@ -87,6 +87,26 @@ documents (they stay searchable throughout), with the ingest worker running:
 uv run --package eagleeye-ingest-worker python -m ingest_worker.reindex --all   # or --document <id>, --dry-run
 ```
 
+### Demo data: Grand Line Shipping Company
+
+The app runs on data for **Grand Line Shipping Company**, a fictional container shipping line
+(Jan 2024 – Oct 2026). Its database, documents and data files are generated so they agree with
+each other, alongside real public material (daily Brent prices, US federal shipping and customs
+rules; see `data/public/SOURCES.md`). Details: `docs/phase7-enterprise-data-plan.md`.
+
+```bash
+# warehouse: about 12.6M rows, ~6 min (scripts/start --onboard does this on first run)
+uv run --no-project --with numpy==2.1.3 --with pandas==2.2.3 --with faker==33.1.0 --with asyncpg==0.30.0 python infra/warehouse/generate.py
+# document library (~400 files; about USD 0.15 of LLM use once, cached afterwards)
+uv run --package eagleeye-ingest-worker python data/grandline/make_docs.py
+# data files for the analysis feature (upload them from the Data files panel)
+uv run --package eagleeye-datasets --with pandas==2.2.3 --with numpy==2.1.3 python data/grandline/make_files.py
+# load the documents into the app as enterprise documents (ingest worker running)
+uv run --package eagleeye-api python data/grandline/load_docs.py
+```
+
+Generated output lives in `data/grandline/out/` (not committed).
+
 ## Tests
 
 ```bash

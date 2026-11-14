@@ -62,7 +62,10 @@ tables:
   network.ports:
     enabled: true
     sensitivity: public
-    description: Real container ports identified by UN/LOCODE, with region and coordinates.
+    description: >-
+      Port master data: real container ports identified by UN/LOCODE, with region and
+      coordinates. It includes ports Grand Line does not currently call at; the ports on its
+      services are in network.service_rotations.
     columns:
       port_code: UN/LOCODE, e.g. 'NLRTM' (Rotterdam), 'CNSHA' (Shanghai), 'SGSIN' (Singapore), 'USLAX' (Los Angeles).
       name: Port name.
@@ -77,7 +80,8 @@ tables:
     sensitivity: internal
     description: >-
       Container ships operated by Grand Line, owned or chartered. Vessels with in_fleet_to set
-      left the fleet on that date (for example extra ships chartered during the Red Sea diversion).
+      left the fleet on that date (for example extra ships chartered during the Red Sea diversion);
+      the current fleet is in_fleet_to IS NULL.
     columns:
       vessel_id: Vessel identifier.
       imo_number: IMO ship identification number.
@@ -132,9 +136,11 @@ tables:
     enabled: true
     sensitivity: internal
     description: >-
-      Each port a voyage calls at, with scheduled and actual times. A call is on time when
-      actual_arrival is no more than 24 hours after scheduled_arrival. Actual times are null for
-      calls that have not happened yet. container_moves = containers loaded plus discharged.
+      Each port a voyage calls at, with scheduled and actual times. Schedule reliability (on-time
+      rate) counts arrivals only: exclude seq = 1 (the departure port) and calls with no
+      actual_arrival; a call is on time when actual_arrival is no more than 24 hours after
+      scheduled_arrival; assign calls to a period by scheduled_arrival. container_moves =
+      containers loaded plus discharged.
     columns:
       seq: Position of the call in the voyage (1 = departure port).
       scheduled_arrival: Planned arrival time (UTC).
@@ -174,7 +180,7 @@ tables:
 
   commercial.rate_cards:
     enabled: true
-    sensitivity: confidential
+    sensitivity: internal
     description: Contracted base ocean freight rate per container, by contract, port pair and container type.
     columns:
       container_type: "'20DV', '40DV', '40HC' (40ft high cube) or '40RF' (40ft reefer)."
@@ -184,9 +190,11 @@ tables:
     enabled: true
     sensitivity: internal
     description: >-
-      One row per booking (a customer's shipment on one voyage). Revenue questions should
-      exclude status = 'cancelled'. freight_revenue_usd is ocean freight only; surcharges are on
-      finance.invoice_lines. teu = container_count converted to TEU (40ft = 2 TEU).
+      One row per booking (a customer's shipment on one voyage). Volume and revenue questions
+      exclude status = 'cancelled'. Assign bookings to a period (month, quarter, year) by
+      cargo_ready_date - the reporting date used in all Grand Line reports - unless the question
+      asks when bookings were made (booking_date). freight_revenue_usd is ocean freight only;
+      surcharges are on finance.invoice_lines. teu = container_count converted to TEU (40ft = 2 TEU).
     columns:
       booking_number: Booking number, e.g. 'GLS250012345'.
       contract_id: Contract the booking was priced under (null = spot booking).
@@ -240,7 +248,7 @@ tables:
 
   finance.invoices:
     enabled: true
-    sensitivity: confidential
+    sensitivity: internal
     description: One invoice per shipped booking. amount_usd is the sum of its invoice lines.
     columns:
       invoice_number: Invoice number, e.g. 'GLI-2025-0001234'.
@@ -250,7 +258,7 @@ tables:
 
   finance.invoice_lines:
     enabled: true
-    sensitivity: confidential
+    sensitivity: internal
     description: Charges on each invoice.
     columns:
       charge_code: "OFR ocean freight, BAF bunker adjustment, THC terminal handling, DOC documentation, PSS peak season surcharge, CTG contingency (Red Sea) surcharge, ETS EU emissions surcharge, DGS dangerous goods surcharge, DND demurrage and detention."
@@ -258,7 +266,7 @@ tables:
 
   finance.bunker_purchases:
     enabled: true
-    sensitivity: confidential
+    sensitivity: internal
     description: Ship fuel (bunker) purchases.
     columns:
       fuel_grade: "'VLSFO', 'HSFO' or 'LNG'."
@@ -267,7 +275,7 @@ tables:
 
   finance.claims:
     enabled: true
-    sensitivity: confidential
+    sensitivity: internal
     description: Customer cargo claims and their settlement.
     columns:
       claim_type: "'Cargo damage', 'Shortage', 'Delay', 'Contamination', 'Theft', 'Reefer temperature deviation'."

@@ -17,6 +17,7 @@ import statistics
 import sys
 import time
 from collections import Counter
+from decimal import Decimal
 from typing import Any
 
 import asyncpg
@@ -53,7 +54,7 @@ class NullStore:
 def norm(value: Any) -> Any:
     if isinstance(value, bool) or value is None:
         return value
-    if isinstance(value, int | float):
+    if isinstance(value, int | float | Decimal):
         return round(float(value), 2)
     text = str(value)
     if len(text) >= 10 and text[4] == "-" and text[7] == "-":
@@ -86,6 +87,7 @@ async def evaluate_case(ctx_factory, wh: asyncpg.Pool, case: dict) -> dict:  # n
     secs = time.perf_counter() - started
     rows = [tuple(r) for r in outcome.llm_preview]
     cols = [c["name"].lower() for c in outcome.artifact.columns] if outcome.artifact else []
+    reference: list[tuple] = []
     if case.get("refuse"):
         leaked = any(f in c for c in cols for f in case.get("forbidden", []))
         ok = outcome.artifact is None or (not leaked and bool(case.get("forbidden")))
@@ -100,6 +102,9 @@ async def evaluate_case(ctx_factory, wh: asyncpg.Pool, case: dict) -> dict:  # n
         "secs": secs,
         "cost": ctx.usage.cost_usd,
         "cols": cols,
+        "sql": outcome.artifact.sql if outcome.artifact else "",
+        "got": rows[:3],
+        "want": reference[:3],
     }
 
 
@@ -165,6 +170,10 @@ def report(model: str, results: list[dict]) -> None:
             print(
                 f"    FAIL {r['id']} status={r['status']} attempts={r['attempts']} cols={r['cols']}"
             )
+            if r["sql"]:
+                print(f"         sql : {' '.join(r['sql'].split())}")
+                print(f"         got : {r['got']}")
+                print(f"         want: {r['want']}")
 
 
 async def main(models: list[str]) -> None:

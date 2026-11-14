@@ -1,10 +1,10 @@
 """Analysis golden-set eval: numeric accuracy of the real analysis sub-agent (C6 §8).
 
 Run from the repo root with Docker and the sandbox image available (costs a few cents):
-  uv run --package eagleeye-agent-worker python evals/analysis_eval.py [model ...]
+  uv run --package eagleeye-agent-worker --with scipy python evals/analysis_eval.py [model ...]
 
-Inputs are the fixtures in evals/fixtures (converted and profiled exactly like uploads) plus
-a deterministic synthetic orders table. Expected numbers are computed here with pandas/scipy
+Inputs are the Grand Line data files from data/grandline/make_files.py, converted and profiled
+exactly like uploads. Expected numbers are computed here with pandas/scipy
 from the same data; a case passes when every expected number appears in the agent's result
 tables or stats (relative tolerance 0.5 %, absolute 0.005 for small values). Cases marked
 `expect_status` pass when the agent declines with that status.
@@ -20,9 +20,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-import numpy as np
 import pandas as pd
-import pyarrow as pa
 import pyarrow.parquet as pq
 from eagleeye_agents.analysis.agent import run_analysis_agent
 from eagleeye_agents.analysis.types import LoadedInput
@@ -39,7 +37,7 @@ from eagleeye_sandbox.docker_executor import DockerExecutor
 from scipy import stats
 
 HERE = pathlib.Path(__file__).parent
-FIXTURES = HERE / "fixtures"
+FILES = HERE.parent / "data" / "grandline" / "out" / "files"  # data/grandline/make_files.py
 GOLDEN = HERE / "analysis_golden.jsonl"
 CONCURRENCY = 3
 REL_TOL, ABS_TOL = 0.005, 0.005
@@ -58,22 +56,6 @@ class NullStore:
         return None
 
 
-def orders_parquet() -> bytes:
-    rng = np.random.default_rng(7)
-    web = rng.gamma(4.0, 400.0, 240)
-    store = rng.gamma(4.0, 450.0, 160)
-    frame = pd.DataFrame(
-        {
-            "order_id": np.arange(1, 401),
-            "channel": ["web"] * 240 + ["store"] * 160,
-            "order_value": np.round(np.concatenate([web, store]), 2),
-        }
-    )
-    buf = io.BytesIO()
-    pq.write_table(pa.Table.from_pandas(frame, preserve_index=False), buf)
-    return buf.getvalue()
-
-
 def loaded(name: str, parquet: bytes, column_map: dict[str, str] | None = None) -> LoadedInput:
     profile = profile_parquet(parquet, column_map)
     columns = tuple({"name": c["name"], "type": c["type"]} for c in profile["columns"])
@@ -82,16 +64,21 @@ def loaded(name: str, parquet: bytes, column_map: dict[str, str] | None = None) 
 
 
 def build_inputs() -> dict[str, LoadedInput]:
-    targets = convert_csv((FIXTURES / "targets.csv").read_bytes())
-    revenue = convert_csv((FIXTURES / "monthly_revenue.csv").read_bytes())
-    sheets = {s.sheet: s for s in convert_xlsx((FIXTURES / "regional_plan.xlsx").read_bytes())}
-    return {
-        "targets": loaded("targets", targets.parquet, targets.column_map),
-        "revenue": loaded("revenue", revenue.parquet, revenue.column_map),
-        "region_targets": loaded("region_targets", sheets["Region targets"].parquet),
-        "headcount": loaded("headcount", sheets["Headcount"].parquet),
-        "orders": loaded("orders", orders_parquet()),
+    out: dict[str, LoadedInput] = {}
+    for name, file in (
+        ("survey", "customer_survey_2026.csv"),
+        ("fuel", "vessel_fuel_and_emissions.csv"),
+        ("utilisation", "voyage_utilisation_by_week.csv"),
+        ("brent", "brent_crude_daily.csv"),
+        ("congestion", "port_congestion_weekly.csv"),
+    ):
+        c = convert_csv((FILES / file).read_bytes())
+        out[name] = loaded(name, c.parquet, c.column_map)
+    sheets = {
+        x.sheet: x for x in convert_xlsx((FILES / "demand_forecast_2027_by_lane.xlsx").read_bytes())
     }
+    out["forecast"] = loaded("forecast", sheets["Forecast"].parquet)
+    return out
 
 
 def frame(item: LoadedInput) -> pd.DataFrame:
@@ -99,40 +86,37 @@ def frame(item: LoadedInput) -> pd.DataFrame:
 
 
 def references(inputs: dict[str, LoadedInput]) -> dict[str, Callable[[], list[float]]]:
-    t, r = frame(inputs["targets"]), frame(inputs["revenue"])
-    t["key"] = t["month"].str[:7]
-    r["key"] = pd.to_datetime(r["month"]).dt.strftime("%Y-%m")
-    j = r.merge(t, on="key")
-    j["gap"] = j["net_revenue"] - j["target_eur"]
-    reg, hc, o = (
-        frame(inputs["region_targets"]),
-        frame(inputs["headcount"]),
-        frame(inputs["orders"]),
-    )
-    per_rep = reg["c_2026_target_eur"] / reg["sales_reps"]
-    hc["net"] = hc["hires"] - hc["leavers"]
-    web, store = o[o.channel == "web"].order_value, o[o.channel == "store"].order_value
-    below = j[j.gap < 0]
-    worst = j.loc[j.gap.idxmin()]
-    hires_by_q = hc.groupby("quarter").hires.sum()
+    sv, fu, ut = frame(inputs["survey"]), frame(inputs["fuel"]), frame(inputs["utilisation"])
+    br, cg = frame(inputs["brent"]), frame(inputs["congestion"])
+    fc = frame(inputs["forecast"])
+    fa, ft = fc[fc.trade_lane == "AEU"], fc[fc.trade_lane == "TPW"]
+    ltr = sv["likelihood_to_recommend_0_10"]
+    fu_year = pd.to_datetime(fu["departure_date"]).dt.year
+    ut_year = pd.to_datetime(ut["week_start"]).dt.year
+    br_year = pd.to_datetime(br["date"]).dt.year
+    ut26 = ut[ut_year == 2026].groupby("service_code").utilisation.mean()
+    strategic = ltr[sv.segment == "strategic"]
+    sme = ltr[sv.segment == "sme"]
     return {
-        "avg_target": lambda: [t.target_eur.mean()],
-        "h1_target": lambda: [t[t.key <= "2026-06"].target_eur.sum()],
-        "below_target": lambda: [*below.gap.tolist(), float(len(below))][:4],
-        "total_gap": lambda: [j.gap.sum()],
-        "largest_shortfall": lambda: [abs(worst.gap)],
-        "october_ratio": lambda: [
-            float(j[j.key == "2026-10"].eval("net_revenue / target_eur").iloc[0])
-        ],
-        "unmatched_months": lambda: [float(len(set(t.key) - set(r.key)))],
-        "target_per_rep": lambda: [per_rep.max()],
-        "target_rep_corr": lambda: [reg["c_2026_target_eur"].corr(reg["sales_reps"])],
-        "net_hires": lambda: hc.groupby("region").net.sum().astype(float).tolist(),
-        "top_quarter": lambda: [float(hires_by_q.max())],
-        "welch_p": lambda: [float(stats.ttest_ind(web, store, equal_var=False).pvalue)],
-        "median_by_channel": lambda: [web.median(), store.median()],
-        "share_above_2000": lambda: [float((o.order_value > 2000).mean())],
-        "revenue_slope": lambda: [float(np.polyfit(np.arange(1, len(r) + 1), r.net_revenue, 1)[0])],
+        "avg_ltr": lambda: [ltr.mean()],
+        "nps": lambda: [float(((ltr >= 9).mean() - (ltr <= 6).mean()) * 100)],
+        "ltr_by_segment": lambda: (
+            sv.groupby("segment").likelihood_to_recommend_0_10.mean().tolist()
+        ),
+        "comment_share": lambda: [float((sv["comment"].fillna("").str.len() > 0).mean())],
+        "ltr_welch": lambda: [float(stats.ttest_ind(strategic, sme, equal_var=False).pvalue)],
+        "fuel_2025": lambda: [fu[fu_year == 2025].fuel_consumed_mt.sum()],
+        "intensity_by_fuel": lambda: fu.groupby("fuel_type").co2_grams_per_teu_km.mean().tolist(),
+        "distance_by_routing": lambda: fu.groupby("routing").distance_nm.mean().tolist(),
+        "speed_intensity_corr": lambda: [fu["avg_speed_knots"].corr(fu["co2_grams_per_teu_km"])],
+        "util_by_direction": lambda: ut.groupby("direction").utilisation.mean().tolist(),
+        "top_service_2026": lambda: [float(ut26.max())],
+        "aeu_base_2027": lambda: [fa.base_teu.sum()],
+        "tpw_range": lambda: [float((ft.high_teu - ft.low_teu).sum())],
+        "two_lanes_base": lambda: [float(fa.base_teu.sum() + ft.base_teu.sum())],
+        "brent_avg_2025": lambda: [br[br_year == 2025].brent_usd_per_barrel.mean()],
+        "brent_max_2024": lambda: [br[br_year == 2024].brent_usd_per_barrel.max()],
+        "worst_port_delay": lambda: [float(cg.groupby("port").avg_delay_hours.mean().max())],
     }
 
 

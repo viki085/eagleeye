@@ -1,4 +1,4 @@
-"""Retrieval eval: compares chunking configurations on the fixture corpus (C4, ADR-32).
+"""Retrieval eval: compares chunking configurations on the Grand Line corpus (C4, ADR-32).
 
   uv run --package eagleeye-ingest-worker python evals/retrieval_eval.py            # dev split
   uv run --package eagleeye-ingest-worker python evals/retrieval_eval.py --split test --configs C
@@ -13,7 +13,7 @@ Metrics, per configuration (overall and per document kind):
                  win just by containing more text.
   recall@5       gold span in any of the top 5 chunks (as hydrated: truncated like production)
   mrr            1 / rank of the first chunk containing the span (0 beyond the top 20)
-Embeddings cost about $0.01 per configuration.
+Embeddings cost about $0.10 per configuration (about 400 documents).
 """
 
 import argparse
@@ -43,8 +43,14 @@ from ingest_worker.pipeline import embedding_text
 from ingest_worker.sniff import sniff
 
 ROOT = Path(__file__).parent
-DOCS_DIR = ROOT / "fixtures" / "retrieval_docs"
-GOLDEN = ROOT / "retrieval_golden.jsonl"
+CORPUS = ROOT.parent / "data" / "grandline" / "out"  # built by data/grandline/make_docs.py
+GOLDEN = ROOT / "retrieval_golden.jsonl"  # built by evals/build_retrieval_golden.py
+
+
+def corpus() -> list[tuple[Path, str, str]]:
+    """(file, slug, title) for every document in the Grand Line library."""
+    manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
+    return [(CORPUS / d["path"], d["slug"], d["title"]) for d in manifest]
 CONTEXT_BUDGET = 6000
 TOP_N = 20
 SEPARATOR = " ¦ "  # between chunks, so a span can't match across a chunk boundary
@@ -123,7 +129,7 @@ async def ingest(pool: asyncpg.Pool, embedder: CachingEmbedder, cfg: Config, use
     sizes: list[int] = []
     per_doc: dict[str, int] = {}
     async with pool.acquire() as conn:
-        for path in sorted(DOCS_DIR.iterdir()):
+        for path, slug, title in corpus():
             chunks = chunk(
                 parse(path, cfg).elements,
                 max_chars=cfg.max_chars,
@@ -131,7 +137,6 @@ async def ingest(pool: asyncpg.Pool, embedder: CachingEmbedder, cfg: Config, use
                 min_chars=cfg.min_chars,
                 overlap=cfg.overlap,
             )
-            title = path.stem.replace("_", " ").title()
             vectors = await embedder.embed([embedding_text(title, c) for c in chunks])
             doc = await conn.fetchrow(
                 """
@@ -151,7 +156,7 @@ async def ingest(pool: asyncpg.Pool, embedder: CachingEmbedder, cfg: Config, use
             async with conn.transaction():
                 await repo.replace_chunks(conn, doc, chunks, vectors)
             sizes += [len(c.content) for c in chunks]
-            per_doc[path.stem] = len(chunks)
+            per_doc[slug] = len(chunks)
     return {
         "chunks": sum(per_doc.values()),
         "avg_chars": round(statistics.mean(sizes)),

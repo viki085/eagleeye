@@ -134,6 +134,59 @@ The AWS estimate in the Phase 7 plan rises by under $1.
 
 **Verify:** full test suite passes with no reference to Acme outside `legacy/`; the new evals are reported (SQL execution accuracy, retrieval budget recall, analysis pass rate); `scripts/start` works locally.
 
+## As built (2026-11-14)
+
+What changed from the proposal above, and the measured results.
+
+**Warehouse** (`infra/warehouse/generate.py`, about 6 minutes to generate and load):
+- **Network:** 62 vessels on 8 weekly services and 74 real ports (the proposal said about 120 vessels, 38 services and 220 ports). The smaller network keeps ship capacity consistent with the cargo carried: headhaul utilisation is 0.67–0.83 and backhaul 0.29–0.59 by service.
+- **Volume:** 900,895 bookings carrying 4.23 million container trips (about 2.4 million TEU a year).
+- **Finance:** 838,792 invoices with 4.13 million charge lines, and 8,932 claims.
+- **Operations:** 1,440 delay incidents and 2.0 million tracking events (the last 90 days only).
+- **Total:** about 12.6 million rows, 2.25 GB.
+- **Schedule reliability:** 56% in 2024, 70% in 2025 and 79% in 2026. Asia - North Europe was 31% in 2024 during the Red Sea diversion.
+- **Largest customer:** about 2% of 2025 volume.
+
+**Documents** (`data/grandline/make_docs.py`):
+- **Library:** 407 documents and 8.3 MB in total.
+  - 29 policies
+  - 124 incident reports, 4 of them executive reviews
+  - 80 customer service agreements
+  - 30 supplier agreements
+  - 34 monthly reports
+  - 11 quarterly reviews and 12 board decks
+  - 15 meeting minutes
+  - 15 training modules and 12 IT runbooks
+  - 37 port profiles
+  - 8 real US federal documents
+- **Formats:** 240 PDF, 23 slide PDF, 87 DOCX, 52 Markdown and 5 text files.
+- **Writing:** 260 LLM-written documents cost USD 0.15 in total. Every required figure appeared in the text; no document needed its facts appended. Contracts and supplier agreements come from templates filled with warehouse rows.
+- **Ingested locally:** about 4,500 passages. The Supabase database grew to about 80 MB of the 500 MB free limit.
+- **EU documents:** EUR-Lex blocks automated downloads, so EU regulations are named in Grand Line's policies but not included as files. The 8 public documents are US federal works (public domain).
+
+**Data files** (`data/grandline/make_files.py`):
+- **Files:** 8 data files, each under the 25 MB upload limit.
+  - Real public data: the daily Brent crude price.
+  - Bookings, survey and planning: a Q3 2026 bookings extract, a 2026 customer survey, and a 2027 demand forecast with all lanes on one sheet.
+  - Fleet and ports: weekly voyage utilisation, weekly port congestion, and vessel fuel and emissions.
+  - Suppliers: subcontractor scorecards.
+- **Forecast layout:** the forecast uses a single sheet because uploads keep at most 5 sheets per workbook.
+
+**Evaluations** (gpt-6-luna):
+
+| Set | Result | Cost per run |
+|---|---|---|
+| SQL (`evals/sql_golden.jsonl`, 52 questions + 5 refusals) | 94% execution accuracy (49/52); refusals 5/5 | USD 0.02 |
+| Data-file analysis (`evals/analysis_golden.jsonl`, 17 + 1 decline) | 17/17; decline 1/1 | under USD 0.01 |
+| Retrieval (`evals/retrieval_golden.jsonl`, 97 questions; production chunking, config C) | budget recall 0.845, recall@5 0.784, MRR 0.618 | about USD 0.10 |
+
+- **Retrieval by document type (budget recall):** meeting minutes 1.00, monthly reports 0.93, board decks 0.90, port profiles 0.90, policies 0.86, contracts 0.80, incident reports 0.67. The 124 incident reports share one template and similar wording, so the right one is harder to rank first. This is a candidate for metadata filters (incident number, port, vessel) in a later phase. The result is close to the old 10-document toy corpus (0.86), on a corpus 40 times larger.
+- **First SQL pass:** 73%. Most misses came from the catalog not saying which date assigns a booking to a period, or that the on-time rate excludes the departure port. The catalog now states both, as a data team would document them. Six questions were made explicit about cancelled bookings, and the eval now treats Postgres `Decimal` values as numbers.
+
+**Local clean-up:**
+- **Removed:** the Acme warehouse source, the two Acme documents and the three Acme data files were removed from the local app.
+- **Kept:** your own uploads ("Section 14 Security and Governance Foundations", "Product Case Interview Cheat Sheet", iris, pokeman).
+
 ## Risks
 
 | Risk | Mitigation |

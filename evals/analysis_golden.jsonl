@@ -1,0 +1,18 @@
+{"id": "a01", "question": "What is the average likelihood-to-recommend score (0 to 10) across all survey responses?", "inputs": ["survey"], "ref": "avg_ltr"}
+{"id": "a02", "question": "Calculate the Net Promoter Score: percentage of promoters (9-10) minus percentage of detractors (0-6).", "inputs": ["survey"], "ref": "nps"}
+{"id": "a03", "question": "What is the average likelihood-to-recommend score per customer segment?", "inputs": ["survey"], "ref": "ltr_by_segment"}
+{"id": "a04", "question": "What share of survey responses include a written comment?", "inputs": ["survey"], "ref": "comment_share"}
+{"id": "a05", "question": "Is the difference in likelihood-to-recommend between strategic and sme customers statistically significant? Use Welch's t-test and report the p-value.", "inputs": ["survey"], "ref": "ltr_welch"}
+{"id": "a06", "question": "How much fuel in tonnes was consumed by voyages departing in 2025?", "inputs": ["fuel"], "ref": "fuel_2025"}
+{"id": "a07", "question": "What is the average carbon intensity (grams of CO2 per TEU-km) for each fuel type?", "inputs": ["fuel"], "ref": "intensity_by_fuel"}
+{"id": "a08", "question": "Compare the average voyage distance for standard routing and for routing via the Cape of Good Hope.", "inputs": ["fuel"], "ref": "distance_by_routing"}
+{"id": "a09", "question": "What is the Pearson correlation between average speed and carbon intensity per TEU-km?", "inputs": ["fuel"], "ref": "speed_intensity_corr"}
+{"id": "a10", "question": "What is the average vessel utilisation for headhaul and for backhaul voyages?", "inputs": ["utilisation"], "ref": "util_by_direction"}
+{"id": "a11", "question": "Which service had the highest average utilisation in 2026, and what was it?", "inputs": ["utilisation"], "ref": "top_service_2026"}
+{"id": "a12", "question": "What is the total base-case TEU forecast for Asia - North Europe (AEU) in 2027?", "inputs": ["forecast"], "ref": "aeu_base_2027"}
+{"id": "a13", "question": "For the Transpacific (TPW) forecast, what is the total difference between the high and low case over 2027?", "inputs": ["forecast"], "ref": "tpw_range"}
+{"id": "a14", "question": "What is the combined 2027 base-case TEU forecast for Asia - North Europe (AEU) and Transpacific (TPW)?", "inputs": ["forecast"], "ref": "two_lanes_base"}
+{"id": "a15", "question": "What was the average Brent crude price in 2025?", "inputs": ["brent"], "ref": "brent_avg_2025"}
+{"id": "a16", "question": "What was the highest Brent crude price in 2024?", "inputs": ["brent"], "ref": "brent_max_2024"}
+{"id": "a17", "question": "Which port had the highest average delay hours across all weeks, and what was that average?", "inputs": ["congestion"], "ref": "worst_port_delay"}
+{"id": "u01", "question": "What is the customer churn rate per region?", "inputs": ["survey"], "expect_status": "no_access"}
