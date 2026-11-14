@@ -251,3 +251,44 @@ async def test_no_title_after_first_turn(db: DB) -> None:
     llm = FakeLLM([guard_json(intent="chitchat")], [Turn("ok")])
     await runner.execute_run(_deps(llm, FakeRedis()), "r1", lambda rid: sink)
     assert db.titles == [] and "chat.updated" not in sink.names()
+
+
+@pytest.mark.parametrize(
+    ("is_demo", "python_on", "has_executor", "expected"),
+    [
+        (False, True, True, True),  # company user: notebook mode
+        (True, True, True, False),  # the shared demo account keeps the light version
+        (False, False, True, False),  # Python analysis switched off
+        (False, True, False, False),  # notebook mode disabled in settings (no executor)
+    ],
+)
+async def test_notebook_mode_is_for_company_users_only(
+    monkeypatch: pytest.MonkeyPatch,
+    is_demo: bool,
+    python_on: bool,
+    has_executor: bool,
+    expected: bool,
+) -> None:
+    async def demo(pool, user_id):  # noqa: ANN001, ANN202
+        return is_demo
+
+    monkeypatch.setattr(persistence, "is_demo_user", demo)
+    deps = runner.RunnerDeps(
+        pool=None,
+        redis=SwitchRedis(set()),
+        llm=FakeLLM(),
+        retriever=FakeRetriever(),  # type: ignore[arg-type]
+        settings=AgentSettings(notebook_max_seconds=300.0),
+        prompts=load_prompts(),
+        model_ids={},
+        workspace=object(),
+        executor=UpExecutor(),
+        notebook_executor=UpExecutor() if has_executor else None,
+        python_analysis=python_on,
+    )
+    ctx = runner._build_context(deps, RUN, FakeSink())
+    await runner._enable_analysis(deps, ctx)
+    assert ctx.analysis_available is True
+    assert ctx.notebook_available is expected
+    assert (ctx.notebook_executor is not None) is expected
+    assert ctx.budget._limits.max_seconds == (300.0 if expected else 240.0)  # noqa: SLF001

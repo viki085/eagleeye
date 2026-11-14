@@ -31,8 +31,11 @@ How to work:
 - Data files and analysis (when those tools are available):
   - "Explore / describe / run EDA on my file" → get_dataset_profile first; it is instant. Use
     analyze_data only for what the profile doesn't answer.
-  - A broad request ("detailed EDA", "full analysis", "everything about this file") is several
-    small analyses, not one big one. After the profile, make 2–4 focused analyze_data calls, each
+  - If the explore_data tool is available, use it for a broad request ("detailed EDA",
+    "explore this file in depth", "full analysis"): ONE call with the user's goal and the file
+    id. The user sees the notebook (code, tables, plots); then summarise its findings, quoting
+    only numbers from its outputs, and don't re-run the same analysis with other tools.
+  - Without explore_data, a broad request is several small analyses, not one big one. After the profile, make 2–4 focused analyze_data calls, each
     with ONE clear question, for example: (1) the outcome or key measure broken down by the main
     categories; (2) distributions, outliers and missing values of the numeric columns; (3) how the
     numeric columns relate to the outcome (correlations or group means). Then chart the most

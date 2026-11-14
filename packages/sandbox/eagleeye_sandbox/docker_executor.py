@@ -16,11 +16,11 @@ import time
 import uuid
 from pathlib import Path
 
-from eagleeye_sandbox.types import ResultTable, SandboxResult, SandboxTask
+from eagleeye_sandbox.result_io import parse_result, task_spec
+from eagleeye_sandbox.types import SandboxResult, SandboxTask
 
 logger = logging.getLogger(__name__)
 
-MAX_OUTPUT_BYTES = 20 * 1024 * 1024
 KILL_GRACE_S = 10
 OOM_EXIT_CODE = 137
 START_FAILURE = "The analysis sandbox could not run this task."
@@ -106,13 +106,7 @@ class DockerExecutor:
             for item in task.inputs:
                 (in_dir / f"{item.name}.parquet").write_bytes(item.parquet)
                 inputs.append({"name": item.name, "file": f"{item.name}.parquet"})
-            spec = {
-                "mode": task.mode,
-                "code": task.code,
-                "inputs": inputs,
-                "max_rows": task.max_rows,
-                "max_tables": task.max_tables,
-            }
+            spec = task_spec(task, inputs)
             (in_dir / "task.json").write_text(json.dumps(spec), encoding="utf-8")
             try:
                 proc = subprocess.run(  # noqa: S603
@@ -156,43 +150,12 @@ class DockerExecutor:
             body = json.loads(result_file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return SandboxResult("error", error=START_FAILURE, duration_ms=duration_ms)
-        if body.get("status") != "ok":
-            return SandboxResult(
-                "error",
-                error=str(body.get("error", "The analysis failed."))[:800],
-                error_type=str(body.get("error_type", "")),
-                stdout=str(body.get("stdout", "")),
-                duration_ms=duration_ms,
-            )
-        tables: list[ResultTable] = []
-        total = 0
-        for item in body.get("tables", []):
-            path = out_dir / Path(str(item["file"])).name  # basename only: stay inside out_dir
-            if not path.is_file():
-                continue
-            total += path.stat().st_size
-            if total > MAX_OUTPUT_BYTES:
-                return SandboxResult(
-                    "error",
-                    error="The result is too large; aggregate or filter it.",
-                    duration_ms=duration_ms,
-                )
-            tables.append(
-                ResultTable(
-                    name=str(item["name"]),
-                    parquet=path.read_bytes(),
-                    columns=tuple(item.get("columns", [])),
-                    row_count=int(item.get("rows", 0)),
-                    truncated=bool(item.get("truncated")),
-                )
-            )
-        return SandboxResult(
-            "ok",
-            tables=tuple(tables),
-            stats=dict(body.get("stats", {})),
-            stdout=str(body.get("stdout", "")),
-            duration_ms=duration_ms,
-        )
+
+        def read(name: str) -> bytes | None:  # basename only: stays inside out_dir
+            path = out_dir / name
+            return path.read_bytes() if name and path.is_file() else None
+
+        return parse_result(body, read, duration_ms)
 
 
 def _ms(started: float) -> int:

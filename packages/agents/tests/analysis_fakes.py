@@ -85,6 +85,7 @@ class FakeWorkspace:
     owner: str = "u1"
     saved: list[dict[str, Any]] = field(default_factory=list)
     logged: list[dict[str, Any]] = field(default_factory=list)
+    notebooks: list[dict[str, Any]] = field(default_factory=list)
     runs_last_hour: int = 0
 
     def _items(self) -> dict[str, LoadedInput]:
@@ -115,6 +116,10 @@ class FakeWorkspace:
     async def save_result(self, **kw: Any) -> str:
         self.saved.append(kw)
         return f"art-{len(self.saved)}"
+
+    async def save_notebook(self, **kw: Any) -> str:
+        self.notebooks.append(kw)
+        return str(kw["notebook_id"])
 
     async def sandbox_runs_last_hour(self, user_id: str) -> int:
         return self.runs_last_hour

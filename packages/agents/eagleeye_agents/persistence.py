@@ -44,6 +44,11 @@ async def load_user_role(pool: asyncpg.Pool, user_id: str) -> str:
     return str(role) if role else "member"
 
 
+async def is_demo_user(pool: asyncpg.Pool, user_id: str) -> bool:
+    """The shared public demo account (users.is_demo) gets the light analysis only."""
+    return bool(await pool.fetchval("SELECT is_demo FROM users WHERE id = $1", user_id))
+
+
 async def heartbeat(pool: asyncpg.Pool, run_id: str) -> None:
     await pool.execute(
         "UPDATE runs SET heartbeat_at = now() WHERE id = $1 AND status = 'RUNNING'", run_id

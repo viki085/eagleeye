@@ -47,6 +47,7 @@ class RunnerDeps:
     catalog: Any = None  # eagleeye_catalog.service.CatalogService
     workspace: Any = None  # analysis.workspace.DataWorkspace (None = data files disabled)
     executor: Any = None  # eagleeye_sandbox AnalysisExecutor (None = analysis disabled)
+    notebook_executor: Any = None  # sandbox with notebook limits (None = notebook mode off)
     python_analysis: bool = True
     sandbox_runs_per_hour: int = 60
     cache: Any = None  # eagleeye_core.app_cache.AppCache (None = no caching)
@@ -75,6 +76,8 @@ def _parts(ctx: RunContext, outcome: Outcome) -> list[dict]:
         parts.append({"type": "citations", "items": outcome.citations})
     if ctx.charts:
         parts.append({"type": "charts", "items": list(ctx.charts)})
+    if ctx.notebooks:
+        parts.append({"type": "notebooks", "items": list(ctx.notebooks)})
     if ctx.artifacts:
         parts.append({"type": "artifacts", "items": [a.to_dict() for a in ctx.artifacts]})
     parts.append({"type": "steps", "items": [r.compact() for r in ctx.steps.records]})
@@ -253,9 +256,26 @@ async def _enable_analysis(deps: RunnerDeps, ctx: RunContext) -> None:
         return
     ctx.executor = deps.executor
     ctx.analysis_available = True
-    limits = replace(ctx.settings.limits, max_seconds=ctx.settings.analysis_max_seconds)
+    seconds = ctx.settings.analysis_max_seconds
+    if await _notebook_allowed(deps, ctx):
+        ctx.notebook_executor = deps.notebook_executor
+        ctx.notebook_available = True
+        seconds = max(seconds, ctx.settings.notebook_max_seconds)
+    limits = replace(ctx.settings.limits, max_seconds=seconds)
     ctx.settings = replace(ctx.settings, limits=limits)
     ctx.budget = BudgetTracker(limits)
+
+
+async def _notebook_allowed(deps: RunnerDeps, ctx: RunContext) -> bool:
+    """Notebook mode: Python analysis on, a notebook sandbox configured, and a company user
+    (the shared demo account keeps the light analysis). Decided here, never by the model."""
+    if deps.notebook_executor is None or not ctx.python_analysis:
+        return False
+    try:
+        return not await persistence.is_demo_user(deps.pool, ctx.user_id)
+    except Exception:
+        logger.warning("demo check failed; notebook mode off for %s", ctx.run_id, exc_info=True)
+        return False
 
 
 async def _enable_sql(deps: RunnerDeps, ctx: RunContext) -> None:

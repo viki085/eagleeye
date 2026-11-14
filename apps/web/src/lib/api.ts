@@ -619,6 +619,32 @@ export class ApiClient {
     URL.revokeObjectURL(url);
   }
 
+  /** A notebook figure (PNG) fetched with the bearer token, shown from a blob URL. */
+  async getNotebookFigure(notebookId: string, name: string): Promise<Blob> {
+    const token = await this.getToken();
+    const resp = await fetch(
+      `${API_URL}/v1/notebooks/${encodeURIComponent(notebookId)}/figures/${encodeURIComponent(name)}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+    );
+    if (!resp.ok) throw new ApiError(`Could not load the figure (${resp.status})`, resp.status);
+    return resp.blob();
+  }
+
+  /** Authenticated .ipynb download of a notebook. */
+  async downloadNotebook(notebookId: string, title: string): Promise<void> {
+    const token = await this.getToken();
+    const resp = await fetch(`${API_URL}/v1/notebooks/${encodeURIComponent(notebookId)}/notebook.ipynb`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) throw new ApiError(`Download failed (${resp.status})`, resp.status);
+    const url = URL.createObjectURL(await resp.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${title.replace(/[^A-Za-z0-9._-]+/g, "_") || "notebook"}.ipynb`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   getUsage(): Promise<UsageSummary> {
     return this.request<UsageSummary>("/v1/me/usage");
   }

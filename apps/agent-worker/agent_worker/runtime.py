@@ -58,6 +58,7 @@ def agent_settings(s: Settings) -> AgentSettings:
         ),
         rag_min_score=s.rag_min_score,
         analysis_max_seconds=float(s.agent_max_seconds_analysis),
+        notebook_max_seconds=float(s.agent_max_seconds_notebook),
     )
 
 
@@ -94,6 +95,11 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         gateway = HttpGateway(s.gateway_url, resolve_secret(s.gateway_hmac_secret, s.app_env))
         catalog = CatalogService(CatalogRepo(pool), embedder)
     workspace, executor = _analysis(s, pool)
+    notebook_executor = (
+        DockerExecutor(s.sandbox_image, s.notebook_sandbox_mem_mb, s.notebook_sandbox_timeout_s)
+        if executor is not None and s.enable_notebook_mode
+        else None
+    )
     retriever = Retriever(
         pool=pool,
         llm=llm,
@@ -121,6 +127,7 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         catalog=catalog,
         workspace=workspace,
         executor=executor,
+        notebook_executor=notebook_executor,
         python_analysis=s.enable_python_analysis,
         sandbox_runs_per_hour=s.sandbox_runs_per_hour,
         cache=cache if cache.enabled else None,

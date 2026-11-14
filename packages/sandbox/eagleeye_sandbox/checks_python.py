@@ -24,6 +24,9 @@ ALLOWED_MODULES = frozenset(
         "itertools",
         "collections",
         "functools",
+        # notebook mode: figures are captured by the runner (never saved by the code)
+        "matplotlib",
+        "seaborn",
     }
 )
 BANNED_NAMES = frozenset(
@@ -64,6 +67,11 @@ BANNED_ATTRIBUTES = frozenset(
         "memmap",
         "ctypeslib",
         "f2py",
+        # plotting: the runner captures figures itself; code never touches image files
+        "savefig",
+        "imread",
+        "imsave",
+        "load_dataset",  # seaborn's sample-data download
     }
 )
 _ALLOWED_DUNDER_NAMES = frozenset({"__name__"})

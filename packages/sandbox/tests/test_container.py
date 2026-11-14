@@ -126,3 +126,60 @@ async def test_too_many_result_tables_refused() -> None:
     code = "\n".join(f"save_table('t{i}', datasets['ds_1'])" for i in range(5))
     result = await run(code)
     assert result.status == "error" and "at most 3" in result.error
+
+
+# ---- notebook mode: cells share one namespace; figures are captured per cell -----------------
+
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+async def notebook(*cells: str):  # noqa: ANN201
+    return await EXECUTOR.run(SandboxTask("notebook", "", INPUT, cells=tuple(cells)))
+
+
+async def test_notebook_cells_share_variables_and_report_per_cell() -> None:
+    result = await notebook(
+        "df = datasets['ds_1']\nprint(len(df))\ndisplay(df.head(2))",
+        "save_stat('total', df['v'].sum())\n"
+        "save_table('by_group', df.groupby('g', as_index=False)['v'].sum())",
+    )
+    assert result.status == "ok", result.error
+    first, second = result.cells
+    assert first.stdout.startswith("3\n") and "g" in first.stdout and first.error == ""
+    assert second.stats == {"total": 8.0} and second.tables == ("by_group",)
+    assert result.tables[0].name == "by_group" and result.stats == {"total": 8.0}
+
+
+async def test_notebook_captures_figures_as_png() -> None:
+    result = await notebook(
+        "import matplotlib.pyplot as plt\nimport seaborn as sns\n"
+        "fig, ax = plt.subplots()\nsns.barplot(data=datasets['ds_1'], x='g', y='v', ax=ax)\n"
+        "fig2, ax2 = plt.subplots()\nax2.hist(datasets['ds_1']['v'])",
+        "x = 1",  # no figure in this cell
+        "sns.histplot(datasets['ds_1']['v'])",  # sns and plt are pre-loaded, like in Jupyter
+    )
+    assert result.status == "ok", result.error
+    assert len(result.cells[0].figures) == 2 and result.cells[1].figures == ()
+    assert len(result.cells[2].figures) == 1
+    assert len(result.figures) == 3
+    assert all(f.png.startswith(PNG_SIGNATURE) and len(f.png) < 400_000 for f in result.figures)
+
+
+async def test_a_failing_cell_stops_later_cells_but_keeps_earlier_outputs() -> None:
+    result = await notebook("save_stat('a', 1)", "1 / 0", "save_stat('never', 2)")
+    assert result.status == "error" and result.failed_cell == 1
+    assert "ZeroDivisionError" in result.error
+    assert len(result.cells) == 2 and result.cells[0].stats == {"a": 1}
+    assert "ZeroDivisionError" in result.cells[1].error
+
+
+async def test_figure_count_is_capped() -> None:
+    from eagleeye_sandbox.types import MAX_FIGURES
+
+    cell = (
+        "import matplotlib.pyplot as plt\n"
+        f"for i in range({MAX_FIGURES + 3}):\n    plt.figure()\n    plt.plot([1, 2])"
+    )
+    result = await notebook(cell)
+    assert result.status == "ok" and len(result.figures) == MAX_FIGURES
+    assert "figure limit" in result.cells[0].note

@@ -49,6 +49,7 @@ class AgentSettings:
     denied_topics: tuple[str, ...] = ()
     answer_max_tokens: int = 2048
     analysis_max_seconds: float = 240.0  # run deadline when analysis tools are offered
+    notebook_max_seconds: float = 300.0  # run deadline when notebook mode is offered
 
 
 @dataclass
@@ -83,6 +84,10 @@ class RunContext:
     sandbox_runs_per_hour: int = 60
     python_runs: int = 0
     charts: list[dict[str, Any]] = field(default_factory=list)  # chart event payloads, in order
+    # Notebook mode (company users only; never the shared demo account)
+    notebook_available: bool = False  # explore_data offered
+    notebook_executor: Any = None  # the sandbox with notebook limits (longer, more memory)
+    notebooks: list[dict[str, Any]] = field(default_factory=list)  # notebook event payloads
     cache: Any = None  # eagleeye_core.app_cache.AppCache (None = no caching)
     answer_key: tuple | None = None  # set when this run's answer may be reused or stored
     data_files: list[Any] = field(default_factory=list)  # the user's READY data files

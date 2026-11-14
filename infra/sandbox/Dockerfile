@@ -19,6 +19,12 @@ RUN apt-get update \
 COPY requirements.txt /opt/requirements.txt
 RUN pip install --no-cache-dir -r /opt/requirements.txt
 
+# matplotlib's font cache, built once here (read-only at run time; the runner copies it to
+# /tmp), so notebook runs don't spend seconds rebuilding it on every start
+ENV MPLBACKEND=Agg
+RUN MPLCONFIGDIR=/opt/mplconfig python -c "import matplotlib.pyplot, seaborn" \
+    && chmod -R a+rX /opt/mplconfig
+
 COPY runner.py /opt/runner.py
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin sandbox
 USER 10001

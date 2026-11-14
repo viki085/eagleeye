@@ -98,3 +98,30 @@ def test_python_rejected(code: str, expected: str) -> None:
     with pytest.raises(CodeRejected) as exc:
         check_python(code)
     assert exc.value.code == expected
+
+
+# ---- notebook mode: plotting -----------------------------------------------------------------
+
+
+def test_plotting_libraries_are_allowed() -> None:
+    code = (
+        "import matplotlib.pyplot as plt\nimport seaborn as sns\n"
+        "fig, ax = plt.subplots()\nsns.histplot(datasets['ds_1']['v'], ax=ax)\n"
+    )
+    assert check_python(code) == code
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "import matplotlib.pyplot as plt\nplt.savefig('/work/out/x.png')",  # figures are captured
+        "import matplotlib.pyplot as plt\nfig = plt.figure()\nfig.savefig('/tmp/f.png')",
+        "import matplotlib.pyplot as plt\nplt.imread('/etc/passwd')",
+        "import matplotlib.pyplot as plt\nplt.imsave('/tmp/a.png', [[0]])",
+        "import seaborn as sns\nsns.load_dataset('titanic')",  # downloads from the internet
+    ],
+)
+def test_plotting_file_and_network_access_is_rejected(code: str) -> None:
+    with pytest.raises(CodeRejected) as exc:
+        check_python(code)
+    assert exc.value.code == "NAME_NOT_ALLOWED"

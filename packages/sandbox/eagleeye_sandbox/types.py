@@ -1,11 +1,16 @@
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
-Mode = Literal["sql", "python"]
+Mode = Literal["sql", "python", "notebook"]
 Status = Literal["ok", "error", "timeout", "oom", "unavailable"]
 
 MAX_RESULT_ROWS = 100_000
 MAX_RESULT_TABLES = 3
+# notebook mode (company users): several cells, plots captured by the runner
+MAX_NOTEBOOK_CELLS = 8
+MAX_NOTEBOOK_TABLES = 20
+MAX_FIGURES = 12
+MAX_FIGURE_BYTES = 400_000
 
 
 class CodeRejected(Exception):  # noqa: N818 — reads naturally: `except CodeRejected`
@@ -31,6 +36,7 @@ class SandboxTask:
     inputs: tuple[SandboxInput, ...]
     max_rows: int = MAX_RESULT_ROWS
     max_tables: int = MAX_RESULT_TABLES
+    cells: tuple[str, ...] = ()  # notebook mode: run in order in one shared namespace
 
 
 @dataclass(frozen=True)
@@ -43,6 +49,24 @@ class ResultTable:
 
 
 @dataclass(frozen=True)
+class Figure:
+    name: str  # e.g. "fig_2_1": cell 2, first figure
+    png: bytes
+    cell: int
+
+
+@dataclass(frozen=True)
+class CellOutput:
+    index: int
+    stdout: str = ""
+    tables: tuple[str, ...] = ()  # names of tables saved by this cell
+    stats: dict[str, Any] = field(default_factory=dict)  # stats saved by this cell
+    figures: tuple[str, ...] = ()  # names of figures this cell produced
+    error: str = ""
+    note: str = ""  # e.g. a cap that was reached
+
+
+@dataclass(frozen=True)
 class SandboxResult:
     status: Status
     error: str = ""
@@ -51,6 +75,9 @@ class SandboxResult:
     stats: dict[str, Any] = field(default_factory=dict)
     stdout: str = ""
     duration_ms: int = 0
+    cells: tuple[CellOutput, ...] = ()  # notebook mode
+    figures: tuple[Figure, ...] = ()
+    failed_cell: int | None = None  # notebook mode: the cell that raised
 
 
 class AnalysisExecutor(Protocol):

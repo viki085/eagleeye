@@ -25,6 +25,7 @@ from app.routers import (
     documents,
     health,
     me,
+    notebooks,
     runs,
     sources,
 )
@@ -119,6 +120,7 @@ def create_app() -> FastAPI:
         documents.router,
         sources.router,
         artifacts.router,
+        notebooks.router,
         datasets.router,
         admin.router,
         admin_users.router,

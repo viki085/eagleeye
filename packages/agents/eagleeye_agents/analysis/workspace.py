@@ -13,7 +13,7 @@ import asyncpg
 import pyarrow.parquet as pq
 from eagleeye_core.pii import pii_column_name
 from eagleeye_core.storage import ObjectNotFoundError, ObjectStore
-from eagleeye_datasets.artifacts import save_table_artifact
+from eagleeye_datasets.artifacts import save_notebook_artifact, save_table_artifact
 from eagleeye_datasets.models import Dataset
 from eagleeye_datasets.repo import DatasetRepo
 
@@ -36,6 +36,17 @@ class DataWorkspace(Protocol):
         row_count: int,
         truncated: bool,
         source_refs: dict[str, Any],
+    ) -> str: ...
+
+    async def save_notebook(
+        self,
+        *,
+        notebook_id: str,
+        user_id: str,
+        run_id: str,
+        title: str,
+        manifest: dict[str, Any],
+        figures: list[tuple[str, bytes]],
     ) -> str: ...
 
     async def sandbox_runs_last_hour(self, user_id: str) -> int: ...
@@ -125,6 +136,9 @@ class PgDataWorkspace:
 
     async def save_result(self, **kw: Any) -> str:
         return await save_table_artifact(self._artifact_store, self._pool, **kw)
+
+    async def save_notebook(self, **kw: Any) -> str:
+        return await save_notebook_artifact(self._artifact_store, self._pool, **kw)
 
     async def sandbox_runs_last_hour(self, user_id: str) -> int:
         return await self._repo.sandbox_runs_last_hour(user_id)

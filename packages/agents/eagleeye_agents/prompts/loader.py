@@ -15,6 +15,8 @@ PROMPT_NAMES = (
     "sql_generate",
     "sql_answer",
     "analysis_generate",
+    "notebook_generate",
+    "notebook_repair",
 )
 
 

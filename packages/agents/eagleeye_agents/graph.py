@@ -52,6 +52,7 @@ def build_graph(ctx: RunContext, registry: ToolRegistry | None = None) -> Any:
         include_sql=ctx.sql_available,
         include_data=ctx.workspace is not None,
         include_analysis=ctx.analysis_available,
+        include_notebook=ctx.notebook_available,
     )
     g = StateGraph(RunState)
     g.add_node("guard", make_guard_node(ctx))

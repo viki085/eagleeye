@@ -16,6 +16,7 @@ import { useDocuments } from "@/hooks/use-documents";
 import { useUsage } from "@/hooks/use-usage";
 import { ApiError, type ArtifactView, type ChatSummary, type Citation } from "@/lib/api";
 import { fromRun, toUiMessage, userMessage, type UiMessage } from "@/lib/messages";
+import type { NotebookView } from "@/lib/notebook";
 import { foldEvent, initialRun, type RunView } from "@/lib/run-fold";
 import { consumeSse } from "@/lib/sse";
 
@@ -34,6 +35,18 @@ export default function ChatPage() {
   const downloadArtifact = useCallback(
     (a: ArtifactView) => {
       api.downloadArtifactCsv(a.artifact_id, a.title).catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Download failed");
+      });
+    },
+    [api],
+  );
+  const loadFigure = useCallback(
+    (notebookId: string, name: string) => api.getNotebookFigure(notebookId, name),
+    [api],
+  );
+  const downloadNotebook = useCallback(
+    (nb: NotebookView) => {
+      api.downloadNotebook(nb.notebook_id, nb.title).catch((e: unknown) => {
         setError(e instanceof Error ? e.message : "Download failed");
       });
     },
@@ -255,6 +268,9 @@ export default function ChatPage() {
                 replaced={m.replaced}
                 artifacts={m.artifacts}
                 charts={m.charts}
+                notebooks={m.notebooks}
+                onLoadFigure={loadFigure}
+                onDownloadNotebook={downloadNotebook}
                 warnings={m.warnings}
                 onOpenCitation={setOpenCitation}
                 onViewArtifact={setOpenArtifact}
@@ -268,6 +284,9 @@ export default function ChatPage() {
                 steps={stream.steps}
                 artifacts={stream.artifacts}
                 charts={stream.charts}
+                notebooks={stream.notebooks}
+                onLoadFigure={loadFigure}
+                onDownloadNotebook={downloadNotebook}
                 route={stream.guard?.route ?? null}
                 onViewArtifact={setOpenArtifact}
                 onDownloadArtifact={downloadArtifact}

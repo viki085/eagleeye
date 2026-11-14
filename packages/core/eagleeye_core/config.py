@@ -101,6 +101,12 @@ class Settings(BaseSettings):
     sandbox_timeout_s: int = 60
     sandbox_runs_per_hour: int = 60  # per user
     agent_max_seconds_analysis: int = 240  # run deadline when analysis tools are available
+    # Notebook mode (docs/notebook-eda-plan.md): analyst-style notebooks with plots for company
+    # users (never the shared demo account), run with larger sandbox limits
+    enable_notebook_mode: bool = True
+    notebook_sandbox_mem_mb: int = 2048
+    notebook_sandbox_timeout_s: int = 120
+    agent_max_seconds_notebook: int = 300
     dataset_max_rows: int = 2_000_000
     dataset_max_columns: int = 200
 

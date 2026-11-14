@@ -3,6 +3,7 @@
  * shape (text, citations, steps, run status), so live and reloaded messages match.
  */
 import type { ArtifactView, ChartView, Citation } from "./api";
+import { isNotebook, type NotebookView } from "./notebook";
 
 export type StepStatus = "running" | "ok" | "error" | "skipped";
 
@@ -30,6 +31,7 @@ export interface RunView {
   citations: readonly Citation[];
   artifacts: readonly ArtifactView[];
   charts: readonly ChartView[];
+  notebooks: readonly NotebookView[];
   warnings: readonly string[];
   guard: GuardView | null;
   done: boolean;
@@ -58,6 +60,7 @@ export function initialRun(runId: string): RunView {
     citations: [],
     artifacts: [],
     charts: [],
+    notebooks: [],
     warnings: [],
     guard: null,
     done: false,
@@ -143,6 +146,10 @@ export function foldEvent(view: RunView, evt: RunEvent): RunView {
         : view;
     case "chart":
       return isChart(d) ? { ...view, charts: [...view.charts, d as unknown as ChartView] } : view;
+    case "notebook":
+      return isNotebook(d)
+        ? { ...view, notebooks: [...view.notebooks, d as unknown as NotebookView] }
+        : view;
     case "run.done":
       return {
         ...view,

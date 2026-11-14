@@ -6,6 +6,8 @@ import remarkGfm from "remark-gfm";
 import { CitationChips } from "@/components/chat/citation-chips";
 import { StepTree } from "@/components/chat/step-tree";
 import { ChartCard } from "@/components/charts/chart-card";
+import { NotebookCard, type FigureLoader } from "@/components/notebook/notebook-card";
+import type { NotebookView } from "@/lib/notebook";
 import { ArtifactList } from "@/components/data/artifact-list";
 import type { ArtifactView, ChartView, Citation } from "@/lib/api";
 import type { StepView } from "@/lib/run-fold";
@@ -17,6 +19,9 @@ interface MessageBubbleProps {
   citations?: readonly Citation[];
   artifacts?: readonly ArtifactView[];
   charts?: readonly ChartView[];
+  notebooks?: readonly NotebookView[];
+  onLoadFigure?: FigureLoader;
+  onDownloadNotebook?: (notebook: NotebookView) => void;
   steps?: readonly StepView[];
   status?: string | null;
   route?: string | null;
@@ -66,6 +71,7 @@ export function MessageBubble({
   citations = [],
   artifacts = [],
   charts = [],
+  notebooks = [],
   steps = [],
   status = null,
   route = null,
@@ -75,6 +81,8 @@ export function MessageBubble({
   onOpenCitation,
   onViewArtifact,
   onDownloadArtifact,
+  onLoadFigure,
+  onDownloadNotebook,
 }: MessageBubbleProps) {
   if (role === "user") {
     return (
@@ -98,6 +106,17 @@ export function MessageBubble({
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
           {streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-neutral-400" />}
         </div>
+        {notebooks.map((n) =>
+          onLoadFigure ? (
+            <NotebookCard
+              key={n.notebook_id}
+              notebook={n}
+              loadFigure={onLoadFigure}
+              onDownload={(nb) => onDownloadNotebook?.(nb)}
+              onViewTable={onViewArtifact}
+            />
+          ) : null,
+        )}
         {charts.map((c) => (
           <ChartCard key={c.chart_id} chart={c} />
         ))}
