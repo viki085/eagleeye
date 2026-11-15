@@ -5,8 +5,13 @@
 #
 #   docker build -f infra/sandbox/Dockerfile.lambda -t eagleeye-sandbox-lambda:1 infra/sandbox
 #   scripts\stop.cmd                       (stop the laptop API, gateway and workers first)
+#   export EAGLEEYE_ENV_FILE=../../.env    (the repo .env, relative to this folder)
+#   export WAREHOUSE_ADMIN_PASSWORD=unused (the warehouse service is off here, but Compose
+#                                           still requires its variables)
 #   docker compose -f infra/cloud/compose.demo.yml -f infra/cloud/compose.local.yml \
 #     --env-file .env up -d
+#   (stop.cmd also stops the web app: start it again with `npm run dev` in apps/web.
+#    Afterwards, `... down` and scripts\start.cmd return the laptop to normal.)
 #
 # The repo's .env is read by Docker itself; only the local addresses are replaced here.
 x-local-lambda: &local-lambda

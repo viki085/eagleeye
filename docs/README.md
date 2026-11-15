@@ -56,14 +56,14 @@ All milestones below run on the local Docker Compose stack; AWS (Phase 2 of ADR-
 | 5 | Hardening: guardrails, load test to 2k concurrent, security review | Load-test + security sign-off |
 | 6 (Phase 2) | AWS lift: Terraform, ECS Fargate, Supabase Cloud, managed Redis/Qdrant | Cloud deploy green; parity with local demo |
 
-**Build status (2026-11-13):**
+**Build status (2026-11-15):**
 
 | Milestone | Status |
 |---|---|
 | 0 Scaffold | ✅ Done |
 | 1 Auth, chat, streaming | ✅ Done |
 | 2 RAG | ✅ Done — retrieval eval (150 questions): budget recall 0.86, recall@5 0.87 with the chosen chunking (C4 §9.1, ADR-32) |
-| 3 Text-to-SQL | 🟡 Built (C5 "As built"); SQL golden set exists (`evals/sql_eval.py`), the formal execution-accuracy target is deferred |
+| 3 Text-to-SQL | ✅ Done — SQL golden set (`evals/sql_eval.py`, 2026-11-15, gpt-6-luna): execution accuracy 50/52 (96%; 49–50 of 52 across two runs, scored with the corrected q24), refusals 5/5, p50 2.4 s, $0.02 per run. Remaining misses: the agent adds an end date the question didn't ask for (forward bookings run into 2027). Reference q24 fixed: it counted 2027 bookings as "made in 2026" |
 | 4 CSV EDA, cross-source analysis, charts | ✅ Done — document + database + data-file demo passed (C6 "As built") |
 | 5 Hardening | 🟡 Guardrails, rate limits, kill switches, admin console, admin-provisioned accounts and the security review are done (C8 §7, [security-review-phase6.md](security-review-phase6.md)); the 2,000-concurrent load test moves to cloud pre-production |
 | 6 AWS lift (Phase 2) | ⏳ Next |
