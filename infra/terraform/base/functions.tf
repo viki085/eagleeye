@@ -207,4 +207,8 @@ resource "aws_lambda_function" "sandbox" {
     security_group_ids = [aws_security_group.sandbox.id]
   }
   depends_on = [aws_cloudwatch_log_group.sandbox]
+  lifecycle {
+    # after creation the deploy workflow moves the function to each new image
+    ignore_changes = [image_uri]
+  }
 }

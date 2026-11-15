@@ -35,6 +35,10 @@ resource "aws_budgets_budget" "monthly" {
 
 # ---- GitHub Actions deploys without stored AWS keys (OIDC) ----------------------------------
 
+locals {
+  github_subject = var.github_oidc_subject_prefix != "" ? var.github_oidc_subject_prefix : "repo:${var.github_repo}"
+}
+
 resource "aws_iam_openid_connect_provider" "github" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
@@ -52,7 +56,7 @@ resource "aws_iam_role" "deploy" {
         StringEquals = {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           # only the main branch of this repo
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub" = "${local.github_subject}:ref:refs/heads/main"
         }
       }
     }]

@@ -19,6 +19,16 @@ variable "github_repo" {
   type        = string
 }
 
+variable "github_oidc_subject_prefix" {
+  description = <<-EOT
+    The repo part of GitHub's OIDC subject. Repos with immutable subjects use
+    "repo:<owner>@<owner id>/<name>@<repo id>"; see
+    gh api repos/OWNER/REPO/actions/oidc/customization/sub. Empty = "repo:<github_repo>".
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "web_origin" {
   description = "The web app's address (Vercel), for CORS and Clerk token checks"
   type        = string
