@@ -40,15 +40,33 @@ FIGURE_DPI = (144, 100, 60)  # sharp first; smaller tries when a figure is over 
 # light dashed grid, no top/right frame, readable type. Set once; model code may still override.
 PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
 STYLE = {
-    "figure.figsize": (8, 4.5), "figure.facecolor": "white", "axes.facecolor": "white",
-    "axes.edgecolor": "#c3c2b7", "axes.linewidth": 0.8, "axes.spines.top": False,
-    "axes.spines.right": False, "axes.grid": True, "axes.axisbelow": True,
-    "grid.color": "#e1e0d9", "grid.linestyle": "--", "grid.linewidth": 0.7,
-    "axes.titlesize": 13, "axes.titleweight": "semibold", "axes.titlelocation": "left",
-    "axes.titlepad": 10, "axes.labelsize": 10.5, "axes.labelcolor": "#52514e",
-    "xtick.color": "#52514e", "ytick.color": "#52514e", "xtick.labelsize": 9.5,
-    "ytick.labelsize": 9.5, "legend.frameon": False, "legend.fontsize": 9.5,
-    "lines.linewidth": 2.2, "patch.edgecolor": "white", "font.family": "DejaVu Sans",
+    "figure.figsize": (8, 4.5),
+    "figure.facecolor": "white",
+    "axes.facecolor": "white",
+    "axes.edgecolor": "#c3c2b7",
+    "axes.linewidth": 0.8,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.grid": True,
+    "axes.axisbelow": True,
+    "grid.color": "#e1e0d9",
+    "grid.linestyle": "--",
+    "grid.linewidth": 0.7,
+    "axes.titlesize": 13,
+    "axes.titleweight": "semibold",
+    "axes.titlelocation": "left",
+    "axes.titlepad": 10,
+    "axes.labelsize": 10.5,
+    "axes.labelcolor": "#52514e",
+    "xtick.color": "#52514e",
+    "ytick.color": "#52514e",
+    "xtick.labelsize": 9.5,
+    "ytick.labelsize": 9.5,
+    "legend.frameon": False,
+    "legend.fontsize": 9.5,
+    "lines.linewidth": 2.2,
+    "patch.edgecolor": "white",
+    "font.family": "DejaVu Sans",
 }
 
 
@@ -153,7 +171,7 @@ class _PythonEnv:
         for name, df in self.tables.items():
             frame = df.reset_index() if df.index.name or df.index.nlevels > 1 else df
             frame.columns = [str(c) for c in frame.columns]
-            table = pa.Table.from_pandas(frame, preserve_index=False)
+            table = pa.Table.from_pandas(_arrow_safe(frame), preserve_index=False)
             written.append(_write_table(name, table, self.task["max_rows"]))
         return written
 
@@ -162,6 +180,29 @@ def run_python(task: dict) -> dict:
     env = _PythonEnv(task)
     env.run(task["code"], "<analysis>")
     return {"tables": env.written_tables(), "stats": env.stats}
+
+
+def _arrow_safe(frame):  # noqa: ANN001, ANN202
+    """Text columns holding more than one kind of value (e.g. ints and strings after a melt or
+    concat) can't be stored as Parquet; they become text throughout, blanks kept as blanks.
+    Otherwise a valid analysis would fail at the very last step."""
+    import pandas as pd
+
+    frame = frame.copy()
+    for col in frame.columns:
+        if frame[col].dtype != object:
+            continue
+        kinds = {
+            type(v)
+            for v in frame[col]
+            if v is not None and not (isinstance(v, float) and pd.isna(v))
+        }
+        if len(kinds) > 1:
+            frame[col] = [
+                None if v is None or (isinstance(v, float) and pd.isna(v)) else str(v)
+                for v in frame[col]
+            ]
+    return frame
 
 
 def _prepare_matplotlib():  # noqa: ANN202

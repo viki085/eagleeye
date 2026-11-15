@@ -183,3 +183,17 @@ async def test_figure_count_is_capped() -> None:
     result = await notebook(cell)
     assert result.status == "ok" and len(result.figures) == MAX_FIGURES
     assert "figure limit" in result.cells[0].note
+
+
+async def test_a_mixed_type_text_column_is_saved_as_text() -> None:
+    # e.g. a melt/concat leaves ints and strings in one "level" column: still saved
+    code = "\n".join(
+        [
+            "import pandas as pd",
+            "save_table('levels', pd.DataFrame({'level': [1, 'high', None], 'n': [3, 4, 5]}))",
+        ]
+    )
+    result = await run(code)
+    assert result.status == "ok", result.error
+    table = pq.read_table(io.BytesIO(result.tables[0].parquet))
+    assert table.column("level").to_pylist() == ["1", "high", None]
