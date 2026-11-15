@@ -59,6 +59,7 @@ def agent_settings(s: Settings) -> AgentSettings:
         rag_min_score=s.rag_min_score,
         analysis_max_seconds=float(s.agent_max_seconds_analysis),
         notebook_max_seconds=float(s.agent_max_seconds_notebook),
+        demo_notebook_runs=s.demo_notebook_runs,
     )
 
 

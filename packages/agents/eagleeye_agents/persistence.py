@@ -44,6 +44,15 @@ async def load_user_role(pool: asyncpg.Pool, user_id: str) -> str:
     return str(role) if role else "member"
 
 
+async def notebooks_used(pool: asyncpg.Pool, user_id: str) -> int:
+    """Notebooks this user has made (a demo visit is one user, so: this visit's notebooks)."""
+    return int(
+        await pool.fetchval(
+            "SELECT count(*) FROM artifacts WHERE user_id = $1 AND type = 'notebook'", user_id
+        )
+    )
+
+
 async def is_demo_user(pool: asyncpg.Pool, user_id: str) -> bool:
     """The shared public demo account (users.is_demo) gets the light analysis only."""
     return bool(await pool.fetchval("SELECT is_demo FROM users WHERE id = $1", user_id))

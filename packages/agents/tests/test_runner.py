@@ -8,7 +8,7 @@ from eagleeye_agents.budgets import BudgetLimits
 from eagleeye_agents.context import AgentSettings
 from eagleeye_agents.prompts.loader import load_prompts
 from eagleeye_llm.gateway import ChatMessage
-from fakes import FakeLLM, FakeRetriever, FakeSink, FakeStore, Turn, guard_json
+from fakes import FakeLLM, FakeRetriever, FakeSink, FakeStore, Turn, guard_json, make_ctx
 
 RUN = {
     "id": "r1",
@@ -254,31 +254,38 @@ async def test_no_title_after_first_turn(db: DB) -> None:
 
 
 @pytest.mark.parametrize(
-    ("is_demo", "python_on", "has_executor", "expected"),
+    ("is_demo", "used", "python_on", "has_executor", "expected", "exhausted"),
     [
-        (False, True, True, True),  # company user: notebook mode
-        (True, True, True, False),  # the shared demo account keeps the light version
-        (False, False, True, False),  # Python analysis switched off
-        (False, True, False, False),  # notebook mode disabled in settings (no executor)
+        (False, 5, True, True, True, False),  # company user: notebook mode, no allowance
+        (True, 0, True, True, True, False),  # demo visit: its one notebook question
+        (True, 1, True, True, False, True),  # demo visit, allowance used: light analysis + note
+        (False, 0, False, True, False, False),  # Python analysis switched off
+        (False, 0, True, False, False, False),  # notebook mode disabled in settings (no executor)
     ],
 )
-async def test_notebook_mode_is_for_company_users_only(
+async def test_notebook_mode_and_the_demo_allowance(
     monkeypatch: pytest.MonkeyPatch,
     is_demo: bool,
+    used: int,
     python_on: bool,
     has_executor: bool,
     expected: bool,
+    exhausted: bool,
 ) -> None:
     async def demo(pool, user_id):  # noqa: ANN001, ANN202
         return is_demo
 
+    async def notebooks(pool, user_id):  # noqa: ANN001, ANN202
+        return used
+
     monkeypatch.setattr(persistence, "is_demo_user", demo)
+    monkeypatch.setattr(persistence, "notebooks_used", notebooks)
     deps = runner.RunnerDeps(
         pool=None,
         redis=SwitchRedis(set()),
         llm=FakeLLM(),
         retriever=FakeRetriever(),  # type: ignore[arg-type]
-        settings=AgentSettings(notebook_max_seconds=300.0),
+        settings=AgentSettings(notebook_max_seconds=300.0, demo_notebook_runs=1),
         prompts=load_prompts(),
         model_ids={},
         workspace=object(),
@@ -291,4 +298,15 @@ async def test_notebook_mode_is_for_company_users_only(
     assert ctx.analysis_available is True
     assert ctx.notebook_available is expected
     assert (ctx.notebook_executor is not None) is expected
+    assert ctx.notebook_quota_exhausted is exhausted
     assert ctx.budget._limits.max_seconds == (300.0 if expected else 240.0)  # noqa: SLF001
+
+
+def test_used_up_allowance_tells_the_planner_to_say_so() -> None:
+    from eagleeye_agents.nodes.supervisor import NOTEBOOK_QUOTA_NOTE, _system_prompt
+
+    llm = FakeLLM()
+    ctx, _, _ = make_ctx(llm)
+    assert NOTEBOOK_QUOTA_NOTE not in _system_prompt(ctx)
+    ctx.notebook_quota_exhausted = True
+    assert NOTEBOOK_QUOTA_NOTE in _system_prompt(ctx)

@@ -31,11 +31,22 @@ REPEAT_HINT = (
 )
 
 
+NOTEBOOK_QUOTA_NOTE = (
+    "This is a demo visit and its detailed-analysis (notebook) allowance is used up, so "
+    "explore_data is not available. If the user asks for a detailed or exploratory analysis, do "
+    "the analysis with analyze_data instead, and end your answer with this sentence: "
+    '"Detailed analysis (notebook mode) is limited to one question per demo visit, so this is '
+    'the basic analysis."'
+)
+
+
 def _system_prompt(ctx: RunContext) -> str:
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    note = planner_note(ctx.references)
-    return f"{ctx.prompts.text('supervisor')}\n\nCurrent time: {now}" + (
-        f"\n\n{note}" if note else ""
+    notes = [n for n in (planner_note(ctx.references),) if n]
+    if ctx.notebook_quota_exhausted:
+        notes.append(NOTEBOOK_QUOTA_NOTE)
+    return f"{ctx.prompts.text('supervisor')}\n\nCurrent time: {now}" + "".join(
+        f"\n\n{n}" for n in notes
     )
 
 

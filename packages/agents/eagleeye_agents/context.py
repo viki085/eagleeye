@@ -50,6 +50,7 @@ class AgentSettings:
     answer_max_tokens: int = 2048
     analysis_max_seconds: float = 240.0  # run deadline when analysis tools are offered
     notebook_max_seconds: float = 300.0  # run deadline when notebook mode is offered
+    demo_notebook_runs: int = 1  # notebooks a demo visit may make (then the light analysis)
 
 
 @dataclass
@@ -87,6 +88,7 @@ class RunContext:
     # Notebook mode (company users only; never the shared demo account)
     notebook_available: bool = False  # explore_data offered
     notebook_executor: Any = None  # the sandbox with notebook limits (longer, more memory)
+    notebook_quota_exhausted: bool = False  # demo visit used its notebook(s): say so if asked
     notebooks: list[dict[str, Any]] = field(default_factory=list)  # notebook event payloads
     cache: Any = None  # eagleeye_core.app_cache.AppCache (None = no caching)
     answer_key: tuple | None = None  # set when this run's answer may be reused or stored

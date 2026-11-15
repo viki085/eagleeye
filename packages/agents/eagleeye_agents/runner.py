@@ -267,15 +267,24 @@ async def _enable_analysis(deps: RunnerDeps, ctx: RunContext) -> None:
 
 
 async def _notebook_allowed(deps: RunnerDeps, ctx: RunContext) -> bool:
-    """Notebook mode: Python analysis on, a notebook sandbox configured, and a company user
-    (the shared demo account keeps the light analysis). Decided here, never by the model."""
+    """Notebook mode: Python analysis on and a notebook sandbox configured. Company users always;
+    a demo visit only until it has made `demo_notebook_runs` notebooks, after which it gets the
+    light analysis and the planner says the allowance is used up. Decided here, never by the
+    model. (Two runs started at the same moment could both see the last free notebook; a visit
+    has at most two runs at once, so that bounds the overshoot to one.)"""
     if deps.notebook_executor is None or not ctx.python_analysis:
         return False
     try:
-        return not await persistence.is_demo_user(deps.pool, ctx.user_id)
+        if not await persistence.is_demo_user(deps.pool, ctx.user_id):
+            return True
+        used = await persistence.notebooks_used(deps.pool, ctx.user_id)
     except Exception:
         logger.warning("demo check failed; notebook mode off for %s", ctx.run_id, exc_info=True)
         return False
+    if used < ctx.settings.demo_notebook_runs:
+        return True
+    ctx.notebook_quota_exhausted = True
+    return False
 
 
 async def _enable_sql(deps: RunnerDeps, ctx: RunContext) -> None:
