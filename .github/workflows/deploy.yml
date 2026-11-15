@@ -1,0 +1,104 @@
+# Deploy to the demo environment (Phase 7B). Runs only after CI passed on main (or by hand).
+# Builds both images, pushes them to ECR tagged with the commit SHA, points the sandbox function
+# at the new sandbox image, records the tag the demo machine runs, and restarts the stack if the
+# machine happens to be running (a stopped machine picks the tag up at its next start).
+# AWS access is through GitHub's OIDC token and the eagleeye-github-deploy role: no stored keys.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # for the AWS role
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  SANDBOX_FUNCTION: eagleeye-sandbox
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # the commit CI tested, not whatever main is now
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Commit tag
+        id: tag
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Service image
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/eagleeye:${{ steps.tag.outputs.sha }}
+        run: |
+          if aws ecr describe-images --repository-name eagleeye \
+               --image-ids imageTag=${{ steps.tag.outputs.sha }} >/dev/null 2>&1; then
+            echo "already pushed: $IMAGE"; exit 0
+          fi
+          docker buildx build --platform linux/amd64 --provenance=false --push \
+            -f infra/docker/python.Dockerfile -t "$IMAGE" .
+
+      - name: Sandbox image
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/eagleeye-sandbox-lambda:${{ steps.tag.outputs.sha }}
+        run: |
+          if aws ecr describe-images --repository-name eagleeye-sandbox-lambda \
+               --image-ids imageTag=${{ steps.tag.outputs.sha }} >/dev/null 2>&1; then
+            echo "already pushed: $IMAGE"; exit 0
+          fi
+          # Lambda needs a plain image manifest: no provenance attestation index
+          docker buildx build --platform linux/amd64 --provenance=false --push \
+            -f infra/sandbox/Dockerfile.lambda -t "$IMAGE" infra/sandbox
+
+      - name: Point the sandbox function at the new image
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/eagleeye-sandbox-lambda:${{ steps.tag.outputs.sha }}
+        run: |
+          if aws lambda get-function --function-name "$SANDBOX_FUNCTION" >/dev/null 2>&1; then
+            aws lambda update-function-code --function-name "$SANDBOX_FUNCTION" \
+              --image-uri "$IMAGE" --query LastUpdateStatus --output text
+            aws lambda wait function-updated-v2 --function-name "$SANDBOX_FUNCTION"
+          else
+            echo "sandbox function not created yet (terraform: sandbox_image_tag)"
+          fi
+
+      - name: Record the tag the demo machine runs
+        run: |
+          aws ssm put-parameter --name /eagleeye/demo/image_tag --type String --overwrite \
+            --value "${{ steps.tag.outputs.sha }}" >/dev/null
+          echo "image_tag = ${{ steps.tag.outputs.sha }}"
+
+      - name: Restart the stack if the machine is running
+        run: |
+          id=$(aws ec2 describe-instances \
+            --filters Name=tag:Name,Values=eagleeye-demo Name=instance-state-name,Values=running \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+          if [ -z "$id" ]; then
+            echo "demo machine is stopped: it uses the new image at its next start"; exit 0
+          fi
+          aws ssm send-command --instance-ids "$id" --document-name AWS-RunShellScript \
+            --comment "eagleeye deploy ${{ steps.tag.outputs.sha }}" \
+            --parameters 'commands=["systemctl restart eagleeye"]' \
+            --query Command.CommandId --output text
