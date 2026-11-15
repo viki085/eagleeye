@@ -107,6 +107,48 @@ uv run --package eagleeye-api python data/grandline/load_docs.py
 
 Generated output lives in `data/grandline/out/` (not committed).
 
+## Cloud demo (AWS + Vercel)
+
+The public demo (Phase 7B, [ADR-33](docs/99-decision-log.md), [plan](docs/phase7-cloud-plan.md)):
+the web app on **Vercel**; the API behind **CloudFront** on one **EC2 machine** that runs the same
+image with Docker Compose and is **stopped when nobody uses it**; analysis code in a **Lambda**
+sandbox with no internet; Supabase (session pooler), Qdrant Cloud and S3 for data. Everything on
+AWS is Terraform in `infra/terraform/`.
+
+### First-time setup (in order)
+
+```bash
+aws login --profile eagleeye                       # an IAM admin user with MFA, not root
+cd infra/terraform/bootstrap && terraform init && terraform apply   # the state bucket
+terraform output -raw backend_hcl > ../base/backend.hcl
+cd ../base && cp terraform.tfvars.example terraform.tfvars          # fill it in (git-ignored)
+terraform init -backend-config=backend.hcl && terraform apply
+gh variable set AWS_DEPLOY_ROLE_ARN --body "$(terraform output -raw deploy_role_arn)"
+# push to main → CI → Deploy builds and pushes both images; then create the sandbox function:
+#   add sandbox_image_tag = "<commit sha>" to terraform.tfvars and terraform apply
+uv run --no-project --with "boto3[crt]" python scripts/cloud_env.py push   # secrets from .env.cloud
+```
+
+Then, with the machine running: apply `supabase/migrations` to the cloud project
+(`supabase db push --db-url <session pooler URL>`), restore the warehouse (a `pg_dump` of the local
+one), run catalog onboarding against the cloud database, run `python -m app.demo setup` and
+`data/grandline/load_docs.py` inside the API container, and make the first admin in SQL. Vercel:
+import the repo with root `apps/web` and paste the settings (`NEXT_PUBLIC_API_URL`, Clerk keys,
+`WAKE_URL`/`WAKE_SECRET`, `SUPABASE_URL`/`SUPABASE_DEMO_GATE_KEY`, demo credentials); set
+`web_origin` in `terraform.tfvars` to the Vercel address and apply.
+
+### Day to day
+
+| Task | How |
+|---|---|
+| Deploy | Push to `main`: after CI passes, Deploy pushes the images, records the tag in SSM and restarts the stack if the machine is running (a stopped machine uses the new tag at its next start) |
+| Change a secret | Edit `.env.cloud`, `cloud_env.py push`, then restart the machine (or wait for its next start) |
+| Wake / stop | Visitors wake it from `/demo` or the "Starting EagleEye" screen. It stops itself after 30 idle minutes with no background work; at most 6 h of running time a day; safety stop 03:00 UTC |
+| A shell on the machine | No SSH. `aws ssm start-session --target <instance id>` (Session Manager plugin) or `aws ssm send-command`; `eagleeye-compose ps/logs` wraps Compose with the demo settings |
+| Machine start-up | `infra/cloud/boot.sh`, fetched from S3 at every boot (change it and `terraform apply`; no new machine needed) |
+| Demo limits | `app_settings` keys `demo_visit_seconds`, `demo_visit_budget_usd`, `demo_daily_budget_usd` (defaults 1800, 0.50, 2.00) |
+| Costs | About $5 a month standing (Elastic IP + disk) plus about $0.10 an hour while the machine runs; budget emails at $25 / $50 / $75 |
+
 ## Tests
 
 ```bash

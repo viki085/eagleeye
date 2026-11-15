@@ -66,7 +66,7 @@ All milestones below run on the local Docker Compose stack; AWS (Phase 2 of ADR-
 | 3 Text-to-SQL | ✅ Done — SQL golden set (`evals/sql_eval.py`, 2026-11-15, gpt-6-luna): execution accuracy 50/52 (96%; 49–50 of 52 across two runs, scored with the corrected q24), refusals 5/5, p50 2.4 s, $0.02 per run. Remaining misses: the agent adds an end date the question didn't ask for (forward bookings run into 2027). Reference q24 fixed: it counted 2027 bookings as "made in 2026" |
 | 4 CSV EDA, cross-source analysis, charts | ✅ Done — document + database + data-file demo passed (C6 "As built") |
 | 5 Hardening | 🟡 Guardrails, rate limits, kill switches, admin console, admin-provisioned accounts and the security review are done (C8 §7, [security-review-phase6.md](security-review-phase6.md)); the 2,000-concurrent load test moves to cloud pre-production |
-| 6 AWS lift (Phase 2) | ⏳ Next |
+| 6 AWS lift (Phase 2) | 🟡 Demo live (Phase 7B, 2026-11-15): Vercel web app + CloudFront + EC2 demo machine (stopped when idle) + Lambda sandbox, Terraform in `infra/terraform/`, deploys from CI ([ADR-33](99-decision-log.md), README "Cloud demo"). Next: Phase 7C scale mode (Fargate + load balancer), the 2,000-user load test and its report |
 
 Build phases map onto milestones as: phase 2 → M2, phase 4 → M3, phase 5 → M4, phases 3 and 6 → M5 (agent orchestration C3 §8 is the enabler for M3–M4).
 

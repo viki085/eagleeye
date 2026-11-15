@@ -1,5 +1,13 @@
 # EagleEye — Phase 7: low-cost cloud deployment and scaling proof
 
+> **Status (2026-11-15):** 7.0 preflight, 7A and 7B are done. The demo is live (Vercel web app,
+> CloudFront → EC2 demo machine, Lambda sandbox); the 7B browser checklist passed, including a fix
+> found on the live site (CloudFront is IPv4-only so the `/demo` gate and the API key visitors the
+> same way) and a Supabase REST lockdown (migration 17). Differences from this plan, as built, are in
+> ADR-33: the machine sits behind an Elastic IP + CloudFront prefix-list firewall + secret header (a
+> VPC origin needs a NAT gateway), and its boot logic lives in the S3 bundle. Waiting on: the Fargate
+> quota case (6 → 16 vCPUs) before 7C; the Lambda concurrency quota is still 10.
+
 > Approved 2026-11-14. Progress and "as built" notes go in `docs/README.md` and the component docs as each part lands.
 
 ## Context
