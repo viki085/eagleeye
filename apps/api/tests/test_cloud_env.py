@@ -43,3 +43,17 @@ def test_bad_lines_are_rejected() -> None:
         assert "line 1" in str(exc)
     else:
         raise AssertionError("expected a ValueError")
+
+
+def test_a_comment_after_a_value_is_dropped_but_hashes_inside_stay() -> None:
+    lines = [
+        "DATABASE_URL=postgresql://u:p@h:5432/postgres      # eagleeye-demo pooler",
+        "OPENAI_API_KEY=sk-abc#def",
+        'QDRANT_URL="https://x:6333 # quoted stays"',
+    ]
+    text = "\n".join(lines)
+    assert cloud_env.parse(text) == {
+        "DATABASE_URL": "postgresql://u:p@h:5432/postgres",
+        "OPENAI_API_KEY": "sk-abc#def",
+        "QDRANT_URL": "https://x:6333 # quoted stays",
+    }

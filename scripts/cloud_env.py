@@ -12,6 +12,7 @@ Names Terraform manages (buckets, generated passwords...) are refused, so the tw
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -68,6 +69,8 @@ def parse(text: str) -> dict[str, str]:
             raise ValueError(f"line {n}: expected NAME=VALUE")
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
+        else:  # an unquoted value ends at " #": a comment after it is not part of it
+            value = re.split(r"\s+#", value, maxsplit=1)[0].strip()
         values[name] = value
     return values
 
