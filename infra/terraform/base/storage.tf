@@ -73,6 +73,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "transfer" {
 locals {
   bundle_files = {
     "infra/cloud/compose.demo.yml"       = "${path.module}/../../cloud/compose.demo.yml"
+    "infra/cloud/boot.sh"                = "${path.module}/../../cloud/boot.sh"
     "infra/warehouse/init/01_schema.sql" = "${path.module}/../../warehouse/init/01_schema.sql"
     "infra/warehouse/init/02_roles.sql"  = "${path.module}/../../warehouse/init/02_roles.sql"
   }

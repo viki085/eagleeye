@@ -82,6 +82,10 @@ class S3ObjectStore:
             logger.info("creating bucket %s", self._bucket)
             await asyncio.to_thread(self._client.create_bucket, Bucket=self._bucket)
 
+    async def reachable(self) -> None:
+        """Raises unless the bucket answers (for health checks; needs s3:ListBucket)."""
+        await asyncio.to_thread(self._client.head_bucket, Bucket=self._bucket)
+
     async def put(self, key: str, data: bytes, content_type: str) -> None:
         await asyncio.to_thread(
             self._client.put_object,

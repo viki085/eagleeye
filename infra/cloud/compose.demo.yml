@@ -65,7 +65,7 @@ services:
       redis: { condition: service_healthy }
 
   redis:
-    image: redis:7-alpine
+    image: public.ecr.aws/docker/library/redis:7-alpine  # AWS's mirror: no Docker Hub limits
     command: ["redis-server", "--appendonly", "yes"]
     restart: unless-stopped
     volumes:
@@ -79,7 +79,7 @@ services:
   # Grand Line operations data, queried only by the gateway as eagleeye_ro. The role comes from
   # warehouse/init; the data is loaded once into the volume (Phase 7B).
   warehouse:
-    image: postgres:16-alpine
+    image: public.ecr.aws/docker/library/postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: warehouse

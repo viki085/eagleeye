@@ -1,7 +1,7 @@
 #!/bin/bash
 # First boot of the demo machine (Amazon Linux 2023). Installs Docker and two systemd units:
-#   eagleeye.service      at EVERY boot: settings from Parameter Store → .env, the Compose
-#                         bundle from S3, the image tag from SSM, then `docker compose up`
+#   eagleeye.service      at EVERY boot: syncs the Compose bundle from S3 and runs its
+#                         infra/cloud/boot.sh (settings → .env, image tag, `docker compose up`)
 #   eagleeye-idle.timer   every 5 minutes: stop the machine after ${idle_minutes} idle minutes
 set -euo pipefail
 
@@ -39,45 +39,26 @@ exec docker compose --env-file /opt/eagleeye/.env.demo \
 SH
 chmod 755 /usr/local/bin/eagleeye-compose
 
+cat > /opt/eagleeye/machine.env <<'ENV'
+REGION=${region}
+ACCOUNT_ID=${account_id}
+SSM_ENV=${ssm_env}
+SSM_ROOT=${ssm_root}
+DEPLOY_BUCKET=${deploy_bucket}
+ENV
+chmod 600 /opt/eagleeye/machine.env
+
+# kept tiny on purpose: the real start-up is infra/cloud/boot.sh in the bundle, fetched at every
+# boot, so it can change without replacing the machine
 cat > /usr/local/bin/eagleeye-boot <<'SH'
 #!/bin/bash
 set -euo pipefail
-cd /opt/eagleeye
-registry="${account_id}.dkr.ecr.${region}.amazonaws.com"
-
-# settings: every parameter under the env path, NAME=VALUE
-umask 077
-aws ssm get-parameters-by-path --region "${region}" --path "${ssm_env}" --recursive \
-  --with-decryption --query 'Parameters[].[Name,Value]' --output text \
-  | while IFS=$'\t' read -r name value; do echo "$${name##*/}=$value"; done > .env.demo.new
-# AWS mode for object storage: no endpoint and no keys = the machine's role
-printf 'S3_ENDPOINT_URL=\nS3_ACCESS_KEY=\nS3_SECRET_KEY=\n' >> .env.demo.new
-mv .env.demo.new .env.demo
-
-aws s3 sync --region "${region}" --delete "s3://${deploy_bucket}/bundle/" /opt/eagleeye/repo/
-
-tag=$(aws ssm get-parameter --region "${region}" --name "${ssm_root}/image_tag" \
-  --query Parameter.Value --output text)
-if [ "$tag" = "none" ]; then
-  echo "eagleeye: nothing deployed yet (image_tag is none)"
-  exit 0
-fi
-echo "$registry/eagleeye:$tag" > /opt/eagleeye/image
-aws ecr get-login-password --region "${region}" \
-  | docker login --username AWS --password-stdin "$registry"
-eagleeye-compose pull --quiet
-eagleeye-compose up -d --remove-orphans
-
-# the warehouse's read-only role gets this deployment's password (its init file has a local one)
-ro=$(grep '^WAREHOUSE_RO_PASSWORD=' .env.demo | cut -d= -f2-)
-for _ in $(seq 1 30); do
-  if eagleeye-compose exec -T warehouse pg_isready -U warehouse_admin -d warehouse >/dev/null; then
-    eagleeye-compose exec -T warehouse psql -q -U warehouse_admin -d warehouse \
-      -v ON_ERROR_STOP=1 -c "ALTER ROLE eagleeye_ro PASSWORD '$ro'"
-    break
-  fi
-  sleep 5
+. /opt/eagleeye/machine.env
+for i in 1 2 3; do
+  aws s3 sync --region "$REGION" --delete "s3://$DEPLOY_BUCKET/bundle/" /opt/eagleeye/repo/ && break
+  sleep $((i * 10))
 done
+exec bash /opt/eagleeye/repo/infra/cloud/boot.sh
 SH
 chmod 755 /usr/local/bin/eagleeye-boot
 
@@ -94,6 +75,8 @@ chmod 755 /usr/local/bin/eagleeye-idle
 cat > /etc/systemd/system/eagleeye.service <<'UNIT'
 [Unit]
 Description=EagleEye demo stack
+StartLimitIntervalSec=900
+StartLimitBurst=5
 After=docker.service network-online.target
 Wants=network-online.target
 Requires=docker.service
@@ -101,6 +84,9 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+# a failed start (registry or network hiccup) is retried; the limits below stop a hot loop
+Restart=on-failure
+RestartSec=30
 ExecStart=/usr/local/bin/eagleeye-boot
 ExecStop=/usr/local/bin/eagleeye-compose stop
 TimeoutStartSec=900

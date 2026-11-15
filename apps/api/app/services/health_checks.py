@@ -6,7 +6,8 @@ from dataclasses import dataclass
 import asyncpg
 import httpx
 import redis.asyncio as aioredis
-from eagleeye_core.config import get_settings
+from eagleeye_core.config import Settings, get_settings
+from eagleeye_core.storage import S3ObjectStore
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,10 @@ async def _check_qdrant() -> ServiceHealth:
     settings = get_settings()
     start = time.perf_counter()
     try:
+        # Qdrant Cloud answers only with its key; the local server needs none
+        headers = {"api-key": settings.qdrant_api_key} if settings.qdrant_api_key else {}
         async with httpx.AsyncClient(timeout=CHECK_TIMEOUT_S) as client:
-            resp = await client.get(f"{settings.qdrant_url}/readyz")
+            resp = await client.get(f"{settings.qdrant_url}/readyz", headers=headers)
             resp.raise_for_status()
         return ServiceHealth("qdrant", "up", _ms(start))
     except Exception as exc:
@@ -48,10 +51,24 @@ async def _check_qdrant() -> ServiceHealth:
         return ServiceHealth("qdrant", "down", detail=type(exc).__name__)
 
 
+_aws_stores: dict[tuple[str, str], S3ObjectStore] = {}
+
+
+def _aws_store(settings: Settings) -> S3ObjectStore:
+    """One S3 client per bucket and region (creating one per check would be wasteful)."""
+    key = (settings.docs_bucket, settings.aws_region)
+    if key not in _aws_stores:
+        _aws_stores[key] = S3ObjectStore.from_settings(settings, settings.docs_bucket)
+    return _aws_stores[key]
+
+
 async def _check_object_store() -> ServiceHealth:
     settings = get_settings()
     start = time.perf_counter()
     try:
+        if not settings.s3_endpoint_url:  # AWS: no endpoint, the machine's role; ask the bucket
+            await asyncio.wait_for(_aws_store(settings).reachable(), CHECK_TIMEOUT_S)
+            return ServiceHealth("object-store", "up", _ms(start))
         async with httpx.AsyncClient(timeout=CHECK_TIMEOUT_S) as client:
             resp = await client.get(settings.s3_endpoint_url)
         if resp.status_code >= 500:
