@@ -26,10 +26,13 @@ resource "aws_cloudfront_origin_request_policy" "api_viewer" {
 }
 
 resource "aws_cloudfront_distribution" "api" {
-  enabled         = true
-  comment         = "EagleEye API (demo machine)"
-  price_class     = "PriceClass_100" # North America and Europe edges: the cheapest class
-  is_ipv6_enabled = true
+  enabled     = true
+  comment     = "EagleEye API (demo machine)"
+  price_class = "PriceClass_100" # North America and Europe edges: the cheapest class
+  # IPv4 only, on purpose: the demo allowances are per visitor address, and the web app's host
+  # (Vercel) sees visitors over IPv4. With IPv6 here, a dual-stack visitor would have one key at
+  # the /demo sign-in gate and another at the API, and a used-up visitor could sign in again.
+  is_ipv6_enabled = false
   http_version    = "http2and3"
 
   origin {
