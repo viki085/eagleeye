@@ -17,7 +17,7 @@ class PageMeta(BaseModel):
     total: int
 
 
-class Envelope(BaseModel, Generic[T]):
+class Envelope(BaseModel, Generic[T]):  # noqa: UP046 - pydantic generic models need Generic
     """Consistent response envelope for all JSON endpoints (LLD §2.2)."""
 
     success: bool

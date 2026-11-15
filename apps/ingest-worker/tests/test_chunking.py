@@ -45,7 +45,12 @@ def test_long_section_is_split_with_bounded_size_and_overlap() -> None:
 
 
 def test_no_overlap_between_sections() -> None:
-    els = [E("A", heading_level=1), E(_para(800, "alpha")), E("B", heading_level=1), E(_para(800, "beta"))]
+    els = [
+        E("A", heading_level=1),
+        E(_para(800, "alpha")),
+        E("B", heading_level=1),
+        E(_para(800, "beta")),
+    ]
     a, b = chunk(els)
     assert "alpha" not in b.content
 
