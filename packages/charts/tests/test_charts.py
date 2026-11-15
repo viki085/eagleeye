@@ -271,3 +271,55 @@ def test_lttb_keeps_endpoints_and_size() -> None:
     keep = lttb(points, 100)
     assert len(keep) == 100 and keep[0] == 0 and keep[-1] == 999
     assert lttb(points[:5], 100) == [0, 1, 2, 3, 4]
+
+
+# ---- summary tables and year axes (found in the containerised check, 2026-11-15) ----------
+
+YEARLY = [{"name": "year", "type": "BIGINT"}, {"name": "mean_price", "type": "DOUBLE"}]
+
+
+def yearly() -> bytes:
+    return parquet({"year": [2023, 2024, 2025, 2026], "mean_price": [84.01, 80.52, 69.14, 96.38]})
+
+
+def test_one_row_per_point_titles_the_axis_with_the_column() -> None:
+    chart = build_chart(yearly(), YEARLY, intent(type="line", x="year", y="mean_price"))
+    assert chart.spec["encoding"]["y"]["title"] == "mean_price"
+    assert chart.summary.startswith("mean_price over year")
+
+
+def test_real_aggregation_keeps_the_aggregate_in_the_title() -> None:
+    chart = build_chart(sales(), COLUMNS, intent(type="line", x="month", y="revenue"))
+    assert chart.spec["encoding"]["y"]["title"] == "sum of revenue"
+
+
+def test_year_axis_has_whole_year_ticks() -> None:
+    x = build_chart(yearly(), YEARLY, intent(type="line", x="year", y="mean_price")).spec[
+        "encoding"
+    ]["x"]
+    assert x["type"] == "quantitative"
+    assert x["axis"] == {"format": "d", "tickMinStep": 1}
+    assert x["scale"] == {"zero": False}
+
+
+def test_other_numeric_x_axes_are_unchanged() -> None:
+    table = parquet({"speed": [10.5, 12.0, 14.25], "co2": [1.0, 2.0, 3.0]})
+    cols = [{"name": "speed", "type": "DOUBLE"}, {"name": "co2", "type": "DOUBLE"}]
+    x = build_chart(table, cols, intent(type="line", x="speed", y="co2")).spec["encoding"]["x"]
+    assert "axis" not in x and "scale" not in x
+
+
+def test_decimal_years_from_a_database_also_get_year_ticks() -> None:
+    import decimal
+
+    table = pa.table(
+        {
+            "yr": pa.array([decimal.Decimal(y) for y in (2024, 2025, 2026)], pa.decimal128(4, 0)),
+            "n": [3.0, 4.0, 5.0],
+        }
+    )
+    buf = io.BytesIO()
+    pq.write_table(table, buf)
+    cols = [{"name": "yr", "type": "DECIMAL(4,0)"}, {"name": "n", "type": "DOUBLE"}]
+    x = build_chart(buf.getvalue(), cols, intent(type="line", x="yr", y="n")).spec["encoding"]["x"]
+    assert x["axis"] == {"format": "d", "tickMinStep": 1}

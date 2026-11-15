@@ -46,6 +46,8 @@ class Resolved:
     x_sql: str = ""  # expression for x; text months/dates are cast to DATE
     size: str | None = None  # scatter: numeric column for bubble size
     label: str | None = None  # scatter: column naming each point
+    # every point is one source row (an already-summarised table): "sum of x" is just x
+    one_row_per_point: bool = False
 
     @property
     def multi(self) -> bool:
@@ -197,6 +199,17 @@ def grouped(con: duckdb.DuckDBPyConnection, r: Resolved) -> list[tuple[Any, Any,
         ).fetchall()
         rows += [(v[0], v[1], float(v[2])) for v in fetched]
     return rows
+
+
+def one_row_per_point(con: duckdb.DuckDBPyConnection, r: Resolved) -> bool:
+    """True when no (x, series) group holds more than one row, so aggregating changed nothing."""
+    x = r.x_expr
+    series = f"{quote(r.color)}::VARCHAR" if r.color else "NULL"
+    biggest = con.execute(
+        f"SELECT max(n) FROM (SELECT count(*) AS n FROM t WHERE {x} IS NOT NULL "  # noqa: S608
+        f"GROUP BY {x}, {series})"
+    ).fetchone()
+    return bool(biggest) and biggest[0] == 1
 
 
 def month_labels(values: list[Any]) -> bool:

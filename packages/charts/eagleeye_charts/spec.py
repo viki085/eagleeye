@@ -33,7 +33,9 @@ def y_title(r: Resolved) -> str:
     if r.aggregate == "count":
         return "count"
     if r.multi:
-        return "value" if r.aggregate == "sum" else f"{r.aggregate} value"
+        return "value" if r.aggregate == "sum" or r.one_row_per_point else f"{r.aggregate} value"
+    if r.one_row_per_point:
+        return r.y or "value"
     return f"{r.aggregate} of {r.y}"
 
 

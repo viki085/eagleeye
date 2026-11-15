@@ -8,6 +8,7 @@ them) and no expressions, transforms, parameters or URLs.
 from collections import defaultdict
 from dataclasses import replace
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from eagleeye_charts.aggregate import (
@@ -17,6 +18,7 @@ from eagleeye_charts.aggregate import (
     iso_text_columns,
     label,
     numeric_text_columns,
+    one_row_per_point,
     open_table,
     resolve,
 )
@@ -40,6 +42,7 @@ from eagleeye_charts.spec import (
 __all__ = ["OTHER", "assert_safe", "build_chart"]
 
 POINT_MARK_MAX = 60
+YEAR_MIN, YEAR_MAX = 1800, 2200  # whole numbers in this range on an x axis are years
 
 
 def _xnum(value: Any) -> float:
@@ -48,6 +51,16 @@ def _xnum(value: Any) -> float:
     if isinstance(value, date):
         return float(value.toordinal()) * 86400.0
     return float(value)
+
+
+def _looks_like_years(values: list[Any]) -> bool:
+    return bool(values) and all(
+        isinstance(v, int | float | Decimal)
+        and not isinstance(v, bool)
+        and float(v).is_integer()
+        and YEAR_MIN <= v <= YEAR_MAX
+        for v in values
+    )
 
 
 def _series(rows: list[Row], r: Resolved, intent: ChartIntent) -> Chart:
@@ -71,6 +84,9 @@ def _series(rows: list[Row], r: Resolved, intent: ChartIntent) -> Chart:
         "x": {"field": "x", "type": "temporal" if temporal else "quantitative", "title": r.x},
         "y": {"field": "y", "type": "quantitative", "title": y_title(r)},
     }
+    if not temporal and _looks_like_years([p[0] for p in rows]):
+        # whole years: "2023, 2024" instead of "2,023.0, 2,023.2"; no zero baseline
+        enc["x"] |= {"axis": {"format": "d", "tickMinStep": 1}, "scale": {"zero": False}}
     if r.color or r.multi:
         enc["color"] = {"field": "series", "type": "nominal", "title": series_title(r)}
     if intent.type == "area":
@@ -129,6 +145,8 @@ def build_chart(parquet: bytes, columns: list[dict[str, str]], intent: ChartInte
         rows = grouped(con, r)
         if not rows:
             raise ChartError("There is no data to plot for these columns.")
+        if r.aggregate != "count" and one_row_per_point(con, r):
+            r = replace(r, one_row_per_point=True)
         if r.color and len({s for _, s, _ in rows}) <= 1:
             # a single-valued color column adds a legend and nothing else
             r = replace(r, color=None)

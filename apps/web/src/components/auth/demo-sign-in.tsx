@@ -172,8 +172,8 @@ export function DemoSignIn() {
             )}
           </div>
           <ul className="mt-6 flex flex-col gap-1 text-center text-xs text-neutral-500">
-            <li>A shared account: other visitors can see its chats, so don&apos;t upload private files.</li>
-            <li>It has a small budget for AI answers and is reset every day.</li>
+            <li>Your chats and uploads are private to your visit and deleted after 24 hours. Still, don&apos;t upload confidential files.</li>
+            <li>Each visit has 30 minutes a day. You can come back later the same day and carry on where you left off.</li>
           </ul>
         </div>
       </main>
