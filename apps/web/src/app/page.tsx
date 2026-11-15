@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { NoAccess } from "@/components/auth/no-access";
@@ -8,10 +9,11 @@ import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
 import { SourceDrawer } from "@/components/chat/source-drawer";
 import { ArtifactModal } from "@/components/data/artifact-modal";
-import { DemoBanner, DemoQuestions } from "@/components/demo/demo-welcome";
+import { DemoBanner, DemoEnded, DemoQuestions } from "@/components/demo/demo-welcome";
 import { DocumentsPanel, type CurrentUser } from "@/components/documents/documents-panel";
 import { UsagePanel } from "@/components/usage/usage-panel";
 import { useApi } from "@/hooks/use-api";
+import { useDemoVisit } from "@/hooks/use-demo-visit";
 import { useDocuments } from "@/hooks/use-documents";
 import { useUsage } from "@/hooks/use-usage";
 import { ApiError, type ArtifactView, type ChatSummary, type Citation } from "@/lib/api";
@@ -57,6 +59,9 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<{ text: string; id: number } | null>(null);
   const isDemo = me?.isDemo === true;
+  const demoVisit = useDemoVisit(api, isDemo);
+  const clerk = useClerk();
+  const signOutOfDemo = useCallback(() => void clerk.signOut({ redirectUrl: "/demo" }), [clerk]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const refreshChats = useCallback(async () => {
@@ -238,10 +243,11 @@ export default function ChatPage() {
         onNewChat={handleNewChat}
         onSelect={(id) => void openChat(id)}
         onDelete={(id) => void handleDelete(id)}
-        footer={<UsagePanel state={usage} />}
+        footer={isDemo ? undefined : <UsagePanel state={usage} />}
       />
       <main className="flex min-w-0 flex-1 flex-col">
-        {isDemo && <DemoBanner usage={usage.usage} />}
+        {isDemo && <DemoBanner visit={demoVisit} />}
+        {isDemo && demoVisit?.exhausted && <DemoEnded visit={demoVisit} onSignOut={signOutOfDemo} />}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
             {messages.length === 0 && stream === null && isDemo && (

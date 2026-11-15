@@ -58,6 +58,13 @@ class FakePool:
         return [r for r in self.rows.values() if r["owner_id"] == owner]
 
     async def fetchval(self, sql: str, *args: object):  # noqa: ANN201
+        if "s3_key = $1 AND id <> $2" in sql:  # another row shares the processed data
+            key, own_id = args
+            return (
+                1
+                if any(r["s3_key"] == key and r["id"] != own_id for r in self.rows.values())
+                else None
+            )
         if "sha256" in sql:
             owner, sha = args
             hit = [r for r in self.rows.values() if r["owner_id"] == owner and r["sha256"] == sha]
@@ -185,3 +192,32 @@ def test_delete_removes_row_and_objects(client: TestClient) -> None:
     client.app.state.pool.rows[ds] = row
     assert client.delete(f"/v1/datasets/{ds}").json()["data"]["deleted"] is True
     assert set(client.app.state.store.removed) == {row["s3_key"], row["s3_key_original"]}
+
+
+def _shared_pair(client: TestClient, owner: str) -> str:
+    """Two rows pointing at the same processed file (how demo visits share the samples)."""
+    mine, other = str(uuid.uuid4()), str(uuid.uuid4())
+    row = _row(mine, owner)
+    client.app.state.pool.rows[mine] = row
+    client.app.state.pool.rows[other] = {**_row(other, "someone-else"), "s3_key": row["s3_key"]}
+    return mine
+
+
+def test_demo_visitors_cannot_delete_the_sample_files(client: TestClient) -> None:
+    from dataclasses import replace
+
+    from app.auth import get_current_user
+
+    visitor = replace(ME, is_demo=True)
+    client.app.dependency_overrides[get_current_user] = lambda: visitor
+    ds = _shared_pair(client, visitor.id)
+    resp = client.delete(f"/v1/datasets/{ds}")
+    assert resp.status_code == 403 and "sample files" in resp.json()["error"]["message"]
+    assert ds in client.app.state.pool.rows and client.app.state.store.removed == []
+
+
+def test_deleting_a_shared_file_keeps_the_shared_data(client: TestClient) -> None:
+    ds = _shared_pair(client, ME.id)
+    shared_key = client.app.state.pool.rows[ds]["s3_key"]
+    assert client.delete(f"/v1/datasets/{ds}").status_code == 200
+    assert shared_key not in client.app.state.store.removed

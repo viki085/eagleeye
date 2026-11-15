@@ -27,6 +27,7 @@ class AuthedUser:
     role: str
     is_demo: bool = False
     usage_limit_usd: float | None = None  # None = the organisation default
+    session_id: str | None = None  # demo visits: the Clerk session the visit was resolved from
 
 
 def usage_limit_for(user: "AuthedUser", default: float) -> float:
@@ -129,7 +130,7 @@ async def get_current_user(
                 redis, Limit("user", settings.rate_limit_general_per_min), cached.id
             )
         await _note_demo(request, cached, claims)
-        return cached
+        return await _as_demo_visit(request, cached, claims)
 
     from app.repos import users as users_repo  # local import avoids cycle
 
@@ -153,7 +154,44 @@ async def get_current_user(
     if redis is not None:
         await rate_limit.hit(redis, Limit("user", settings.rate_limit_general_per_min), user.id)
     await _note_demo(request, user, claims)
-    return user
+    return await _as_demo_visit(request, user, claims)
+
+
+_visit_cache = _TtlCache(USER_CACHE_TTL_S)  # Clerk session id -> the visit account
+
+
+async def _as_demo_visit(request: Request, user: AuthedUser, claims: dict) -> AuthedUser:
+    """The shared demo sign-in acts as the visit account of this session (one per visitor,
+    so visitors never see each other's data). Everyone else is returned unchanged."""
+    if not user.is_demo:
+        return user
+    session_id = claims.get("sid")
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Please sign in to the demo again.")
+    cached = _visit_cache.get(str(session_id))
+    if cached is not None:
+        return cached
+    from app.repos import users as users_repo
+    from app.services import demo_visits
+
+    pool = request.app.state.pool
+    ip = request.client.host if request.client else "unknown"
+    visit_user_id = await demo_visits.account_for_session(pool, user.id, str(session_id), ip)
+    row = await users_repo.get_user(pool, visit_user_id)
+    if row is None:
+        raise HTTPException(status_code=403, detail="The demo is not available right now.")
+    visit = AuthedUser(
+        id=str(row["id"]),
+        clerk_user_id=user.clerk_user_id,
+        email=user.email,
+        display_name=row["display_name"],
+        role="member",
+        is_demo=True,
+        usage_limit_usd=_float_or_none(row.get("usage_limit_usd")),
+        session_id=str(session_id),
+    )
+    _visit_cache.put(str(session_id), visit)
+    return visit
 
 
 def _float_or_none(value: object) -> float | None:

@@ -45,6 +45,9 @@ async def maybe_reset(state: Any, settings: Settings) -> bool:
 async def run_forever(state: Any, settings: Settings) -> None:
     while True:
         try:
+            await account.cleanup_expired_visits(
+                state.pool, state.store, getattr(state, "artifact_store", None)
+            )
             await maybe_reset(state, settings)
         except asyncio.CancelledError:
             raise

@@ -14,6 +14,7 @@ from app.repos import documents as docs_repo
 from app.repos import messages as messages_repo
 from app.repos import runs as runs_repo
 from app.repos import usage as usage_repo
+from app.services import demo_visits
 from app.services.guards import ensure_enabled, limit_action
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,7 @@ MAX_MESSAGE_CHARS = 8000
 MAX_SELECTED_DOCS = 20
 STILL_ANSWERING = "Still answering the previous message in this chat."
 DEMO_BUDGET_USED = (
-    "The demo's $1 budget for AI answers has been used up, so it can't answer new questions. "
-    "Thanks for trying EagleEye!"
+    "Your demo budget for AI answers is used up for today. Thanks for trying EagleEye!"
 )
 
 
@@ -128,6 +128,11 @@ async def _admit_run(pool: asyncpg.Pool, chat_id: str, user: AuthedUser) -> None
         raise ApiException(
             429, "RATE_LIMITED", "Too many answers in progress. Wait for one to finish."
         )
+    if user.is_demo and user.session_id:
+        # a demo visit: its 30 minutes, its budget and the demo's daily total (docs: Phase 7)
+        state = await demo_visits.state_of(pool, user_id)
+        if state is not None and state.exhausted:
+            raise ApiException(429, "DEMO_LIMIT", demo_visits.refusal_message(state))
     limit = usage_limit_for(user, settings.usage_limit_usd)
     if await usage_repo.total_cost(pool, user_id) >= limit:
         message = (

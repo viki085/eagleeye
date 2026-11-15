@@ -22,6 +22,7 @@ from app.routers import (
     artifacts,
     chats,
     datasets,
+    demo,
     documents,
     health,
     me,
@@ -122,6 +123,7 @@ def create_app() -> FastAPI:
         artifacts.router,
         notebooks.router,
         datasets.router,
+        demo.router,
         admin.router,
         admin_users.router,
     ):

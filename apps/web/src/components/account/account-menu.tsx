@@ -175,9 +175,11 @@ export function AccountMenu({ placement = "below", role, isDemo = false }: Accou
               </div>
             </div>
           </div>
-          <div className="border-b border-black/[0.06] dark:border-white/[0.07]">
-            <UsageRow usage={usage} />
-          </div>
+          {!isDemo && (
+            <div className="border-b border-black/[0.06] dark:border-white/[0.07]">
+              <UsageRow usage={usage} />
+            </div>
+          )}
           <div className="flex flex-col gap-0.5 p-1.5">
             {!isDemo && (
               <button type="button" role="menuitem" className={ITEM}

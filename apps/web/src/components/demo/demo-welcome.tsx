@@ -1,20 +1,59 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { Icon } from "@/components/admin/icons";
-import type { UsageSummary } from "@/lib/api";
+import { gateMessage } from "@/lib/demo-gate";
+import { timeLeftLabel, type DemoVisit } from "@/lib/demo-visit";
 import { DEMO_GROUPS } from "@/lib/demo-questions";
 
-/** A thin strip above the chat, demo account only. */
-export function DemoBanner({ usage }: { usage: UsageSummary | null }) {
-  const spent = usage ? `$${usage.cost_usd.toFixed(2)} of $${usage.limit_usd.toFixed(2)}` : null;
+const LOW_TIME_S = 5 * 60;
+const AUTO_SIGN_OUT_MS = 20_000;
+
+/** A thin strip above the chat, demo visits only: privacy note and the time left. */
+export function DemoBanner({ visit }: { visit: DemoVisit | null }) {
+  const low = visit !== null && visit.seconds_left <= LOW_TIME_S;
   return (
     <div
       role="note"
       className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-[rgba(197,163,104,0.3)] bg-[#9E8253]/[0.07] px-4 py-2 text-xs text-[#6b5636] dark:text-[#d6bd8f]"
     >
       <span className="font-semibold uppercase tracking-[0.12em] text-[#7d6540] dark:text-[#C5A368]">Demo</span>
-      <span>Shared account: anyone with the demo sign-in can see these chats. Don&apos;t upload private files.</span>
-      {spent && <span className="tabular-nums text-neutral-500">AI budget used: {spent}</span>}
+      <span>Your chats and uploads are private to this visit and deleted after 24 hours. Don&apos;t upload confidential files.</span>
+      {visit && (
+        <span
+          aria-live="polite"
+          className={`rounded-full px-2 py-0.5 font-semibold tabular-nums ${
+            low ? "bg-[#d03b3b]/10 text-[#b42f2f] dark:text-[#e66767]" : "bg-[#9E8253]/[0.12] text-[#7d6540] dark:text-[#C5A368]"
+          }`}
+        >
+          {timeLeftLabel(visit.seconds_left)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Shown when the visit is over (time, budget or the demo's daily limit): why, and when to return. */
+export function DemoEnded({ visit, onSignOut }: { visit: DemoVisit; onSignOut: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onSignOut, AUTO_SIGN_OUT_MS);
+    return () => clearTimeout(timer);
+  }, [onSignOut]);
+  return (
+    <div role="alertdialog" aria-modal="true" aria-labelledby="demo-ended" className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-[rgba(197,163,104,0.35)] bg-white p-6 text-center shadow-xl dark:border-[rgba(197,163,104,0.25)] dark:bg-[#141517]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7d6540] dark:text-[#C5A368]">Demo</p>
+        <h2 id="demo-ended" className="mt-2 text-lg font-semibold text-neutral-900 dark:text-neutral-50">Thanks for trying EagleEye</h2>
+        <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-300">{gateMessage({ allowed: false, reason: visit.exhausted, availableAt: visit.available_at })}</p>
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="mt-5 w-full rounded-lg bg-[#9E8253] px-3 py-2.5 text-sm font-semibold text-white hover:bg-[#B0925E] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#9E8253]/25"
+        >
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }

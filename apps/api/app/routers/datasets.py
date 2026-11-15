@@ -161,11 +161,17 @@ async def get_rows(
 async def delete_dataset(dataset_id: UUID, request: Request, user: CurrentUser) -> dict:
     state = request.app.state
     ds = await _owned(request, dataset_id, user.id)
+    shared = await state.pool.fetchval(
+        "SELECT 1 FROM datasets WHERE s3_key = $1 AND id <> $2 LIMIT 1", ds.s3_key, ds.id
+    )
+    if user.is_demo and shared:
+        raise ApiException(403, "FORBIDDEN", "The sample files can't be deleted in the demo.")
     await _repo(request).delete(ds.id, user.id)
     still_used = await state.pool.fetchval(
         "SELECT 1 FROM datasets WHERE s3_key_original = $1 LIMIT 1", ds.s3_key_original
     )
-    keys = [ds.s3_key] if ds.s3_key else []
+    # another row may point at the same processed data (demo visits share the sample files)
+    keys = [ds.s3_key] if ds.s3_key and not shared else []
     if not still_used:  # other sheets of the same workbook keep the original
         keys.append(ds.s3_key_original)
     for key in keys:

@@ -216,7 +216,7 @@ def test_demo_account_has_its_own_cap_and_message(env: Env) -> None:
     env.spent_usd = 1.0
     resp = _send(env)
     assert resp.status_code == 429
-    assert "demo's $1 budget" in resp.json()["error"]["message"]
+    assert "demo budget" in resp.json()["error"]["message"]
 
 
 def test_usage_endpoint_reports_the_users_own_limit(

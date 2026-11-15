@@ -1,6 +1,7 @@
 import { clerkClient } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { checkDemoGate, gateConfig, gateMessage } from "@/lib/demo-gate";
 import { WindowLimiter, configuredDemo, isDemoLogin } from "@/lib/demo-login";
 
 /**
@@ -19,11 +20,25 @@ function fail(status: number, message: string): NextResponse {
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const demo = configuredDemo(process.env);
   if (!demo) return fail(404, "The demo isn't open at the moment.");
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  // Vercel sets x-real-ip / x-forwarded-for to the visitor; locally it's this machine, the
+  // same address the API sees, so the gate and the visits match in local testing too
+  const ip =
+    req.headers.get("x-real-ip")?.trim() ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "127.0.0.1";
   if (!limiter.allow(ip)) return fail(429, "Too many attempts. Wait a minute and try again.");
 
   const body: unknown = await req.json().catch(() => null);
   if (!isDemoLogin(body, demo)) return fail(401, "That isn't the demo username and password.");
+
+  // one visit per IP per 24 hours (30 minutes, a small budget) and a daily total for everyone
+  const verdict = await checkDemoGate(ip, gateConfig(process.env), process.env.NODE_ENV === "production");
+  if (!verdict.allowed) {
+    return NextResponse.json(
+      { error: gateMessage(verdict), reason: verdict.reason, available_at: verdict.availableAt },
+      { status: 403 },
+    );
+  }
 
   try {
     const clerk = await clerkClient();

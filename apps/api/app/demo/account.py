@@ -153,9 +153,62 @@ async def clear_visitor_data(
         if ds.sha256 in keep_sha256 and ds.status != "FAILED":
             continue
         await repo.delete(ds.id, user_id)
-        await _delete_objects(store, [k for k in (ds.s3_key, ds.s3_key_original) if k])
+        await _delete_objects(store, await _unshared_keys(pool, ds.s3_key, ds.s3_key_original))
         removed += 1
     return int(chats.split()[-1]), len(docs), removed
+
+
+async def _unshared_keys(pool: asyncpg.Pool, *keys: str) -> list[str]:
+    """The keys no other data file still points at (demo visits share the sample files)."""
+    out = []
+    for key in keys:
+        if key and not await pool.fetchval(
+            "SELECT 1 FROM datasets WHERE s3_key = $1 OR s3_key_original = $1 LIMIT 1", key
+        ):
+            out.append(key)
+    return out
+
+
+async def _artifact_keys(pool: asyncpg.Pool, user_id: str) -> list[str]:
+    """Result tables, and notebooks with their figures, stored for this account."""
+    keys: list[str] = []
+    for row in await pool.fetch(
+        "SELECT type, s3_key, source_refs FROM artifacts WHERE user_id = $1", user_id
+    ):
+        keys.append(row["s3_key"])
+        refs = row["source_refs"] if isinstance(row["source_refs"], dict) else {}
+        if row["type"] == "notebook":
+            folder = row["s3_key"].rsplit("/", 1)[0]
+            keys += [f"{folder}/{name}.png" for name in refs.get("figures", [])]
+    return keys
+
+
+async def cleanup_expired_visits(
+    pool: asyncpg.Pool, store: Store, artifact_store: Store | None = None
+) -> int:
+    """Deletes demo visits whose 24 hours are over, with everything in them (chats, uploads,
+    results). A visit that spent money today is kept until tomorrow (UTC) so the demo's daily
+    total stays right. The shared sample files are never deleted."""
+    rows = await pool.fetch(
+        """
+        SELECT v.user_id FROM demo_visits v
+         WHERE v.window_start < now() - interval '24 hours'
+           AND NOT EXISTS (
+               SELECT 1 FROM runs r WHERE r.user_id = v.user_id
+                  AND r.created_at >=
+                      date_trunc('day', now() at time zone 'utc') at time zone 'utc')
+        """
+    )
+    for row in rows:
+        user_id = str(row["user_id"])
+        artifacts = await _artifact_keys(pool, user_id)
+        await clear_visitor_data(pool, store, user_id, set())
+        await pool.execute("DELETE FROM users WHERE id = $1", user_id)  # visit, sessions cascade
+        if artifact_store is not None:
+            await _delete_objects(artifact_store, artifacts)
+    if rows:
+        logger.info("demo: removed %d expired visits", len(rows))
+    return len(rows)
 
 
 async def reset(

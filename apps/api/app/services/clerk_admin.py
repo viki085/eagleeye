@@ -213,3 +213,10 @@ class ClerkAdmin:
         if resp.status_code != 200:
             logger.warning("clerk set password failed: %s %s", resp.status_code, resp.text[:300])
             raise ClerkError(502, "Could not reset the demo password.")
+
+    async def revoke_session(self, session_id: str) -> None:
+        """Signs one session out (a demo visit that has used its time or budget)."""
+        resp = await self._request("POST", f"/sessions/{quote(session_id)}/revoke")
+        if resp.status_code not in (200, 404):  # 404: already gone
+            logger.warning("clerk revoke session failed: %s %s", resp.status_code, resp.text[:300])
+            raise ClerkError(502, "Could not end the demo session.")

@@ -1,3 +1,5 @@
+import type { DemoVisit } from "./demo-visit";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export interface ServiceHealth {
@@ -643,6 +645,11 @@ export class ApiClient {
     link.download = `${title.replace(/[^A-Za-z0-9._-]+/g, "_") || "notebook"}.ipynb`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  /** Demo visits: counts this minute and returns the time left / whether the visit is over. */
+  demoHeartbeat(): Promise<DemoVisit> {
+    return this.request<DemoVisit>("/v1/demo/heartbeat", { method: "POST" });
   }
 
   getUsage(): Promise<UsageSummary> {
