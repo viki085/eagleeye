@@ -35,7 +35,21 @@ MAX_ERROR_CHARS = 800
 MAX_STATS = 60
 MPL_CACHE_BAKED = Path("/opt/mplconfig")  # font cache built into the image
 MPL_CACHE_RUN = Path("/tmp/matplotlib")  # noqa: S108 - the sandbox's writable temp folder
-FIGURE_DPI = (100, 60)  # a second, smaller try when a figure is over the size cap
+FIGURE_DPI = (144, 100, 60)  # sharp first; smaller tries when a figure is over the size cap
+# House style for notebook figures: the app's chart palette (apps/web/src/lib/chart-theme.ts),
+# light dashed grid, no top/right frame, readable type. Set once; model code may still override.
+PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+STYLE = {
+    "figure.figsize": (8, 4.5), "figure.facecolor": "white", "axes.facecolor": "white",
+    "axes.edgecolor": "#c3c2b7", "axes.linewidth": 0.8, "axes.spines.top": False,
+    "axes.spines.right": False, "axes.grid": True, "axes.axisbelow": True,
+    "grid.color": "#e1e0d9", "grid.linestyle": "--", "grid.linewidth": 0.7,
+    "axes.titlesize": 13, "axes.titleweight": "semibold", "axes.titlelocation": "left",
+    "axes.titlepad": 10, "axes.labelsize": 10.5, "axes.labelcolor": "#52514e",
+    "xtick.color": "#52514e", "ytick.color": "#52514e", "xtick.labelsize": 9.5,
+    "ytick.labelsize": 9.5, "legend.frameon": False, "legend.fontsize": 9.5,
+    "lines.linewidth": 2.2, "patch.edgecolor": "white", "font.family": "DejaVu Sans",
+}
 
 
 def _json_safe(value):  # noqa: ANN001, ANN202 — untyped on purpose: numpy/pandas scalars
@@ -219,6 +233,8 @@ def run_notebook(task: dict) -> dict:
     env = _PythonEnv(task)
     # the usual notebook names are pre-loaded, as in a data scientist's Jupyter session
     import seaborn as sns
+
+    sns.set_theme(style="whitegrid", palette=PALETTE, rc=STYLE)
 
     env.namespace.update({"plt": plt, "sns": sns, "display": _display})
     cells: list[dict] = []
