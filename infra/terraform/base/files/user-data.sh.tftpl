@@ -1,0 +1,136 @@
+#!/bin/bash
+# First boot of the demo machine (Amazon Linux 2023). Installs Docker and two systemd units:
+#   eagleeye.service      at EVERY boot: settings from Parameter Store → .env, the Compose
+#                         bundle from S3, the image tag from SSM, then `docker compose up`
+#   eagleeye-idle.timer   every 5 minutes: stop the machine after ${idle_minutes} idle minutes
+set -euo pipefail
+
+COMPOSE_VERSION=v2.32.4
+dnf install -y docker
+systemctl enable --now docker
+
+# Docker Compose plugin, checked against the release's published checksum
+plugins=/usr/libexec/docker/cli-plugins
+mkdir -p "$plugins"
+base="https://github.com/docker/compose/releases/download/$COMPOSE_VERSION"
+curl -fsSL -o /tmp/docker-compose "$base/docker-compose-linux-x86_64"
+curl -fsSL -o /tmp/docker-compose.sha256 "$base/docker-compose-linux-x86_64.sha256"
+expected=$(cut -d' ' -f1 /tmp/docker-compose.sha256)
+echo "$expected  /tmp/docker-compose" | sha256sum -c -
+install -m 0755 /tmp/docker-compose "$plugins/docker-compose"
+
+# 2 GB of swap: headroom for a burst of answers and uploads
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+swapon -a || true
+
+mkdir -p /opt/eagleeye
+chmod 700 /opt/eagleeye
+
+cat > /usr/local/bin/eagleeye-compose <<'SH'
+#!/bin/bash
+# docker compose with the demo settings (used by the boot script, the idle check and admins)
+export EAGLEEYE_ENV_FILE=/opt/eagleeye/.env.demo
+export EAGLEEYE_IMAGE="$(cat /opt/eagleeye/image 2>/dev/null || echo none)"
+exec docker compose --env-file /opt/eagleeye/.env.demo \
+  -f /opt/eagleeye/repo/infra/cloud/compose.demo.yml "$@"
+SH
+chmod 755 /usr/local/bin/eagleeye-compose
+
+cat > /usr/local/bin/eagleeye-boot <<'SH'
+#!/bin/bash
+set -euo pipefail
+cd /opt/eagleeye
+registry="${account_id}.dkr.ecr.${region}.amazonaws.com"
+
+# settings: every parameter under the env path, NAME=VALUE
+umask 077
+aws ssm get-parameters-by-path --region "${region}" --path "${ssm_env}" --recursive \
+  --with-decryption --query 'Parameters[].[Name,Value]' --output text \
+  | while IFS=$'\t' read -r name value; do echo "$${name##*/}=$value"; done > .env.demo.new
+# AWS mode for object storage: no endpoint and no keys = the machine's role
+printf 'S3_ENDPOINT_URL=\nS3_ACCESS_KEY=\nS3_SECRET_KEY=\n' >> .env.demo.new
+mv .env.demo.new .env.demo
+
+aws s3 sync --region "${region}" --delete "s3://${deploy_bucket}/bundle/" /opt/eagleeye/repo/
+
+tag=$(aws ssm get-parameter --region "${region}" --name "${ssm_root}/image_tag" \
+  --query Parameter.Value --output text)
+if [ "$tag" = "none" ]; then
+  echo "eagleeye: nothing deployed yet (image_tag is none)"
+  exit 0
+fi
+echo "$registry/eagleeye:$tag" > /opt/eagleeye/image
+aws ecr get-login-password --region "${region}" \
+  | docker login --username AWS --password-stdin "$registry"
+eagleeye-compose pull --quiet
+eagleeye-compose up -d --remove-orphans
+
+# the warehouse's read-only role gets this deployment's password (its init file has a local one)
+ro=$(grep '^WAREHOUSE_RO_PASSWORD=' .env.demo | cut -d= -f2-)
+for _ in $(seq 1 30); do
+  if eagleeye-compose exec -T warehouse pg_isready -U warehouse_admin -d warehouse >/dev/null; then
+    eagleeye-compose exec -T warehouse psql -q -U warehouse_admin -d warehouse \
+      -v ON_ERROR_STOP=1 -c "ALTER ROLE eagleeye_ro PASSWORD '$ro'"
+    break
+  fi
+  sleep 5
+done
+SH
+chmod 755 /usr/local/bin/eagleeye-boot
+
+cat > /usr/local/bin/eagleeye-idle <<'SH'
+#!/bin/bash
+# exit 0 from the check = idle long enough → stop the machine (1 = in use, 2 = can't tell)
+if eagleeye-compose exec -T api python /usr/local/bin/eagleeye-idle-check --minutes ${idle_minutes}; then
+  echo "eagleeye: idle for ${idle_minutes} minutes, stopping the machine"
+  systemctl poweroff
+fi
+SH
+chmod 755 /usr/local/bin/eagleeye-idle
+
+cat > /etc/systemd/system/eagleeye.service <<'UNIT'
+[Unit]
+Description=EagleEye demo stack
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/eagleeye-boot
+ExecStop=/usr/local/bin/eagleeye-compose stop
+TimeoutStartSec=900
+TimeoutStopSec=180
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+cat > /etc/systemd/system/eagleeye-idle.service <<'UNIT'
+[Unit]
+Description=Stop the demo machine when EagleEye is idle
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/eagleeye-idle
+UNIT
+
+cat > /etc/systemd/system/eagleeye-idle.timer <<'UNIT'
+[Unit]
+Description=Check every 5 minutes whether EagleEye is idle
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable eagleeye.service eagleeye-idle.timer
+systemctl start eagleeye.service eagleeye-idle.timer

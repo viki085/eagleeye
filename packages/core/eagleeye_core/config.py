@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     web_origin: str = "http://localhost:3000"
+    # behind CloudFront: the secret header CloudFront adds to every request; requests without
+    # it are refused, and the visitor address comes from CloudFront-Viewer-Address. Empty = off
+    origin_verify_secret: str = ""
 
     redis_url: str = "redis://localhost:6379/0"
     qdrant_url: str = "http://localhost:6333"

@@ -44,3 +44,15 @@ logs/
 
 # load-test keys and synthetic tokens (scripts/loadtest_seed.py)
 .loadtest/
+
+# Terraform: state, plans, provider caches and per-account settings stay local
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+**/terraform.tfvars
+**/backend.hcl
+# cloud secrets file read by scripts/cloud_env.py (never committed)
+.env.cloud
+# zipped Lambda code built by Terraform
+infra/terraform/base/.build/

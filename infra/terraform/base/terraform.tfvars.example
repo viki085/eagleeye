@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (git-ignored) and fill in.
+alert_email = "you@example.com"
+github_repo = "owner/eagleeye"
+# the Vercel address once the web app is deployed (CORS and Clerk token checks)
+# web_origin = "https://eagleeye.vercel.app"
+# set after the first sandbox image is pushed to ECR (the function is created then)
+# sandbox_image_tag = "<commit sha>"

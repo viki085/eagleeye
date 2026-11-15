@@ -43,6 +43,8 @@ RUN apt-get update \
 COPY --from=build /opt/venv /opt/venv
 COPY infra/docker/entrypoint.sh /usr/local/bin/eagleeye-entrypoint
 COPY infra/docker/healthcheck.py /usr/local/bin/eagleeye-healthcheck
+# the demo machine's stop timer runs this inside the API container (Phase 7B)
+COPY scripts/idle_check.py /usr/local/bin/eagleeye-idle-check
 # the API seeds the shared demo account from these files (python -m app.demo setup|reset)
 COPY Trial/data/data-files /app/Trial/data/data-files
 # with SERVICE=all the container sets SERVICE at run time (compose / the ECS task definition)

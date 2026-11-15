@@ -1,0 +1,7 @@
+# Copy to backend.hcl (git-ignored); the bootstrap stack prints the real values.
+bucket       = "eagleeye-tfstate-<account id>"
+key          = "base/terraform.tfstate"
+region       = "us-east-1"
+profile      = "eagleeye"
+use_lockfile = true
+encrypt      = true

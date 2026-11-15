@@ -36,7 +36,7 @@ jobs:
           for dir in apps/api apps/data-gateway apps/ingest-worker \
                      packages/agents packages/catalog packages/charts packages/core \
                      packages/datasets packages/events packages/llm packages/retrieval \
-                     packages/sandbox packages/sqlsafe; do
+                     packages/sandbox packages/sqlsafe infra/terraform/base/lambda/wake; do
             echo "::group::$dir"
             (cd "$dir" && uv run --frozen pytest -q -p no:cacheprovider)
             echo "::endgroup::"

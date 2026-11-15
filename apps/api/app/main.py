@@ -18,6 +18,7 @@ from app.activity import ActivityMiddleware
 from app.db import create_pool
 from app.demo import reset_loop
 from app.errors import install_error_handlers
+from app.origin import OriginGuardMiddleware
 from app.request_context import RequestIdLogFilter, RequestIdMiddleware
 from app.routers import (
     admin,
@@ -125,6 +126,8 @@ def create_app() -> FastAPI:
     app.add_middleware(JsonBodyLimitMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestIdMiddleware)
+    # outermost: behind CloudFront, refuse anything without its secret header (off locally)
+    app.add_middleware(OriginGuardMiddleware, secret=settings.origin_verify_secret)
     install_error_handlers(app)
     for router in (
         health.router,
