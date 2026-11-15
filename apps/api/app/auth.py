@@ -183,7 +183,9 @@ async def get_current_user(
                 redis, Limit("user", settings.rate_limit_general_per_min), cached.id
             )
         await _note_demo(request, cached, claims)
-        return await _as_demo_visit(request, cached, claims)
+        resolved = await _as_demo_visit(request, cached, claims)
+        await _note_seen(request, resolved.id)
+        return resolved
 
     from app.repos import users as users_repo  # local import avoids cycle
 
@@ -207,7 +209,30 @@ async def get_current_user(
     if redis is not None:
         await rate_limit.hit(redis, Limit("user", settings.rate_limit_general_per_min), user.id)
     await _note_demo(request, user, claims)
-    return await _as_demo_visit(request, user, claims)
+    resolved = await _as_demo_visit(request, user, claims)
+    await _note_seen(request, resolved.id)
+    return resolved
+
+
+SEEN_EVERY_S = 60  # users.last_seen_at is written at most this often per user (per process)
+_last_seen_write: dict[str, float] = {}
+_seen_clock = time.monotonic  # replaced in tests
+
+
+async def _note_seen(request: Request, user_id: str) -> None:
+    """Keeps users.last_seen_at current for the admin console's "online now" (best effort:
+    never slows or fails a request)."""
+    now = _seen_clock()
+    if now - _last_seen_write.get(user_id, float("-inf")) < SEEN_EVERY_S:
+        return
+    _last_seen_write[user_id] = now
+    pool = getattr(request.app.state, "pool", None)
+    if pool is None:
+        return
+    try:
+        await pool.execute("UPDATE users SET last_seen_at = now() WHERE id = $1", user_id)
+    except Exception:  # noqa: BLE001
+        logger.debug("could not record last_seen for %s", user_id, exc_info=True)
 
 
 _visit_cache = _TtlCache(USER_CACHE_TTL_S)  # Clerk session id -> the visit account

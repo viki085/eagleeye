@@ -377,7 +377,37 @@ export interface AdminOverview {
   live: {
     databases: AdminDatabaseHealth;
     agents: { active: number; stuck: number };
+    /** null when the counts couldn't be read (the rest of the page still loads) */
+    presence: AdminPresence | null;
   };
+}
+
+/** People active in the last `online_window_s` seconds, today (UTC) and in the last 7 days. */
+export interface AdminPresence {
+  online_window_s: number;
+  online: { company: number; demo: number };
+  today: { company: number; demo: number };
+  week: { company: number; demo: number };
+}
+
+export interface AdminDemoVisit {
+  id: string;
+  /** the visitor's network, masked (e.g. 203.0.113.x) */
+  network: string;
+  started_at: string;
+  last_active_at: string | null;
+  online: boolean;
+  seconds_used: number;
+  spend_usd: number;
+  questions: number;
+  notebook_used: boolean;
+  status: "active" | "used_up" | "expired";
+}
+
+export interface AdminDemoVisitors {
+  items: AdminDemoVisit[];
+  limits: { visit_seconds: number; visit_budget_usd: number; daily_budget_usd: number };
+  today_spend_usd: number;
 }
 
 export interface AdminUserRow {
@@ -388,6 +418,8 @@ export interface AdminUserRow {
   role: string;
   status: string;
   last_seen_at: string | null;
+  /** a request within the last 5 minutes */
+  online?: boolean;
   created_at: string | null;
   runs: number;
   cost_usd: number;
@@ -502,10 +534,14 @@ export class ApiClient {
     return this.request<AdminOverview>(`/v1/admin/overview?range=${range}`);
   }
 
-  adminUsers(range: AdminRange, sort: AdminUserSort, offset: number): Promise<AdminUsers> {
+  adminUsers(range: AdminRange, sort: AdminUserSort, offset: number, online = false): Promise<AdminUsers> {
     return this.request<AdminUsers>(
-      `/v1/admin/users?range=${range}&sort=${sort}&offset=${offset}&limit=50`,
+      `/v1/admin/users?range=${range}&sort=${sort}&offset=${offset}&limit=50${online ? "&online=true" : ""}`,
     );
+  }
+
+  adminDemoVisitors(): Promise<AdminDemoVisitors> {
+    return this.request<AdminDemoVisitors>("/v1/admin/demo-visitors");
   }
 
   adminUsage(range: AdminRange): Promise<AdminUsage> {

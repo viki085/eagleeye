@@ -83,8 +83,25 @@ function StatusRow({ d, range }: { d: AdminOverview; range: AdminRange }) {
   const perK = d.current.requests ? ((1000 * safety) / d.current.requests).toFixed(1) : "0";
   const safetyChange = compare(safety, d.previous.safety_events, "down");
   const agentHealth: Health = agents.stuck > 0 ? "warn" : agents.active > 0 ? "ok" : "idle";
+  const p = d.live.presence;
+  const online = p ? p.online.company + p.online.demo : null;
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+      <StatusCard
+        label="Online now" icon="users" value={online === null ? "—" : count(online)}
+        status={online ? "ok" : "idle"}
+        statusText={p ? `Active in the last ${Math.round(p.online_window_s / 60)} min` : "Not available"}
+        rows={
+          p
+            ? [
+                { label: "Company users online", value: count(p.online.company) },
+                { label: "Demo visitors online", value: count(p.online.demo) },
+                { label: "Active today (company / demo)", value: `${count(p.today.company)} / ${count(p.today.demo)}` },
+                { label: "Active this week (company / demo)", value: `${count(p.week.company)} / ${count(p.week.demo)}` },
+              ]
+            : []
+        }
+      />
       <StatusCard
         label="Database health" icon="database"
         value={databases.primary_latency_ms === null ? "—" : `${databases.primary_latency_ms} ms`}

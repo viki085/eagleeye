@@ -17,7 +17,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from app.repos import admin_metrics as metrics
-from app.repos import admin_overview, app_settings
+from app.repos import admin_overview, admin_presence, app_settings
 from app.repos import runs as runs_repo
 from app.services.health_checks import check_all, check_databases
 from app.services.permissions import AdminUser
@@ -90,7 +90,20 @@ async def _live(request: Request) -> dict[str, Any]:
     pool = request.app.state.pool
     databases = await check_databases()
     runs = await metrics.run_counts(pool, runs_repo.RUNNING_STALE_S, runs_repo.QUEUED_STALE_S)
-    return {"databases": admin_overview.database_health(databases), "agents": runs}
+    return {
+        "databases": admin_overview.database_health(databases),
+        "agents": runs,
+        "presence": await _presence(pool),
+    }
+
+
+async def _presence(pool: Any) -> dict[str, Any] | None:
+    """Online counts for the overview; a failure here never breaks the page."""
+    try:
+        return await admin_presence.presence(pool)
+    except Exception:  # noqa: BLE001
+        logger.warning("presence counts failed", exc_info=True)
+        return None
 
 
 @router.get("/overview")
@@ -112,6 +125,7 @@ async def users(
     sort: SortParam = "last_seen",
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=metrics.MAX_PAGE)] = 50,
+    online: bool = False,
 ) -> dict:
     data = await metrics.users(
         request.app.state.pool,
@@ -120,8 +134,15 @@ async def users(
         offset,
         limit,
         get_settings().usage_limit_usd,
+        online_only=online,
     )
     return ok({"range": range, "usage_limit_usd": get_settings().usage_limit_usd, **data})
+
+
+@router.get("/demo-visitors")
+async def demo_visitors(request: Request, _admin: AdminUser) -> dict:
+    """The last 7 days' demo visits: time and spend against the allowances, masked network."""
+    return ok(await admin_presence.demo_visitors(request.app.state.pool))
 
 
 @router.get("/usage")

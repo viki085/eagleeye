@@ -11,6 +11,8 @@ from typing import Any, Literal
 
 import asyncpg
 
+from app.repos.admin_presence import ONLINE_S
+
 Range = Literal["24h", "7d", "14d", "30d"]
 TERMINAL = ("SUCCEEDED", "FAILED", "CANCELLED", "BUDGET_EXCEEDED")
 USER_SORTS = {
@@ -46,16 +48,27 @@ def _rows(records: list[asyncpg.Record]) -> list[dict[str, Any]]:
 
 
 async def users(
-    pool: asyncpg.Pool, w: Window, sort: str, offset: int, limit: int, usage_limit: float
+    pool: asyncpg.Pool,
+    w: Window,
+    sort: str,
+    offset: int,
+    limit: int,
+    usage_limit: float,
+    online_only: bool = False,
 ) -> dict[str, Any]:
     order = USER_SORTS.get(sort, USER_SORTS["last_seen"])
+    # demo visit accounts are internal (shown in the Demo visitors panel, not as users)
+    where = "u.status <> 'deleted' AND u.clerk_user_id NOT LIKE 'demo-visit:%'"
+    if online_only:
+        where += f" AND u.last_seen_at >= now() - interval '{ONLINE_S} seconds'"
     rows = await pool.fetch(
         f"""
         SELECT u.id, u.email, u.username, u.display_name, u.role, u.status,
                u.last_seen_at, u.created_at,
                coalesce(r.runs, 0) AS runs, coalesce(p.cost_usd, 0) AS cost_usd,
                coalesce(p.tokens, 0) AS tokens, r.last_run_at,
-               coalesce(l.lifetime_cost, 0) AS lifetime_cost_usd
+               coalesce(l.lifetime_cost, 0) AS lifetime_cost_usd,
+               coalesce(u.last_seen_at >= now() - interval '{ONLINE_S} seconds', false) AS online
           FROM users u
           LEFT JOIN (
                 SELECT user_id, count(*) AS runs, max(created_at) AS last_run_at
@@ -69,15 +82,15 @@ async def users(
           LEFT JOIN (
                 SELECT user_id, sum(cost_usd) AS lifetime_cost FROM usage_ledger GROUP BY user_id
                ) l ON l.user_id = u.id
-         WHERE u.status <> 'deleted'
+         WHERE {where}
          ORDER BY {order}, u.email
          LIMIT $2 OFFSET $3
-        """,  # noqa: S608 — ORDER BY comes from the USER_SORTS allow-list
+        """,  # noqa: S608 — ORDER BY from the USER_SORTS allow-list; WHERE from constants
         w.span,
         min(max(limit, 1), MAX_PAGE),
         max(offset, 0),
     )
-    total = await pool.fetchval("SELECT count(*) FROM users WHERE status <> 'deleted'")
+    total = await pool.fetchval(f"SELECT count(*) FROM users u WHERE {where}")  # noqa: S608
     items = []
     for r in rows:
         item = dict(r)

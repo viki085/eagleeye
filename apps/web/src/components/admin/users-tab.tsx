@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { AddUserDialog, ROLE_INFO } from "@/components/admin/add-user-dialog";
 import { ConfirmDeleteDialog } from "@/components/admin/confirm-delete-dialog";
+import { DemoVisitorsPanel } from "@/components/admin/demo-visitors";
 import { ImportUsersDialog } from "@/components/admin/import-users-dialog";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/admin/modal";
 import { DataTable, Panel, Pill, SectionState, type Column } from "@/components/admin/parts";
@@ -43,7 +44,21 @@ function columns(meId: string | null, onDelete: (u: AdminUserRow) => void): Colu
     },
     { key: "role", label: "Role", render: (u) => <Pill tone={u.role === "admin" ? "warn" : "muted"}>{roleLabel(u.role)}</Pill> },
     { key: "status", label: "Status", render: (u) => <Pill tone={u.status === "active" ? "ok" : "bad"}>{u.status}</Pill> },
-    { key: "seen", label: "Last seen", render: (u) => (u.last_seen_at ? when(u.last_seen_at) : <span className="text-neutral-400">Not signed in yet</span>) },
+    {
+      key: "seen",
+      label: "Last active",
+      render: (u) =>
+        u.online ? (
+          <span className="inline-flex items-center gap-1.5 text-[#006300] dark:text-[#0ca30c]">
+            <span aria-hidden className="h-2 w-2 rounded-full bg-[#0ca30c]" />
+            online now
+          </span>
+        ) : u.last_seen_at ? (
+          when(u.last_seen_at)
+        ) : (
+          <span className="text-neutral-400">Not signed in yet</span>
+        ),
+    },
     { key: "runs", label: "Requests", numeric: true, render: (u) => count(u.runs) },
     { key: "tokens", label: "Tokens", numeric: true, render: (u) => count(u.tokens) },
     { key: "cost", label: "Cost (period)", numeric: true, render: (u) => money(u.cost_usd, 4) },
@@ -79,9 +94,10 @@ export function UsersTab({ api, range, refreshKey, meId }: {
   const [dialog, setDialog] = useState<"add" | "import" | null>(null);
   const [toDelete, setToDelete] = useState<AdminUserRow | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [onlineOnly, setOnlineOnly] = useState(false);
   const [state, reload] = useAdminData(
-    () => api.adminUsers(range, sort, offset),
-    [api, range, sort, offset, refreshKey],
+    () => api.adminUsers(range, sort, offset, onlineOnly),
+    [api, range, sort, offset, onlineOnly, refreshKey],
   );
 
   async function confirmDelete(): Promise<void> {
@@ -100,6 +116,17 @@ export function UsersTab({ api, range, refreshKey, meId }: {
             subtitle="Only people you add here can sign in. There is no self-signup."
             actions={
               <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+                  <input
+                    type="checkbox"
+                    checked={onlineOnly}
+                    onChange={(e) => {
+                      setOnlineOnly(e.target.checked);
+                      setOffset(0);
+                    }}
+                  />
+                  Online now only
+                </label>
                 <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
                   Sort by
                   <select
@@ -128,8 +155,8 @@ export function UsersTab({ api, range, refreshKey, meId }: {
             <DataTable rows={d.items} columns={columns(meId, setToDelete)} empty="No users yet." />
             <footer className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-500">
               <span>
-                Requests, tokens and cost cover the selected period; the usage limit ({money(d.usage_limit_usd, 0)}) is
-                lifetime. Chat content is never shown here.
+                &quot;Online now&quot; = active in the last 5 minutes. Requests, tokens and cost cover the selected
+                period; the usage limit ({money(d.usage_limit_usd, 0)}) is lifetime. Chat content is never shown here.
               </span>
               <span className="flex gap-1.5">
                 <button type="button" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE))} className={SECONDARY_BUTTON}>
@@ -143,6 +170,9 @@ export function UsersTab({ api, range, refreshKey, meId }: {
           </Panel>
         )}
       </SectionState>
+      <div className="mt-4">
+        <DemoVisitorsPanel api={api} refreshKey={refreshKey} />
+      </div>
       <AddUserDialog
         api={api}
         open={dialog === "add"}
