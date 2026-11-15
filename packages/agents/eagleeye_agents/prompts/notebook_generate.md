@@ -29,7 +29,18 @@ Rules:
   seaborn, scipy, sklearn, math, statistics, datetime, json, re, itertools, collections,
   functools.
 - Never read or write files, never use the network, never print whole tables.
-- Handle missing values explicitly (dropna for a statistic, and say so in the purpose).
+- Handle missing values explicitly, as an analyst would, and say what you did in the cell's
+  purpose:
+  - report the count and share missing per column first (cell 2), and never fill silently;
+  - a column mostly missing (over about 40%): don't fill it; analyse "missing" as its own
+    group if it may carry meaning (e.g. no cabin recorded), otherwise leave the column out;
+  - numeric columns with some gaps: fill with the median when skewed (or with outliers), the
+    mean when roughly symmetric; prefer the median within a related group when one clearly
+    drives the value (e.g. age by passenger class); save the fill value with `save_stat`;
+  - text or category columns: fill with "Unknown" (or the most common value when only a few
+    rows are missing);
+  - work on a copy (`df_filled = df.copy()`), so statistics about missingness still use the
+    original data.
 - Keep it fast: the whole notebook must run in well under a minute.
 
 Return ONLY a JSON object:
