@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
+import { EChartView } from "@/components/charts/echart-view";
 import { VegaView, type VegaViewHandle } from "@/components/charts/vega-view";
 import type { ChartView } from "@/lib/api";
+import { chartHeight, toEChartsOption } from "@/lib/echarts-option";
 
 interface ChartCardProps {
   chart: ChartView;
@@ -20,6 +22,11 @@ function safeName(title: string): string {
 export function ChartCard({ chart }: ChartCardProps) {
   const view = useRef<VegaViewHandle>(null);
   const [error, setError] = useState<string | null>(null);
+  // ECharts for every shape the converter knows; anything else (or a drawing error) uses Vega
+  const [useVega, setUseVega] = useState(() => toEChartsOption(chart.spec, false) === null);
+  const option = useCallback((dark: boolean) => toEChartsOption(chart.spec, dark), [chart.spec]);
+  const height = useMemo(() => chartHeight(chart.spec), [chart.spec]);
+  const fallBack = useCallback(() => setUseVega(true), []);
   const onError = useCallback(
     () => setError("This chart couldn't be displayed. The result table below has the data."),
     [],
@@ -58,7 +65,11 @@ export function ChartCard({ chart }: ChartCardProps) {
           </button>
         </span>
       </figcaption>
-      <VegaView ref={view} spec={chart.spec} onError={onError} />
+      {useVega ? (
+        <VegaView ref={view} spec={chart.spec} onError={onError} />
+      ) : (
+        <EChartView ref={view} option={option} height={height} onError={fallBack} />
+      )}
       {error && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{error}</p>}
       <p className="sr-only">{chart.summary}</p>
     </figure>
