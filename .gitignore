@@ -56,3 +56,5 @@ logs/
 .env.cloud
 # zipped Lambda code built by Terraform
 infra/terraform/base/.build/
+# web app settings to paste into Vercel (holds secrets; never committed)
+.env.vercel
