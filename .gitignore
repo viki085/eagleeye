@@ -41,3 +41,6 @@ Section 12 Complete Agent Design and Interview Playbook.pdf
 
 # runtime logs from scripts/start-eagleeye.ps1
 logs/
+
+# load-test keys and synthetic tokens (scripts/loadtest_seed.py)
+.loadtest/

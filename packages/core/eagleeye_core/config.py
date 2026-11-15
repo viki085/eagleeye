@@ -7,6 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # anywhere APP_ENV is not "local" (see Settings._no_local_secrets_when_deployed).
 LOCAL_S3_ACCESS_KEY = "eagleeye"
 LOCAL_S3_SECRET = "eagleeye-local-secret"  # noqa: S105 — local-only default, guarded below
+# The only environment where the load-test switches (stub model, synthetic sign-in) are allowed
+LOADTEST_ENV = "loadtest"
 
 
 class Settings(BaseSettings):
@@ -138,6 +140,9 @@ class Settings(BaseSettings):
         default="", validation_alias="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
     )
     clerk_issuer: str = ""  # optional pin, e.g. https://xxx.clerk.accounts.dev
+    # Load test only (APP_ENV=loadtest, ADR-34): the PEM public key that synthetic users'
+    # sign-in tokens are checked against. The private key stays with the load generator.
+    loadtest_token_public_key: str = ""
 
     # Shared public demo account (users.is_demo). Its credentials are public on purpose;
     # the account is a normal member with its own spend cap, reset every day.
@@ -154,6 +159,22 @@ class Settings(BaseSettings):
     smtp_port: int = 465  # implicit TLS
     smtp_username: str = ""  # e.g. your Gmail address
     smtp_password: str = ""  # a Google app password, never your account password
+
+    @model_validator(mode="after")
+    def _loadtest_switches_only_in_loadtest(self) -> "Settings":
+        if self.app_env == LOADTEST_ENV:
+            return self
+        if self.llm_provider == "stub":
+            raise ValueError(
+                f"LLM_PROVIDER=stub answers with canned text and is only allowed when "
+                f"APP_ENV={LOADTEST_ENV} (APP_ENV is {self.app_env})."
+            )
+        if self.loadtest_token_public_key:
+            raise ValueError(
+                f"LOADTEST_TOKEN_PUBLIC_KEY lets synthetic users sign in and is only allowed "
+                f"when APP_ENV={LOADTEST_ENV} (APP_ENV is {self.app_env})."
+            )
+        return self
 
     @model_validator(mode="after")
     def _no_local_secrets_when_deployed(self) -> "Settings":

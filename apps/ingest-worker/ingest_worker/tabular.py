@@ -23,8 +23,8 @@ from eagleeye_datasets.models import (
 from eagleeye_datasets.profile import profile_parquet
 from eagleeye_datasets.render import profile_digest
 from eagleeye_datasets.repo import DatasetRepo
+from eagleeye_llm.factory import build_llm
 from eagleeye_llm.gateway import ChatMessage, LLMGateway
-from eagleeye_llm.litellm_adapter import LiteLLMGateway
 
 from ingest_worker import repo
 from ingest_worker.errors import PermanentIngestError, TransientIngestError
@@ -138,12 +138,7 @@ async def run_dataset_pipeline(dataset_id: str) -> None:
     s = get_settings()
     conn: asyncpg.Connection = await repo.connect(s.database_url)
     try:
-        llm = LiteLLMGateway(
-            s.model_fast,
-            s.model_capable,
-            reasoning_fast=s.reasoning_effort_fast,
-            reasoning_capable=s.reasoning_effort_capable,
-        )
+        llm = build_llm(s, fallbacks=False)
         await process_dataset(dataset_id, DatasetRepo(conn), build_object_store(), llm)
     finally:
         await conn.close()

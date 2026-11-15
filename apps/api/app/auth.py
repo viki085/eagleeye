@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from eagleeye_core.config import Settings, get_settings
+from eagleeye_core.config import LOADTEST_ENV, Settings, get_settings
 from fastapi import Depends, Header, HTTPException, Request
 from jwt import PyJWKClient
 
@@ -71,6 +71,49 @@ class ClerkVerifier:
         return claims
 
 
+LOADTEST_ISSUER = "eagleeye-loadtest"
+LOADTEST_SUBJECT_PREFIX = "loadtest:"  # synthetic users' clerk_user_id, set by the seed script
+LOADTEST_MAX_TOKEN_LIFETIME_S = 6 * 3600
+
+
+class LoadTestVerifier:
+    """Synthetic users' tokens (APP_ENV=loadtest only, ADR-34): RS256, signed by the load
+    generator's private key, issuer `eagleeye-loadtest`, subject `loadtest:<n>`. Anything
+    else is handed to the Clerk verifier unchanged."""
+
+    def __init__(self, public_key_pem: str, fallback: "ClerkVerifier") -> None:
+        # an env var often carries the PEM on one line with literal "\n"
+        self._key = public_key_pem.replace("\\n", "\n")
+        self._fallback = fallback
+
+    def verify(self, token: str) -> dict:
+        try:
+            unverified = jwt.decode(token, options={"verify_signature": False})
+        except jwt.PyJWTError as exc:
+            raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
+        if unverified.get("iss") != LOADTEST_ISSUER:
+            return self._fallback.verify(token)
+        try:
+            claims = jwt.decode(
+                token,
+                self._key,
+                algorithms=["RS256"],
+                issuer=LOADTEST_ISSUER,
+                options={"require": ["exp", "iat", "sub"]},
+                leeway=5,
+            )
+        except jwt.PyJWTError as exc:
+            raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
+        if not str(claims["sub"]).startswith(LOADTEST_SUBJECT_PREFIX):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        lifetime = int(claims["exp"]) - int(claims["iat"])
+        if lifetime > LOADTEST_MAX_TOKEN_LIFETIME_S or (
+            int(claims["exp"]) - time.time() > LOADTEST_MAX_TOKEN_LIFETIME_S
+        ):
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        return claims
+
+
 class _TtlCache:
     def __init__(self, ttl_s: float) -> None:
         self._ttl = ttl_s
@@ -91,7 +134,7 @@ class _TtlCache:
 
 
 _user_cache = _TtlCache(USER_CACHE_TTL_S)
-_verifier: ClerkVerifier | None = None
+_verifier: "ClerkVerifier | LoadTestVerifier | None" = None
 
 NOT_PROVISIONED = "Your account hasn't been set up for EagleEye. Ask your administrator for access."
 
@@ -101,10 +144,20 @@ def forget_user(clerk_user_id: str) -> None:
     _user_cache.drop(clerk_user_id)
 
 
-def get_verifier() -> ClerkVerifier:
+def build_verifier(settings: Settings) -> "ClerkVerifier | LoadTestVerifier":
+    clerk = ClerkVerifier(settings)
+    if not settings.loadtest_token_public_key:
+        return clerk
+    if settings.app_env != LOADTEST_ENV:  # Settings already refuses this; checked again
+        raise RuntimeError("LOADTEST_TOKEN_PUBLIC_KEY is only allowed when APP_ENV=loadtest")
+    logger.warning("load-test sign-in is ON: synthetic users can sign in (APP_ENV=loadtest)")
+    return LoadTestVerifier(settings.loadtest_token_public_key, clerk)
+
+
+def get_verifier() -> "ClerkVerifier | LoadTestVerifier":
     global _verifier
     if _verifier is None:
-        _verifier = ClerkVerifier(get_settings())
+        _verifier = build_verifier(get_settings())
     return _verifier
 
 

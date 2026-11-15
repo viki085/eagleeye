@@ -7,7 +7,8 @@ from dataclasses import dataclass
 import asyncpg
 from eagleeye_core.config import get_settings
 from eagleeye_core.storage import ObjectNotFoundError, ObjectStore, build_object_store
-from eagleeye_llm.embeddings import Embedder, LiteLLMEmbedder
+from eagleeye_llm.embeddings import Embedder
+from eagleeye_llm.factory import build_embedder
 from eagleeye_retrieval.stores.base import VectorStore
 from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_qdrant_client
 from eagleeye_retrieval.types import VectorPoint
@@ -166,7 +167,7 @@ async def _with_deps(
         deps = PipelineDeps(
             conn=conn,
             store=build_object_store(),
-            embedder=LiteLLMEmbedder(s.embed_model, s.embed_dim),
+            embedder=build_embedder(s),
             enterprise_store=enterprise,
         )
         await enterprise.ensure_collection()

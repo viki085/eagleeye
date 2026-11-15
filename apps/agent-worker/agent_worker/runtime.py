@@ -27,8 +27,8 @@ from eagleeye_core.app_cache import AppCache
 from eagleeye_core.config import Settings, get_settings
 from eagleeye_core.service_auth import resolve_secret
 from eagleeye_core.storage import S3ObjectStore, build_object_store
-from eagleeye_llm.embeddings import CachingEmbedder, LiteLLMEmbedder
-from eagleeye_llm.litellm_adapter import LiteLLMGateway
+from eagleeye_llm.embeddings import CachingEmbedder
+from eagleeye_llm.factory import build_embedder, build_llm
 from eagleeye_retrieval.service import Retriever
 from eagleeye_retrieval.stores.pgvector_store import PgVectorPersonalStore
 from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_qdrant_client
@@ -76,17 +76,10 @@ def _analysis(s: Settings, pool: asyncpg.Pool) -> tuple[PgDataWorkspace | None, 
 async def _build_deps(s: Settings) -> RunnerDeps:
     pool = await _create_pool(s.database_url, s.db_pool_max_worker)
     redis = aioredis.from_url(s.redis_url, socket_connect_timeout=5)
-    llm = LiteLLMGateway(
-        s.model_fast,
-        s.model_capable,
-        s.model_fast_fallback,
-        s.model_capable_fallback,
-        reasoning_fast=s.reasoning_effort_fast,
-        reasoning_capable=s.reasoning_effort_capable,
-    )
+    llm = build_llm(s)
     qdrant = build_qdrant_client(s)
     cache = AppCache(redis, s.app_cache_ttl_s, s.app_cache_enabled)
-    embedder = LiteLLMEmbedder(s.embed_model, s.embed_dim)
+    embedder = build_embedder(s)
     # searches reuse cached query vectors; the catalog keeps the plain embedder
     query_embedder = CachingEmbedder(embedder, cache, s.embed_model) if cache.enabled else embedder
     gateway, catalog = None, None

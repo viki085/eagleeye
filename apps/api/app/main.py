@@ -13,6 +13,7 @@ from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import auth
 from app.activity import ActivityMiddleware
 from app.db import create_pool
 from app.demo import reset_loop
@@ -63,6 +64,8 @@ async def lifespan(app: FastAPI):
     """The API authenticates, admits runs, enqueues and streams; agents run in the
     agent worker (Phase 3), ingestion in the ingest worker."""
     settings = get_settings()
+    if settings.loadtest_token_public_key:  # build now: refuse or announce it at boot
+        auth.get_verifier()
     state = app.state
     state.pool = await create_pool()
     # socket_timeout=None: redis-py 8 defaults to 5 s, which would kill blocked XREADs

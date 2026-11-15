@@ -35,3 +35,37 @@ def test_pool_sizes_are_settings_with_safe_defaults() -> None:
 
 def test_qdrant_api_key_defaults_to_none_for_the_local_server() -> None:
     assert Settings(_env_file=None).qdrant_api_key == ""
+
+
+# ---- load-test switches (ADR-34): only ever accepted with APP_ENV=loadtest ----------------
+
+DEPLOYED_KEYS = {"s3_access_key": "real-key", "s3_secret_key": "real-secret"}
+PEM = "-----BEGIN PUBLIC KEY----- placeholder"  # not a secret: a public-key stand-in
+
+
+@pytest.mark.parametrize("env", ["local", "staging", "production", "demo"])
+def test_stub_model_is_refused_outside_loadtest(env: str) -> None:
+    with pytest.raises(ValidationError, match="LLM_PROVIDER=stub"):
+        Settings(_env_file=None, app_env=env, llm_provider="stub", **DEPLOYED_KEYS)
+
+
+@pytest.mark.parametrize("env", ["local", "production"])
+def test_synthetic_sign_in_key_is_refused_outside_loadtest(env: str) -> None:
+    with pytest.raises(ValidationError, match="LOADTEST_TOKEN_PUBLIC_KEY"):
+        Settings(_env_file=None, app_env=env, loadtest_token_public_key=PEM, **DEPLOYED_KEYS)
+
+
+def test_loadtest_env_accepts_both_switches() -> None:
+    s = Settings(
+        _env_file=None,
+        app_env="loadtest",
+        llm_provider="stub",
+        loadtest_token_public_key=PEM,
+        **DEPLOYED_KEYS,
+    )
+    assert s.llm_provider == "stub" and s.loadtest_token_public_key == PEM
+
+
+def test_loadtest_env_still_refuses_local_storage_secrets() -> None:
+    with pytest.raises(ValidationError, match="S3_SECRET_KEY"):
+        Settings(_env_file=None, app_env="loadtest", llm_provider="stub")
