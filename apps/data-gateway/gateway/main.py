@@ -14,6 +14,7 @@ import asyncpg
 from eagleeye_catalog.repo import CatalogRepo
 from eagleeye_catalog.service import CatalogService
 from eagleeye_core.config import get_settings
+from eagleeye_core.logs import configure_logging
 from eagleeye_core.service_auth import ContextToken, TokenError, resolve_secret, verify
 from eagleeye_core.storage import S3ObjectStore
 from fastapi import Depends, FastAPI, Header, Request
@@ -23,7 +24,7 @@ from pydantic import BaseModel, Field
 from gateway.service import GatewayDeps, GatewayError, execute
 from gateway.sources import SourcePools
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+configure_logging(get_settings(), "gateway")
 logger = logging.getLogger(__name__)
 
 

@@ -7,11 +7,13 @@ import redis.asyncio as aioredis
 from eagleeye_catalog.repo import CatalogRepo
 from eagleeye_catalog.service import CatalogService
 from eagleeye_core.config import get_settings
+from eagleeye_core.logs import configure_logging
 from eagleeye_core.storage import S3ObjectStore, build_object_store
 from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_qdrant_client
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.activity import ActivityMiddleware
 from app.db import create_pool
 from app.demo import reset_loop
 from app.errors import install_error_handlers
@@ -35,15 +37,11 @@ from app.security import (
     SecurityHeadersMiddleware,
     UnhandledErrorMiddleware,
 )
+from app.services import queue_metric
 from app.services.clerk_admin import ClerkAdmin
 from app.services.task_queue import CeleryTaskQueue
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s",
-)
-for _handler in logging.getLogger().handlers:
-    _handler.addFilter(RequestIdLogFilter())
+configure_logging(get_settings(), "api", [RequestIdLogFilter()])
 logger = logging.getLogger(__name__)
 
 
@@ -84,13 +82,23 @@ async def lifespan(app: FastAPI):
     state.catalog = CatalogService(CatalogRepo(state.pool))
     state.artifact_store = S3ObjectStore.from_settings(settings, settings.artifacts_bucket)
     await _prepare_storage(app)
-    demo_reset = asyncio.create_task(reset_loop.run_forever(state, settings))
+    background = [asyncio.create_task(reset_loop.run_forever(state, settings))]
+    if settings.queue_metric_enabled:  # scale mode: agent-worker autoscaling signal
+        import boto3
+
+        cloudwatch = boto3.client("cloudwatch", region_name=settings.aws_region)
+        background.append(
+            asyncio.create_task(
+                queue_metric.run_forever(state.pool, cloudwatch, settings.metric_namespace)
+            )
+        )
     try:
         yield
     finally:
-        demo_reset.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await demo_reset
+        for task in background:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
         await state.qdrant.close()
         await state.redis.aclose()
         await state.pool.close()
@@ -102,6 +110,8 @@ def create_app() -> FastAPI:
     # Starlette runs the LAST added middleware first:
     # request id → headers → size limit → CORS → crash-to-envelope → routes
     app.add_middleware(UnhandledErrorMiddleware)
+    # last activity for the demo machine's idle stop (health checks don't count)
+    app.add_middleware(ActivityMiddleware, redis=lambda: getattr(app.state, "redis", None))
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.web_origin],

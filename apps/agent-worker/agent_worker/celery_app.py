@@ -7,8 +7,9 @@ Run from the repo root (thread pool works on Windows and serves chats concurrent
 
 import logging
 
-from celery import Celery
+from celery import Celery, signals
 from eagleeye_core.config import get_settings
+from eagleeye_core.logs import configure_logging
 from eagleeye_core.queues import AGENT_QUEUE, AGENT_TASK
 from eagleeye_llm.env import export_provider_keys
 
@@ -17,6 +18,14 @@ __all__ = ["AGENT_QUEUE", "AGENT_TASK", "app"]
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 _settings = get_settings()
+
+
+@signals.setup_logging.connect
+def _logging(**_: object) -> None:
+    """Our format (JSON in the cloud) instead of Celery's own logging setup."""
+    configure_logging(_settings, "agent-worker")
+
+
 export_provider_keys(_settings.openai_api_key, _settings.anthropic_api_key)
 
 app = Celery("eagleeye_agent", broker=_settings.redis_url, include=["agent_worker.tasks"])

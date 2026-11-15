@@ -647,6 +647,16 @@ export class ApiClient {
     URL.revokeObjectURL(url);
   }
 
+  /** Liveness without signing in: false while the (sleeping) server doesn't answer. */
+  async isUp(): Promise<boolean> {
+    try {
+      const resp = await fetch(`${API_URL}/v1/health/live`, { cache: "no-store" });
+      return resp.ok;
+    } catch {
+      return false;
+    }
+  }
+
   /** Demo visits: counts this minute and returns the time left / whether the visit is over. */
   demoHeartbeat(): Promise<DemoVisit> {
     return this.request<DemoVisit>("/v1/demo/heartbeat", { method: "POST" });

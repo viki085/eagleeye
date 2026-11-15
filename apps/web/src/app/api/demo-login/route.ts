@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { checkDemoGate, gateConfig, gateMessage } from "@/lib/demo-gate";
 import { WindowLimiter, configuredDemo, isDemoLogin } from "@/lib/demo-login";
+import { requestWake, wakeConfig } from "@/lib/wake";
 
 /**
  * POST /api/demo-login {username, password}: when they are the public demo credentials,
@@ -39,6 +40,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 403 },
     );
   }
+
+  // start the sleeping demo machine now, so it warms up while the visitor signs in
+  void requestWake(wakeConfig(process.env));
 
   try {
     const clerk = await clerkClient();

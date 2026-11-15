@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "local"
+    log_format: str = "text"  # "json" in the cloud: one JSON object per line for CloudWatch
+    log_level: str = "INFO"
+    # scale mode (Phase 7C): publish queued + running answers to CloudWatch for autoscaling
+    queue_metric_enabled: bool = False
+    metric_namespace: str = "EagleEye"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     web_origin: str = "http://localhost:3000"

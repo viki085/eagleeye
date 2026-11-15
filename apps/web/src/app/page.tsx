@@ -4,6 +4,7 @@ import { useClerk } from "@clerk/nextjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { NoAccess } from "@/components/auth/no-access";
+import { ServerWaking } from "@/components/server-waking";
 import { Composer } from "@/components/chat/composer";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
@@ -56,6 +57,8 @@ export default function ChatPage() {
   );
   const [error, setError] = useState<string | null>(null);
   const [noAccess, setNoAccess] = useState<string | null>(null);
+  const [asleep, setAsleep] = useState(false);
+  const isUp = useCallback(() => api.isUp(), [api]);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<{ text: string; id: number } | null>(null);
   const isDemo = me?.isDemo === true;
@@ -88,6 +91,11 @@ export default function ChatPage() {
         setMe(null);
         // 403 here means signed in with Clerk but no (live) EagleEye account
         if (e instanceof ApiError && e.status === 403) setNoAccess(e.message.replace(/ \(request [^)]*\)$/, ""));
+        // no answer at all: the server is down or (in the cloud) asleep, so wake it
+        // (confirmed first, so another kind of failure can never loop through reloads)
+        else if (!(e instanceof ApiError)) {
+          void api.isUp().then((up) => (up ? setError("Couldn't load your account. Reload the page.") : setAsleep(true)));
+        }
       });
   }, [api, refreshChats]);
 
@@ -229,6 +237,7 @@ export default function ChatPage() {
   const closeArtifact = useCallback(() => setOpenArtifact(null), []);
 
   if (noAccess) return <NoAccess message={noAccess} />;
+  if (asleep) return <ServerWaking isUp={isUp} />;
 
   return (
     // relative + overflow-hidden: the shell is exactly one screen; nothing inside it (e.g. an
