@@ -40,3 +40,23 @@ def test_idle_seconds() -> None:
     assert asyncio.run(idle_seconds(redis, now=2000.0)) is None  # never used since start
     redis.data[ACTIVITY_KEY] = "1400"
     assert asyncio.run(idle_seconds(redis, now=2000.0)) == 600.0
+
+
+class QueueRedis:
+    """Celery on Redis with acks_late: waiting tasks in lists, running ones in 'unacked'."""
+
+    def __init__(self, lists: dict[str, int], unacked: int) -> None:
+        self.lists, self.unacked = lists, unacked
+
+    async def llen(self, key: str) -> int:
+        return self.lists.get(key, 0)
+
+    async def hlen(self, key: str) -> int:
+        return self.unacked if key == "unacked" else 0
+
+
+def test_pending_work_counts_waiting_and_running_tasks() -> None:
+    from app.activity import pending_work
+
+    assert asyncio.run(pending_work(QueueRedis({}, 0))) == 0
+    assert asyncio.run(pending_work(QueueRedis({"ingest": 300, "agent": 1}, 2))) == 303

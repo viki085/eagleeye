@@ -52,3 +52,16 @@ async def idle_seconds(redis: Any, now: float | None = None) -> float | None:
     if raw is None:
         return None
     return max((now if now is not None else time.time()) - float(raw), 0.0)
+
+
+# Celery on Redis (task_acks_late): waiting tasks sit in one list per queue; tasks being run are
+# held in the "unacked" hash until they finish
+WORK_QUEUES = ("ingest", "agent")
+RUNNING_KEY = "unacked"
+
+
+async def pending_work(redis: Any) -> int:
+    """Background tasks waiting or running. A machine with work left is not idle, even if
+    nobody has made a request for a while (e.g. 400 documents being ingested)."""
+    waiting = [int(await redis.llen(q)) for q in WORK_QUEUES]
+    return sum(waiting) + int(await redis.hlen(RUNNING_KEY))
