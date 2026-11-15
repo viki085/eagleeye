@@ -71,7 +71,7 @@ export function DemoQuestions({ onPick }: { onPick: (text: string) => void }) {
         </h2>
         <p className="mx-auto mt-1.5 max-w-xl text-sm text-neutral-500">
           Grand Line Shipping is a fictional company. Its policies, reports and operations database are
-          already loaded, and four data files are in <span className="font-medium">My data files</span> on
+          already loaded, and five data files are in <span className="font-medium">My data files</span> on
           the right. Click a question to put it in the message box, then press Enter.
         </p>
       </div>

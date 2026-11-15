@@ -7,7 +7,7 @@ dependencies = [
     "eagleeye-core",
     "eagleeye-llm",
     "asyncpg>=0.30",
-    "qdrant-client>=1.13,<1.14",
+    "qdrant-client>=1.20,<1.21",
 ]
 
 [dependency-groups]

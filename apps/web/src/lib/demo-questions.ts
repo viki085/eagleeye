@@ -1,6 +1,6 @@
 /**
  * Suggested questions for the shared demo account (shown only when /v1/me says is_demo).
- * They use the company documents, the operations database and the four data files the demo
+ * They use the company documents, the operations database and the five data files the demo
  * account is seeded with; `[file name]` references work like a dragged-in file.
  */
 
