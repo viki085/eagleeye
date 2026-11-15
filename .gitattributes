@@ -1,3 +1,7 @@
 # container scripts must keep LF endings (sh in Linux images)
 *.sh text eol=lf
 infra/docker/* text eol=lf
+# the demo machine boot script and compose files run on Linux
+*.tftpl text eol=lf
+infra/cloud/* text eol=lf
+infra/warehouse/init/* text eol=lf
