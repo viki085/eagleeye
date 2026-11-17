@@ -190,7 +190,7 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
           )}
           {state.kind === "loaded" && state.chunk.element_type === "table" && (
             <UseAsDataFile
-              key={citation.chunk_id}
+              key={`save-${citation.chunk_id}`} // distinct from PageView: siblings with one key were duplicated on re-render
               api={api}
               documentId={citation.document_id}
               chunkId={citation.chunk_id}
@@ -204,7 +204,7 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
           )}
           {state.kind === "loaded" && state.chunk.has_page && (
             <PageView
-              key={citation.chunk_id}
+              key={`page-${citation.chunk_id}`}
               api={api}
               documentId={citation.document_id}
               chunkId={citation.chunk_id}
