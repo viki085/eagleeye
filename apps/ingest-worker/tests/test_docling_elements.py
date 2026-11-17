@@ -65,3 +65,25 @@ def test_checklist_lines_are_kept_with_their_leaders_removed() -> None:
 def test_an_ellipsis_in_prose_is_left_alone() -> None:
     (element,) = to_elements(FakeDoc([_item("text", "Revenue rose... then fell.")]))
     assert element.text == "Revenue rose... then fell."
+
+
+def test_tables_are_stored_as_compact_markdown_that_still_renders() -> None:
+    from ingest_worker.parsing.docling_pdf import _compact_markdown
+
+    padded = "| Region   |   2024 |\n|----------|-------:|\n| North    |    120 |"
+    assert _compact_markdown(padded) == "| Region | 2024 |\n| --- | --- |\n| North | 120 |"
+
+
+def test_a_table_embeds_as_plain_rows_without_padding_or_the_rule() -> None:
+    from ingest_worker.chunking import Chunk
+    from ingest_worker.pipeline import embedding_text
+
+    table = Chunk(
+        0,
+        "| Region | 2024 |\n| --- | --- |\n| North | 120 |",
+        ("Revenue",),
+        1,
+        "h",
+        element_type="table",
+    )
+    assert embedding_text("Report", table) == "Report\nRevenue\n\nRegion | 2024\nNorth | 120"

@@ -5,6 +5,7 @@ numbers are dropped before chunking, and how the file was read goes to documents
 """
 
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -36,10 +37,27 @@ class PipelineDeps:
     enterprise_store: VectorStore
 
 
+_CELL_PAD = re.compile(r" {2,}")
+
+
+def compact_table(markdown: str) -> str:
+    """A Markdown table as the embedding model should read it: one line per row, cells without
+    the alignment padding, no |---| rule. Docling pads every cell to its column width, so a
+    wide table is mostly spaces and dashes, which dilutes its embedding."""
+    rows = []
+    for line in markdown.splitlines():
+        cells = [_CELL_PAD.sub(" ", cell).strip() for cell in line.strip().strip("|").split("|")]
+        if all(set(cell) <= set("-: ") for cell in cells):
+            continue  # the header rule
+        rows.append(" | ".join(cells))
+    return "\n".join(rows)
+
+
 def embedding_text(title: str, c: Chunk) -> str:
-    """Contextual chunk header: the stored content stays raw."""
+    """Contextual chunk header: the stored content stays raw (tables compacted, see above)."""
     header = PATH_SEP.join(c.heading_path)
-    return f"{title}\n{header}\n\n{c.content}" if header else f"{title}\n\n{c.content}"
+    body = compact_table(c.content) if c.element_type == "table" else c.content
+    return f"{title}\n{header}\n\n{body}" if header else f"{title}\n\n{body}"
 
 
 async def _load_bytes(deps: PipelineDeps, s3_key: str) -> bytes:

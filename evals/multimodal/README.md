@@ -44,10 +44,13 @@ document kind. Spans match as whole words of letters and digits. Writes `out/sco
 | --- | --- | --- | --- | --- | --- |
 | pypdf (before Phase 1) | 8/11 | 76/96 | 35 | 0.79 | 0.77 |
 | Docling as first shipped (a08e6bb) | 11/11 | 89/96 | 0 | 0.89 | 0.88 |
-| Docling with the eval fixes | 11/11 | 93/96 | 0 | 0.89 to 0.92 | **0.95** |
+| Docling with the eval fixes | 11/11 | 93/96 | 0 | 0.89 to 0.92 | 0.95 |
+| + compact tables (Phase 2) | 11/11 | 93/96 | 0 | 0.92 | **0.99** |
 
-Per tag, Docling with the fixes vs pypdf: image 1.00 vs 0.25, scanned 0.79 vs 0.29, text 0.93 vs
-0.94, table 0.73 vs 0.91 (8 vs 10 of 11).
+Per tag, Docling with compact tables vs pypdf: image 1.00 vs 0.25, scanned 0.93 vs 0.29, table
+1.00 vs 0.91 (11 vs 10 of 11), text 0.90 vs 0.94 (the date cluster is all text questions).
+Compact tables: Docling pads every cell to its column width, so wide tables were mostly spaces;
+stored and embedded without the padding they fit whole (table chunks 47 -> 19) and rank higher.
 
 What the scorer found and fixed in the parser:
 - a text block printed over a watermark was taken for a picture, and the picture's 40 lines were

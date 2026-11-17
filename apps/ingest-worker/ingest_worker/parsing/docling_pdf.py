@@ -127,6 +127,18 @@ def _heading_level(label: str, item: Any) -> int:
     return min(int(level), MAX_HEADING_LEVEL)
 
 
+def _compact_markdown(markdown: str) -> str:
+    """Docling pads every cell to its column width; a wide table is then mostly spaces and
+    dashes, which fills the model's reading budget. Same table, one space around each cell."""
+    rows = []
+    for line in markdown.strip().splitlines():
+        cells = [" ".join(cell.split()) for cell in line.strip().strip("|").split("|")]
+        if cells and all(cell and set(cell) <= set("-:") for cell in cells):
+            cells = ["---"] * len(cells)  # the header rule, shortened
+        rows.append("| " + " | ".join(cells) + " |")
+    return "\n".join(rows)
+
+
 def _index_lines(item: Any) -> str:
     """A table of contents or index as one line per row: the row's distinct cell texts with dot
     leaders removed ("Appendix A. Estimates of Income 15"). As a Markdown table it would be mostly
@@ -166,7 +178,7 @@ def to_elements(document: Any) -> list[ParsedElement]:
                 elements.append(ParsedElement(lines, page=page, kind="text", bbox=bbox))
             continue
         if kind == "table":
-            markdown = item.export_to_markdown(doc=document).strip()
+            markdown = _compact_markdown(item.export_to_markdown(doc=document))
             if markdown:
                 elements.append(
                     ParsedElement(
