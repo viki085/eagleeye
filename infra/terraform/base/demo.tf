@@ -133,6 +133,24 @@ resource "aws_iam_role_policy" "demo" {
         Resource = "${aws_s3_bucket.this["deploy"].arn}/bundle/*"
       },
       {
+        # the containers' logs (Docker's awslogs driver uses the machine's role) and reading
+        # them back for the admin console's Server logs panel
+        Sid    = "ServerLogs"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams",
+          "logs:FilterLogEvents", "logs:GetLogEvents", "logs:StartQuery",
+        ]
+        Resource = [aws_cloudwatch_log_group.demo.arn, "${aws_cloudwatch_log_group.demo.arn}:*"]
+      },
+      {
+        # Logs Insights results are fetched by query id (no resource-level permission exists)
+        Sid      = "ServerLogQueries"
+        Effect   = "Allow"
+        Action   = ["logs:GetQueryResults", "logs:StopQuery"]
+        Resource = "*"
+      },
+      {
         Sid      = "RunSandbox"
         Effect   = "Allow"
         Action   = "lambda:InvokeFunction"
@@ -140,6 +158,13 @@ resource "aws_iam_role_policy" "demo" {
       },
     ]
   })
+}
+
+# Server logs: every container of the demo machine, one stream per container, kept for
+# var.log_retention_days (CloudWatch charges per GB ingested; the demo writes a few MB a day).
+resource "aws_cloudwatch_log_group" "demo" {
+  name              = "/eagleeye/demo"
+  retention_in_days = var.log_retention_days
 }
 
 resource "aws_iam_instance_profile" "demo" {

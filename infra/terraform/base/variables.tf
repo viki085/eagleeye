@@ -52,6 +52,12 @@ variable "idle_minutes" {
   default     = 30
 }
 
+variable "log_retention_days" {
+  description = "How long the demo machine's server logs are kept in CloudWatch"
+  type        = number
+  default     = 14
+}
+
 variable "daily_runtime_cap_hours" {
   description = "The wake function refuses to start the machine beyond this much running time per UTC day"
   type        = number

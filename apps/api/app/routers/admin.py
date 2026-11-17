@@ -22,6 +22,7 @@ from app.repos import admin_metrics as metrics
 from app.repos import admin_overview, admin_presence, app_settings
 from app.repos import runs as runs_repo
 from app.services import demo_visits
+from app.services import server_logs as server_logs_svc
 from app.services.health_checks import check_all, check_databases
 from app.services.permissions import AdminUser
 
@@ -194,6 +195,36 @@ async def _queue_depths(request: Request) -> dict[str, int | None]:
             logger.warning("could not read queue depth for %s", queue, exc_info=True)
             depths[queue] = None
     return depths
+
+
+@router.get("/logs")
+async def server_logs(
+    request: Request,
+    _admin: AdminUser,
+    service: server_logs_svc.Service = "all",
+    window: server_logs_svc.Window = "1h",
+    level: server_logs_svc.Level = "all",
+    q: Annotated[str, Query(max_length=server_logs_svc.MAX_QUERY_CHARS)] = "",
+) -> dict:
+    """The newest server log lines (System tab). Views are not audited, like the rest of the
+    console. No questions or answers are logged (ids, counts, timings and errors); an identity
+    provider error line may include a user's email, so the panel is admin-only."""
+    settings = get_settings()
+    if not settings.log_group:
+        return ok(
+            {
+                "available": False,
+                "events": [],
+                "reason": "Server logs are kept in the cloud deployment only.",
+            }
+        )
+    query = server_logs_svc.LogQuery(service=service, window=window, level=level, text=q)
+    try:
+        events = await server_logs_svc.recent(settings.log_group, settings.aws_region, query)
+    except server_logs_svc.LogsUnavailableError as exc:
+        logger.warning("server logs unavailable: %s", exc)
+        return ok({"available": False, "events": [], "reason": f"Logs could not be loaded: {exc}."})
+    return ok({"available": True, "events": events, "limit": server_logs_svc.MAX_EVENTS})
 
 
 @router.get("/system")

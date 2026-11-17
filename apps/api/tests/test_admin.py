@@ -81,6 +81,7 @@ ROUTES = [
     "/v1/admin/safety",
     "/v1/admin/content",
     "/v1/admin/system",
+    "/v1/admin/logs",
 ]
 
 

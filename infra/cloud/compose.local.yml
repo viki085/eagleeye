@@ -24,8 +24,13 @@ services:
   api: &local
     env_file: ../../.env
     networks: [default, infra]
+    # a laptop has no CloudWatch: logs stay with Docker (and the Server logs panel says so)
+    logging: !override
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
     environment:
       <<: *local-lambda
+      LOG_GROUP: ""
       DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333

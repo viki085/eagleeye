@@ -62,6 +62,33 @@ export interface Citation {
   element_type?: "text" | "table" | "image";
 }
 
+export type ServerLogService = "all" | "api" | "gateway" | "agent-worker" | "ingest-worker";
+export type ServerLogWindow = "15m" | "1h" | "6h" | "24h";
+export type ServerLogLevel = "all" | "warning" | "error";
+
+export interface ServerLogFilters {
+  service: ServerLogService;
+  window: ServerLogWindow;
+  level: ServerLogLevel;
+  text: string;
+}
+
+export interface ServerLogEvent {
+  time: string; // "2026-11-17 17:20:01.123" (UTC)
+  service: string;
+  level: string | null;
+  logger: string | null;
+  message: string;
+  details: Record<string, unknown> | null;
+}
+
+export interface ServerLogs {
+  available: boolean;
+  events: ServerLogEvent[];
+  reason?: string;
+  limit?: number;
+}
+
 export const IS_UP_TIMEOUT_MS = 6_000;
 export const SIGN_OUT_NOTE_MS = 1_500;
 
@@ -546,6 +573,12 @@ export class ApiClient {
     return this.request<AdminUsers>(
       `/v1/admin/users?range=${range}&sort=${sort}&offset=${offset}&limit=50${online ? "&online=true" : ""}`,
     );
+  }
+
+  /** Newest server log lines (System tab); `available` is false where logs aren't kept. */
+  adminLogs(filters: ServerLogFilters): Promise<ServerLogs> {
+    const q = new URLSearchParams({ service: filters.service, window: filters.window, level: filters.level, q: filters.text });
+    return this.request<ServerLogs>(`/v1/admin/logs?${q.toString()}`);
   }
 
   adminDemoVisitors(): Promise<AdminDemoVisitors> {

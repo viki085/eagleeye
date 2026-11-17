@@ -15,9 +15,18 @@ x-service: &service
   restart: unless-stopped
   # Celery warm shutdown / uvicorn graceful shutdown: let running answers finish
   stop_grace_period: 120s
+  # server logs go to CloudWatch (one stream per container; the admin console's System tab
+  # reads them). Non-blocking: a slow CloudWatch never holds up the services. `docker logs`
+  # keeps working through Docker's local cache. compose.local.yml switches back to json-file.
   logging:
-    driver: json-file
-    options: { max-size: "10m", max-file: "3" }
+    driver: awslogs
+    options:
+      awslogs-region: ${AWS_REGION:-us-east-1}
+      awslogs-group: /eagleeye/demo
+      awslogs-create-group: "false"
+      tag: "{{.Name}}"
+      mode: non-blocking
+      max-buffer-size: 4m
 
 x-internal-urls: &internal-urls
   REDIS_URL: redis://redis:6379/0
@@ -30,6 +39,7 @@ services:
     environment:
       <<: *internal-urls
       SERVICE: api
+      LOG_GROUP: /eagleeye/demo  # the admin console's Server logs panel reads it
       # only CloudFront's origin-facing addresses may set the client address (set per deploy)
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
     ports:

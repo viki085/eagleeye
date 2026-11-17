@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Panel, Pill, SectionState, StatTile } from "@/components/admin/parts";
+import { ServerLogs } from "@/components/admin/server-logs";
 import { ServiceCard } from "@/components/service-card";
 import { useAdminData } from "@/hooks/use-admin-data";
 import { count } from "@/lib/admin-format";
@@ -134,6 +135,7 @@ export function SystemTab({ api, refreshKey }: { api: ApiClient; refreshKey: num
               </div>
             </Panel>
           </div>
+          <ServerLogs api={api} />
           <p className="text-[11px] text-neutral-400">Refreshes every 30 s · last updated {state.kind === "ok" ? state.at.toLocaleTimeString() : "—"}</p>
         </div>
       )}
