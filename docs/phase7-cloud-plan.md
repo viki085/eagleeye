@@ -60,7 +60,7 @@ So the plan keeps the production architecture (the same containers, the same aut
 - One EC2 machine runs the API, data gateway, both workers, Redis and the demo warehouse database with Docker Compose, using the same images as scale mode.
 - It is **stopped by default**. A stopped machine costs only its disk (about $1.60 per month).
 - When a visitor opens the app while it is asleep, the web app shows "Demo is asleep — Start demo". That calls a small AWS Lambda which starts the machine. It is ready in about 2 minutes.
-- The machine **stops itself 30 minutes after the last request from anyone**. This is separate from each visitor's own 30-minute allowance (below): with several visitors at once, the machine stays up until the last one leaves. A nightly safety rule also stops it if it is still running, and the wake Lambda refuses to start it beyond 6 hours of running time per day.
+- The machine **stops itself 30 minutes after the last request from anyone**. This is separate from each visitor's own 30-minute allowance (below): with several visitors at once, the machine stays up until the last one leaves. A nightly safety rule also stops it if it is still running, and the wake Lambda refuses to start it beyond 12 hours of running time per day (6 until 2026-11-17).
 - All features work, including data-file analysis and charts.
 
 **Analysis sandbox on Lambda** (both cloud modes; Docker stays for the laptop)
@@ -272,7 +272,7 @@ Commit `feat: phase 7c autoscaling stack and load test`. **Stop.**
 1. **Load-test size.** My recommendation: one ramp to 2,000 (about $13), falling back to 500 if the vCPU quota increase is refused.
 2. **GitHub repo:** private (default in this plan) or public.
 3. **Optional SQL accuracy check** in 7A: include or skip.
-4. **Demo limits (decided):** $0.50 and 30 minutes per IP per 24 hours, resumable the same day; $2 per day for all visitors together; per-visitor chats; countdown in the banner. Also set a monthly hard limit in your OpenAI account (for example $20) as a backstop.
+4. **Demo limits (decided):** $0.50 and 30 minutes per IP per 24 hours, resumable the same day; $3 per day for all visitors together; per-visitor chats; countdown in the banner. Also set a monthly hard limit in your OpenAI account (for example $20) as a backstop.
 
 ## Risks
 
@@ -283,7 +283,7 @@ Commit `feat: phase 7c autoscaling stack and load test`. **Stop.**
 | Free Supabase or Qdrant project suspended or too slow under load | Weekly keep-alive; separate load-test project; temporary Postgres fallback; reindex command |
 | Something is left running and drains the credit | Free plan cannot bill a card; budget alerts; idle stop, nightly stop, 4-hour auto-destroy |
 | Load-test sign-in or stub model enabled outside a test | Startup refuses them unless `APP_ENV=loadtest`; tests; security review; separate database |
-| Anyone with the link can wake the demo and use the model | Per-IP allowance ($0.50, 30 minutes per 24 hours) checked before sign-in and before waking the machine; $2 per day for all visitors; machine running time capped at 6 hours per day and stopped when idle; OpenAI monthly hard limit as a backstop |
+| Anyone with the link can wake the demo and use the model | Per-IP allowance ($1, 30 minutes per 24 hours) checked before sign-in and before waking the machine; $3 per day for all visitors; machine running time capped at 12 hours per day and stopped when idle; OpenAI monthly hard limit as a backstop |
 | Visitors see each other's chats and uploads in the shared demo account | Chats, documents and data files are tagged with the visitor's allowance and filtered by it; visitors' data is deleted when their window ends; banner. Separate Clerk accounts per visitor were ruled out because Clerk development mode caps users at 500 |
 | IP is a weak identity (shared office networks, VPNs, rotating IPv6) | Accepted for a portfolio demo; IPv6 grouped by /64; the $2 daily total and the OpenAI hard limit bound the cost |
 | The demo sign-in is left on in a real deployment | Off by default; a separate setting on web and API; covered by a test and the security review |

@@ -12,6 +12,21 @@ interface ServerWakingProps {
   isUp: () => Promise<boolean>;
 }
 
+/** Shown while the first liveness check runs: the app opens only once the server answers. */
+export function ServerConnecting() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#f3f3f0] px-4 dark:bg-[#0b0b0c]">
+      <div role="status" aria-live="polite" className="w-full max-w-sm text-center">
+        <BrandIcon size={48} className="mx-auto block" />
+        <h1 className="mt-5 text-lg font-semibold text-neutral-900 dark:text-neutral-50">Connecting to EagleEye…</h1>
+        <div className="mx-auto mt-6 h-1 w-40 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
+          <div className="h-full w-1/3 animate-[pulse_1.5s_ease-in-out_infinite] rounded-full bg-[#9E8253]" />
+        </div>
+      </div>
+    </main>
+  );
+}
+
 /**
  * The API didn't answer: in the cloud the demo machine sleeps when idle. Ask once for it to be
  * started (/api/wake), check every few seconds, and reload when it's up (usually ~2 minutes).

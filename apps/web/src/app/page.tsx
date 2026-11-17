@@ -4,7 +4,7 @@ import { useClerk } from "@clerk/nextjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { NoAccess } from "@/components/auth/no-access";
-import { ServerWaking } from "@/components/server-waking";
+import { ServerConnecting, ServerWaking } from "@/components/server-waking";
 import { Composer } from "@/components/chat/composer";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { Sidebar } from "@/components/chat/sidebar";
@@ -59,6 +59,9 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
   const [noAccess, setNoAccess] = useState<string | null>(null);
   const [asleep, setAsleep] = useState(false);
+  // the app opens only after the server has answered; until then "Connecting", and if it doesn't
+  // answer (the demo machine sleeps when idle) straight to "Starting EagleEye"
+  const [serverUp, setServerUp] = useState(false);
   const isUp = useCallback(() => api.isUp(), [api]);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<{ text: string; id: number } | null>(null);
@@ -77,6 +80,19 @@ export default function ChatPage() {
   }, [api]);
 
   useEffect(() => {
+    let cancelled = false;
+    void api.isUp().then((up) => {
+      if (cancelled) return;
+      if (up) setServerUp(true);
+      else setAsleep(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
+  useEffect(() => {
+    if (!serverUp) return;
     void refreshChats();
     api
       .getMe()
@@ -100,7 +116,7 @@ export default function ChatPage() {
         // can never loop through reloads)
         void api.isUp().then((up) => (up ? setError("Couldn't load your account. Reload the page.") : setAsleep(true)));
       });
-  }, [api, refreshChats]);
+  }, [api, refreshChats, serverUp]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -241,6 +257,7 @@ export default function ChatPage() {
 
   if (noAccess) return <NoAccess message={noAccess} />;
   if (asleep) return <ServerWaking isUp={isUp} />;
+  if (!serverUp) return <ServerConnecting />;
 
   return (
     // relative + overflow-hidden: the shell is exactly one screen; nothing inside it (e.g. an

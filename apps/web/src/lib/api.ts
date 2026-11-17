@@ -60,6 +60,8 @@ export interface Citation {
   snippet: string;
 }
 
+export const IS_UP_TIMEOUT_MS = 6_000;
+
 export interface ChunkDetail {
   id: string;
   chunk_no: number;
@@ -692,9 +694,15 @@ export class ApiClient {
   }
 
   /** Liveness without signing in: false while the (sleeping) server doesn't answer. */
+  /** The API answers its liveness check. A sleeping demo machine makes CloudFront wait about
+   * 30 s before its error page, so give up after IS_UP_TIMEOUT_MS (a live server answers in well
+   * under a second). */
   async isUp(): Promise<boolean> {
     try {
-      const resp = await fetch(`${API_URL}/v1/health/live`, { cache: "no-store" });
+      const resp = await fetch(`${API_URL}/v1/health/live`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(IS_UP_TIMEOUT_MS),
+      });
       return resp.ok;
     } catch {
       return false;

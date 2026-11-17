@@ -55,7 +55,7 @@ variable "idle_minutes" {
 variable "daily_runtime_cap_hours" {
   description = "The wake function refuses to start the machine beyond this much running time per UTC day"
   type        = number
-  default     = 6
+  default     = 12
 }
 
 variable "nightly_stop_cron" {
