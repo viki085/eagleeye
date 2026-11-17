@@ -21,7 +21,7 @@ from pypdf.errors import PdfReadError
 
 from ingest_worker.errors import PermanentIngestError
 from ingest_worker.parsing.base import BBox, ElementKind, ParsedDocument, ParsedElement
-from ingest_worker.parsing.pdf import PdfParser
+from ingest_worker.parsing.pdf import PdfParser, heading_level
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +143,11 @@ def to_elements(document: Any) -> list[ParsedElement]:
         if not text:
             continue
         level = _heading_level(label, item) if kind == "heading" else None
+        if level is None and kind == "text":
+            # the layout model can miss a short heading on a sparse page; the plain-text rule
+            # (ALL CAPS or "2.1 Title", short, no end punctuation) still catches it
+            level = heading_level(text)
+            kind = "heading" if level is not None else kind
         elements.append(ParsedElement(text, page=page, heading_level=level, kind=kind, bbox=bbox))
     return elements
 
