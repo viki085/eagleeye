@@ -130,6 +130,13 @@ def line_chart(data: list[tuple[str, float]]) -> Drawing:
     plot.xValueAxis.labelTextFormat = lambda i: data[int(i)][0]
     plot.xValueAxis.labels.fontSize = 7
     plot.yValueAxis.valueMin, plot.yValueAxis.valueMax = 60, 100
+    # the value printed every third month and on the last, so the chart can be read exactly
+    shown = {*range(3, len(data), 3), len(data) - 1}  # not month 0: it would sit on the y-axis
+    plot.lineLabelFormat = "values"
+    plot.lineLabelArray = [[f"{v:.1f}" if i in shown else "" for i, (_, v) in enumerate(data)]]
+    plot.lineLabels.fontSize = 7
+    plot.lineLabels.dy = 7
+    plot.lines[0].symbol = None
     d.add(plot)
     d.add(
         String(
@@ -226,7 +233,7 @@ def main() -> None:
         Paragraph(f"Table 2: Average voyage by routing, {YEAR}", s["Italic"]),
         Spacer(1, 0.3 * cm),
         table(
-            ["Routing", "Voyages", "Avg distance (nm)", "Avg fuel (t)", "Avg CO2 (t)"],
+            ["Routing", "Voyages", "Distance (nm)", "Fuel (t)", "CO2 (t)"],
             by_route,
             [4.6, 2.2, 3.4, 3, 3],
         ),
