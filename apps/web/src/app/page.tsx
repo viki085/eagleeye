@@ -68,7 +68,10 @@ export default function ChatPage() {
   const isDemo = me?.isDemo === true;
   const demoVisit = useDemoVisit(api, isDemo);
   const clerk = useClerk();
-  const signOutOfDemo = useCallback(() => void clerk.signOut({ redirectUrl: "/demo" }), [clerk]);
+  const signOutOfDemo = useCallback(
+    () => void api.noteSignOut().finally(() => clerk.signOut({ redirectUrl: "/demo" })),
+    [api, clerk],
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const refreshChats = useCallback(async () => {

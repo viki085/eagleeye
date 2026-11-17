@@ -45,3 +45,19 @@ def test_a_failed_last_seen_write_never_fails_the_request(monkeypatch) -> None: 
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(pool=Broken())))
     monkeypatch.setattr(auth, "_last_seen_write", {})
     asyncio.run(auth._note_seen(request, "u-2"))  # noqa: SLF001 — no exception
+
+
+def test_after_a_sign_out_last_seen_writes_wait_a_minute(monkeypatch) -> None:  # noqa: ANN001
+    pool = RecordingPool()
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(pool=pool)))
+    clock = iter([1000.0, 1010.0, 1061.0])
+    monkeypatch.setattr(auth, "_seen_clock", lambda: next(clock))
+    monkeypatch.setattr(auth, "_last_seen_write", {})
+    auth.pause_seen("u-3")  # t=1000: signed out
+
+    async def run() -> None:
+        await auth._note_seen(request, "u-3")  # noqa: SLF001 - t=1010: a late request
+        await auth._note_seen(request, "u-3")  # noqa: SLF001 - t=1061: the next sign-in
+
+    asyncio.run(run())
+    assert len(pool.calls) == 1  # the late request did not mark them online again

@@ -102,6 +102,9 @@ row (it stays its own chunk with its own page). Found in the live library: all 8
 agreements have a rate table that breaks across pages 1 and 2, and the page-2 rows could not be
 found.
 
+Re-run after the caption fix and the paired chart-value prompt (same day): budget_recall
+0.978, recall@5 0.978, MRR 0.954 (was 0.939); same four misses.
+
 ## Not done
 
 - Fewer questions sharing one answer (the NIST date cluster).

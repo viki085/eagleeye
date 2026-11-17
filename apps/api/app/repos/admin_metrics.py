@@ -15,6 +15,8 @@ from app.repos.admin_presence import ONLINE_S
 
 Range = Literal["24h", "7d", "14d", "30d"]
 TERMINAL = ("SUCCEEDED", "FAILED", "CANCELLED", "BUDGET_EXCEEDED")
+# active since their last sign-out (a sign-out takes them offline at once)
+SIGNED_IN = "(u.signed_out_at IS NULL OR u.signed_out_at < u.last_seen_at)"
 USER_SORTS = {
     "last_seen": "u.last_seen_at DESC NULLS LAST",
     "cost": "cost_usd DESC",
@@ -60,7 +62,7 @@ async def users(
     # demo visit accounts are internal (shown in the Demo visitors panel, not as users)
     where = "u.status <> 'deleted' AND u.clerk_user_id NOT LIKE 'demo-visit:%'"
     if online_only:
-        where += f" AND u.last_seen_at >= now() - interval '{ONLINE_S} seconds'"
+        where += f" AND u.last_seen_at >= now() - interval '{ONLINE_S} seconds' AND {SIGNED_IN}"
     rows = await pool.fetch(
         f"""
         SELECT u.id, u.email, u.username, u.display_name, u.role, u.status,
@@ -68,7 +70,8 @@ async def users(
                coalesce(r.runs, 0) AS runs, coalesce(p.cost_usd, 0) AS cost_usd,
                coalesce(p.tokens, 0) AS tokens, r.last_run_at,
                coalesce(l.lifetime_cost, 0) AS lifetime_cost_usd,
-               coalesce(u.last_seen_at >= now() - interval '{ONLINE_S} seconds', false) AS online
+               coalesce(u.last_seen_at >= now() - interval '{ONLINE_S} seconds' AND {SIGNED_IN},
+                        false) AS online
           FROM users u
           LEFT JOIN (
                 SELECT user_id, count(*) AS runs, max(created_at) AS last_run_at

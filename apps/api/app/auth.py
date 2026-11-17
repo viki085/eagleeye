@@ -235,6 +235,12 @@ async def _note_seen(request: Request, user_id: str) -> None:
         logger.debug("could not record last_seen for %s", user_id, exc_info=True)
 
 
+def pause_seen(user_id: str) -> None:
+    """After a sign-out: a request still in flight must not mark the user online again, so
+    last_seen writes for them wait a full SEEN_EVERY_S (per process, best effort)."""
+    _last_seen_write[user_id] = _seen_clock()
+
+
 _visit_cache = _TtlCache(USER_CACHE_TTL_S)  # Clerk session id -> the visit account
 
 

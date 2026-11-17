@@ -63,6 +63,7 @@ export interface Citation {
 }
 
 export const IS_UP_TIMEOUT_MS = 6_000;
+export const SIGN_OUT_NOTE_MS = 1_500;
 
 export interface ChunkDetail {
   id: string;
@@ -708,6 +709,23 @@ export class ApiClient {
       return resp.ok;
     } catch {
       return false;
+    }
+  }
+
+  /** Before signing out: the admin console shows this person offline at once. Best effort:
+   * never throws and waits at most SIGN_OUT_NOTE_MS, so signing out is never held up. */
+  async noteSignOut(): Promise<void> {
+    try {
+      const token = await this.getToken();
+      if (!token) return;
+      await fetch(`${API_URL}/v1/me/sign-out`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        keepalive: true,
+        signal: AbortSignal.timeout(SIGN_OUT_NOTE_MS),
+      });
+    } catch {
+      // the 5-minute "online" window still applies
     }
   }
 

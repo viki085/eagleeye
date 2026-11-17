@@ -18,6 +18,8 @@ MAX_VISITS = 100
 
 # company users: real accounts, not the shared demo sign-in, not demo visit accounts
 _COMPANY = "u.status = 'active' AND NOT coalesce(u.is_demo, false) AND u.clerk_user_id NOT LIKE $1"
+# active since their last sign-out (a sign-out takes them offline at once)
+_SIGNED_IN = "(u.signed_out_at IS NULL OR u.signed_out_at < u.last_seen_at)"
 
 
 def mask_ip(ip_key: str) -> str:
@@ -37,14 +39,15 @@ async def presence(pool: asyncpg.Pool) -> dict[str, Any]:
     row = await pool.fetchrow(
         f"""
         SELECT
-          (SELECT count(*) FROM users u WHERE {_COMPANY}
+          (SELECT count(*) FROM users u WHERE {_COMPANY} AND {_SIGNED_IN}
               AND u.last_seen_at >= now() - make_interval(secs => $2)) AS company_online,
           (SELECT count(*) FROM users u WHERE {_COMPANY}
               AND u.last_seen_at >= date_trunc('day', now())) AS company_today,
           (SELECT count(*) FROM users u WHERE {_COMPANY}
               AND u.last_seen_at >= now() - interval '7 days') AS company_7d,
           (SELECT count(DISTINCT s.visit_id) FROM demo_sessions s
-              WHERE s.last_seen_at >= now() - make_interval(secs => $2)) AS demo_online,
+              WHERE s.ended_at IS NULL
+                AND s.last_seen_at >= now() - make_interval(secs => $2)) AS demo_online,
           (SELECT count(DISTINCT s.visit_id) FROM demo_sessions s
               WHERE s.last_seen_at >= date_trunc('day', now())) AS demo_today,
           (SELECT count(DISTINCT s.visit_id) FROM demo_sessions s
@@ -68,6 +71,8 @@ async def demo_visitors(pool: asyncpg.Pool) -> dict[str, Any]:
         SELECT v.id, v.ip_key, v.window_start, v.seconds_used,
                (SELECT max(s.last_seen_at) FROM demo_sessions s WHERE s.visit_id = v.id)
                    AS last_active,
+               (SELECT max(s.last_seen_at) FROM demo_sessions s
+                 WHERE s.visit_id = v.id AND s.ended_at IS NULL) AS open_active,
                (SELECT coalesce(sum(l.cost_usd), 0) FROM usage_ledger l
                  WHERE l.user_id = v.user_id AND l.created_at >= v.window_start) AS spend_usd,
                (SELECT count(*) FROM runs r WHERE r.user_id = v.user_id) AS questions,
@@ -90,9 +95,7 @@ async def demo_visitors(pool: asyncpg.Pool) -> dict[str, Any]:
         DEMO_VISIT,
     )
     online_since = await pool.fetchval("SELECT now() - make_interval(secs => $1)", ONLINE_S)
-    expired_before = await pool.fetchval(
-        "SELECT now() - make_interval(hours => $1)", VISIT_HOURS
-    )
+    expired_before = await pool.fetchval("SELECT now() - make_interval(hours => $1)", VISIT_HOURS)
     seconds, budget = int(limits["visit_seconds"]), float(limits["visit_budget_usd"])
     items = []
     for r in rows:
@@ -109,7 +112,7 @@ async def demo_visitors(pool: asyncpg.Pool) -> dict[str, Any]:
                 "network": mask_ip(r["ip_key"]),
                 "started_at": r["window_start"].isoformat(),
                 "last_active_at": r["last_active"].isoformat() if r["last_active"] else None,
-                "online": bool(r["last_active"] and r["last_active"] >= online_since),
+                "online": bool(r["open_active"] and r["open_active"] >= online_since),
                 "seconds_used": int(r["seconds_used"]),
                 "spend_usd": round(spend, 4),
                 "questions": int(r["questions"]),

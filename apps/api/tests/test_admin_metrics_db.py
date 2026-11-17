@@ -278,3 +278,30 @@ async def test_tokens_cache_calls_and_monthly_spend(conn: asyncpg.Connection) ->
     assert month["spend_usd"] - before["month"]["spend_usd"] == pytest.approx(0.42)
     assert month["remaining_usd"] == pytest.approx(max(50.0 - month["spend_usd"], 0), abs=0.01)
     assert month["month_start"].endswith("-01")
+
+
+async def test_a_sign_out_takes_a_user_offline_at_once(conn: asyncpg.Connection) -> None:
+    from app.repos import admin_presence as ap
+
+    uid = str(uuid.uuid4())
+    await conn.execute(
+        "INSERT INTO users (id, clerk_user_id, email, role, last_seen_at)"
+        " VALUES ($1, $2, 'presence@test.local', 'member', now() - interval '1 minute')",
+        uid,
+        f"clerk_{uid}",
+    )
+
+    async def online() -> tuple[bool, int]:
+        page = await m.users(conn, m.WINDOWS["24h"], "email", 0, 500, 500.0, online_only=True)
+        listed = any(str(i["id"]) == uid for i in page["items"])
+        return listed, (await ap.presence(conn))["online"]["company"]
+
+    listed, count = await online()
+    assert listed
+    await conn.execute("UPDATE users SET signed_out_at = now() WHERE id = $1", uid)
+    assert await online() == (False, count - 1)
+    # signed in again: the next request records a newer last_seen
+    await conn.execute(
+        "UPDATE users SET last_seen_at = now() + interval '1 second' WHERE id = $1", uid
+    )
+    assert (await online())[0]

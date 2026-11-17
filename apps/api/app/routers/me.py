@@ -4,7 +4,7 @@ from eagleeye_core.config import get_settings
 from eagleeye_core.envelope import ok
 from fastapi import APIRouter, Request
 
-from app.auth import CurrentUser, usage_limit_for
+from app.auth import CurrentUser, pause_seen, usage_limit_for
 from app.repos import usage as usage_repo
 from app.repos.users import fresh_role
 from app.services.permissions import can_manage_enterprise
@@ -31,6 +31,21 @@ async def me(request: Request, user: CurrentUser) -> dict:
             "is_demo": user.is_demo,
         }
     )
+
+
+@router.post("/me/sign-out")
+async def signed_out(request: Request, user: CurrentUser) -> dict:
+    """The app is signing this person out: the admin console shows them offline at once
+    (company users through users.signed_out_at, a demo visit by ending its sign-in session)."""
+    pool = request.app.state.pool
+    pause_seen(user.id)
+    await pool.execute("UPDATE users SET signed_out_at = now() WHERE id = $1", user.id)
+    if user.is_demo and user.session_id:
+        await pool.execute(
+            "UPDATE demo_sessions SET ended_at = now() WHERE clerk_session_id = $1",
+            user.session_id,
+        )
+    return ok({"signed_out": True})
 
 
 @router.get("/me/usage")

@@ -189,7 +189,11 @@ export function AccountMenu({ placement = "below", role, isDemo = false }: Accou
               </button>
             )}
             <button type="button" role="menuitem" className={ITEM}
-              onClick={() => { close(false); void clerk.signOut({ redirectUrl: isDemo ? "/demo" : "/sign-in" }); }}>
+              onClick={() => {
+                close(false);
+                // tell the server first so the admin console shows this person offline at once
+                void api.noteSignOut().finally(() => clerk.signOut({ redirectUrl: isDemo ? "/demo" : "/sign-in" }));
+              }}>
               <MenuIcon path={<><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l-5-5 5-5" /><path d="M5 12h11" /></>} />
               Sign out
             </button>
