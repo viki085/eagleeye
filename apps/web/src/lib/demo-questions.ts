@@ -32,6 +32,29 @@ export const DEMO_GROUPS: readonly DemoGroup[] = [
     ],
   },
   {
+    // the Fleet and Market Review 2025 (Trial/data/build_fleet_review.py): tables and charts
+    title: "Tables and charts in documents",
+    icon: "book",
+    questions: [
+      {
+        text: "In the Fleet and Market Review 2025, which vessel class had the highest carbon intensity per TEU-km, and how does it compare with the Neo-Panamax ships?",
+        note: "Read from a table, shown as a table",
+      },
+      {
+        text: "According to the utilisation chart in the Fleet and Market Review 2025, which service was the fullest on headhaul and which the emptiest?",
+        note: "Read from a chart, shown as the picture",
+      },
+      {
+        text: "In the Fleet and Market Review 2025, how much longer and how much more CO2 was an average Cape of Good Hope voyage than a Suez voyage?",
+        note: "A table plus a calculation",
+      },
+      {
+        text: "How did the Brent oil price move during 2025, according to the chart in the Fleet and Market Review 2025?",
+        note: "A trend read from a line chart",
+      },
+    ],
+  },
+  {
     title: "Operations database",
     icon: "database",
     questions: [

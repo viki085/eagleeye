@@ -141,6 +141,10 @@ def _compact_markdown(markdown: str) -> str:
     dashes, which fills the model's reading budget. Same table, one space around each cell."""
     rows = []
     for line in markdown.strip().splitlines():
+        # Docling puts a table's caption (and a blank line) above the rows; the caption is its own
+        # text element too, and as a "row" it took the header's place
+        if not line.strip().startswith("|"):
+            continue
         cells = [" ".join(cell.split()) for cell in line.strip().strip("|").split("|")]
         if cells and all(cell and set(cell) <= set("-:") for cell in cells):
             cells = ["---"] * len(cells)  # the header rule, shortened

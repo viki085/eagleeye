@@ -87,3 +87,10 @@ def test_a_table_embeds_as_plain_rows_without_padding_or_the_rule() -> None:
         element_type="table",
     )
     assert embedding_text("Report", table) == "Report\nRevenue\n\nRegion | 2024\nNorth | 120"
+
+
+def test_a_caption_above_the_table_is_not_taken_for_its_header() -> None:
+    from ingest_worker.parsing.docling_pdf import _compact_markdown
+
+    md = "Table 2: Average voyage by routing\n\n| Routing | Voyages |\n|---|---|\n| Cape | 115 |"
+    assert _compact_markdown(md) == "| Routing | Voyages |\n| --- | --- |\n| Cape | 115 |"
