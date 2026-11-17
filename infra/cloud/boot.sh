@@ -46,9 +46,11 @@ ecr_login() {
     | docker login --username AWS --password-stdin "$registry"
 }
 retry 3 ecr_login
+# the disk is small (20 GB) and each image is a few GB: drop images no container uses before
+# pulling (a full disk fails the pull and the demo stays down), and again after the start
+docker image prune -af >/dev/null || true
 retry 3 eagleeye-compose pull --quiet
 eagleeye-compose up -d --remove-orphans
-# the disk is small (20 GB) and each image is a few GB: drop images no container uses any more
 docker image prune -af >/dev/null || true
 
 # the warehouse's read-only role gets this deployment's password (its init file has a local one)
