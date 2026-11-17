@@ -6,7 +6,8 @@ STEP_STARTED = "step.started"  # {step_id, parent_id, kind, name, input_summary}
 STEP_FINISHED = "step.finished"  # {step_id, status, output_summary, duration_ms, tokens, cost}
 TEXT_DELTA = "text.delta"  # {text}
 TEXT_REPLACE = "text.replace"  # {text} — output filter replaced the answer
-CITATION = "citation"  # {n, document_id, chunk_id, title, page, heading_path, scope, snippet, element_type}
+# {n, document_id, chunk_id, title, page, heading_path, scope, snippet, element_type}
+CITATION = "citation"
 # {artifact_id, type, title, sql, mode, columns, row_count, truncated, preview}
 ARTIFACT = "artifact"
 CHART = "chart"  # {chart_id, title, spec (Vega-Lite, data inline), summary, source_id}
