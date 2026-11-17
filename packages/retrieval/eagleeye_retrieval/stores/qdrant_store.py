@@ -60,7 +60,11 @@ class QdrantEnterpriseStore:
                     qm.PointStruct(
                         id=p.chunk_id,
                         vector=p.vector,
-                        payload={"document_id": p.document_id, "chunk_no": p.chunk_no},
+                        payload={
+                            "document_id": p.document_id,
+                            "chunk_no": p.chunk_no,
+                            "element_type": p.element_type,
+                        },
                     )
                     for p in batch
                 ],

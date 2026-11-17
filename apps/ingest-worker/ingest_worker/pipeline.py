@@ -1,4 +1,8 @@
-"""Ingest pipeline: SCANNING → PARSING → CHUNKING → EMBEDDING → upsert → READY (C4 §3)."""
+"""Ingest pipeline: SCANNING → PARSING → CHUNKING → EMBEDDING → upsert → READY (C4 §3).
+
+PARSING includes the CLEAN step (parsing.clean): watermarks, running headers/footers and page
+numbers are dropped before chunking, and how the file was read goes to documents.parse_report.
+"""
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -17,8 +21,9 @@ from ingest_worker import repo
 from ingest_worker.chunking import PATH_SEP, Chunk, chunk
 from ingest_worker.errors import PermanentIngestError, TransientIngestError
 from ingest_worker.parsing.base import ParsedDocument, sanitize
+from ingest_worker.parsing.clean import clean
 from ingest_worker.parsing.registry import parser_for
-from ingest_worker.sniff import sniff
+from ingest_worker.sniff import FileKind, sniff
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +74,13 @@ async def _upsert(
     if personal:
         return
     points = [
-        VectorPoint(chunk_id=cid, document_id=doc_id, chunk_no=c.chunk_no, vector=v)
+        VectorPoint(
+            chunk_id=cid,
+            document_id=doc_id,
+            chunk_no=c.chunk_no,
+            vector=v,
+            element_type=c.element_type,
+        )
         for cid, c, v in zip(ids, chunks, vectors, strict=True)
     ]
     try:
@@ -77,6 +88,10 @@ async def _upsert(
         await deps.enterprise_store.upsert(points)
     except Exception as exc:
         raise TransientIngestError("The vector store is temporarily unavailable.") from exc
+
+
+def parse(kind: FileKind, data: bytes) -> ParsedDocument:
+    return clean(sanitize(parser_for(kind).parse(data)))
 
 
 def _chunks(parsed: ParsedDocument) -> list[Chunk]:
@@ -107,10 +122,11 @@ async def reindex(document_id: str, deps: PipelineDeps) -> bool:
         return False
     try:
         data = await _load_bytes(deps, doc["s3_key"])
-        parsed = sanitize(parser_for(sniff(doc["filename"], data)).parse(data))
+        parsed = parse(sniff(doc["filename"], data), data)
         chunks = _chunks(parsed)
         vectors = await _embed(deps, doc["title"], chunks)
         await _upsert(deps, doc, chunks, vectors)
+        await repo.set_parse_report(deps.conn, document_id, parsed.report())
         await repo.mark_ready(deps.conn, document_id, len(chunks))
     except PermanentIngestError as exc:
         logger.warning("reindex %s skipped, old chunks kept: %s", document_id, exc.user_message)
@@ -131,8 +147,9 @@ async def process(document_id: str, deps: PipelineDeps) -> None:
         kind = sniff(doc["filename"], data)
 
         await repo.set_status(deps.conn, document_id, "PARSING")
-        parsed = sanitize(parser_for(kind).parse(data))
+        parsed = parse(kind, data)
         await repo.set_page_count(deps.conn, document_id, parsed.page_count)
+        await repo.set_parse_report(deps.conn, document_id, parsed.report())
 
         await repo.set_status(deps.conn, document_id, "CHUNKING")
         chunks = _chunks(parsed)

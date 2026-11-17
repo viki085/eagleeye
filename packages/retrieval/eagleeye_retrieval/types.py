@@ -34,6 +34,7 @@ class VectorPoint:
     document_id: str
     chunk_no: int
     vector: list[float]
+    element_type: str = "text"  # "text" | "table" (stored in the Qdrant payload)
 
 
 @dataclass(frozen=True)

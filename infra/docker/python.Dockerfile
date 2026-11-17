@@ -31,6 +31,13 @@ RUN case "$SERVICE" in \
       *) echo "SERVICE must be all, api, gateway, agent-worker or ingest-worker" >&2; exit 1 ;; \
     esac \
     && uv sync --frozen --no-dev --no-editable $target
+# The ingest worker's PDF parser (Docling) needs its layout, table and OCR models. They are
+# downloaded here, at build time, so a worker never fetches models at run time (~0.7 GB).
+RUN mkdir -p /opt/docling-models \
+    && if [ -x /opt/venv/bin/docling-tools ]; then \
+         /opt/venv/bin/docling-tools models download layout tableformer rapidocr \
+           --rapidocr-backend-lang onnxruntime:latin -o /opt/docling-models; \
+       fi
 
 FROM python:${PYTHON_VERSION}-slim AS runtime
 ARG SERVICE=all
@@ -41,6 +48,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --create-home --shell /usr/sbin/nologin eagleeye
 COPY --from=build /opt/venv /opt/venv
+COPY --from=build /opt/docling-models /opt/docling-models
 COPY infra/docker/entrypoint.sh /usr/local/bin/eagleeye-entrypoint
 COPY infra/docker/healthcheck.py /usr/local/bin/eagleeye-healthcheck
 # the demo machine's stop timer runs this inside the API container (Phase 7B)
@@ -52,6 +60,8 @@ ENV SERVICE=${SERVICE} \
     PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    DOCLING_ARTIFACTS_PATH=/opt/docling-models \
+    HF_HUB_OFFLINE=1 \
     HOME=/home/eagleeye
 WORKDIR /app
 USER 10001

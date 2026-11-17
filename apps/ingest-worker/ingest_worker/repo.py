@@ -38,6 +38,10 @@ async def set_page_count(conn: asyncpg.Connection, document_id: str, pages: int 
     await conn.execute("UPDATE documents SET page_count = $2 WHERE id = $1", document_id, pages)
 
 
+async def set_parse_report(conn: asyncpg.Connection, document_id: str, report: dict) -> None:
+    await conn.execute("UPDATE documents SET parse_report = $2 WHERE id = $1", document_id, report)
+
+
 async def mark_ready(conn: asyncpg.Connection, document_id: str, chunk_count: int) -> None:
     await conn.execute(
         """
@@ -68,8 +72,8 @@ async def replace_chunks(
             """
             INSERT INTO document_chunks
                 (document_id, chunk_no, content, heading_path, page, scope, owner_id,
-                 chunk_hash, embedding)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector)
+                 chunk_hash, embedding, element_type, bbox, table_html)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector, $10, $11, $12)
             RETURNING id
             """,
             doc["id"],
@@ -81,6 +85,9 @@ async def replace_chunks(
             doc["owner_id"],
             c.chunk_hash,
             embedding,
+            c.element_type,
+            list(c.bbox) if c.bbox else None,
+            c.table_html,
         )
         ids.append(str(chunk_id))
     return ids

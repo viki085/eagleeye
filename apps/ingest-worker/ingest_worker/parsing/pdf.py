@@ -147,4 +147,4 @@ class PdfParser:
             for i, text in enumerate(pages, start=1)
             for el in page_elements(text, i, self.options)
         ]
-        return ParsedDocument(tuple(elements), page_count=page_count)
+        return ParsedDocument(tuple(elements), page_count=page_count, parser="pypdf")

@@ -69,6 +69,14 @@ class Settings(BaseSettings):
     chunk_soft_chars: int = 1200
     chunk_min_chars: int = 400
     chunk_overlap_chars: int = 200
+    # PDF parsing (multimodal RAG plan, Phase 1). "docling" = layout, tables and OCR on the
+    # worker's CPU; "pypdf" = the old plain-text reader (emergency fallback).
+    pdf_parser: str = "docling"
+    pdf_max_pages: int = 300
+    docling_ocr: bool = True
+    docling_table_mode: str = "accurate"  # "accurate" | "fast"
+    docling_timeout_s: int = 600  # per document; partial output is kept when it runs out
+    docling_artifacts_path: str = ""  # baked-in models (the image sets it); empty = download
 
     docs_bucket: str = "eagleeye-local-docs"
     max_upload_mb: int = 25

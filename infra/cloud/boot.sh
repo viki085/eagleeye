@@ -48,6 +48,8 @@ ecr_login() {
 retry 3 ecr_login
 retry 3 eagleeye-compose pull --quiet
 eagleeye-compose up -d --remove-orphans
+# the disk is small (20 GB) and each image is a few GB: drop images no container uses any more
+docker image prune -af >/dev/null || true
 
 # the warehouse's read-only role gets this deployment's password (its init file has a local one)
 ro=$(grep '^WAREHOUSE_RO_PASSWORD=' .env.demo | cut -d= -f2-)

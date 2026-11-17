@@ -7,6 +7,9 @@
 - Sections under `min_chars` are merged into the following section when the
   result still fits; the merged path is the common prefix and the dropped heading
   titles are kept inline as text.
+- A table is never mixed with text: it is its own chunk (element_type "table"), and a
+  table longer than `max_chars` is split by rows with its header row repeated in every
+  part, so each part still says which column a number belongs to.
 """
 
 import hashlib
@@ -14,7 +17,7 @@ import re
 from dataclasses import dataclass
 from itertools import takewhile
 
-from ingest_worker.parsing.base import ParsedElement
+from ingest_worker.parsing.base import BBox, ParsedElement
 
 # Chosen with the retrieval eval (config C, ADR-32): budgeted recall 0.86 vs 0.80 for the old
 # 2400/3000 setting. The worker reads these from settings (CHUNK_* env vars).
@@ -36,18 +39,24 @@ class Chunk:
     heading_path: tuple[str, ...]
     page: int | None
     chunk_hash: str
+    element_type: str = "text"  # "text" | "table"
+    bbox: BBox | None = None  # tables: position on the page
+    table_html: str | None = None  # tables: the whole table's structure
 
 
 @dataclass(frozen=True)
 class _Block:
     text: str
     page: int | None
+    bbox: BBox | None = None
+    table_html: str | None = None
 
 
 @dataclass(frozen=True)
 class _Section:
     path: tuple[str, ...]
     blocks: tuple[_Block, ...]
+    table: bool = False
 
     @property
     def size(self) -> int:
@@ -72,6 +81,12 @@ def _sections(elements: list[ParsedElement] | tuple[ParsedElement, ...]) -> list
                 blocks = []
             kept = tuple(s for s in stack if s[0] < el.heading_level)
             stack = (*kept, (el.heading_level, text[:MAX_HEADING_CHARS]))
+        elif el.kind == "table":
+            if blocks:
+                sections.append(_Section(path(), tuple(blocks)))
+                blocks = []
+            table = _Block(text, el.page, el.bbox, el.table_html)
+            sections.append(_Section(path(), (table,), table=True))
         else:
             blocks.append(_Block(text, el.page))
     if blocks:
@@ -101,6 +116,12 @@ def _merge_tiny(sections: list[_Section], min_chars: int, max_chars: int) -> lis
     out: list[_Section] = []
     carry: _Section | None = None
     for sec in sections:
+        if sec.table:  # tables are never merged with text
+            if carry is not None:
+                out.append(carry)
+                carry = None
+            out.append(sec)
+            continue
         if carry is not None:
             prefix = _common_prefix(carry.path, sec.path)
             merged = _Section(
@@ -183,6 +204,29 @@ def _pack(sec: _Section, soft: int, max_chars: int, overlap: int) -> list[tuple[
     return packed
 
 
+def _table_parts(markdown: str, max_chars: int) -> list[str]:
+    """A Markdown table as parts of at most ~max_chars, each starting with the header row."""
+    if len(markdown) <= max_chars:
+        return [markdown]
+    lines = markdown.splitlines()
+    has_header = len(lines) > 2 and set(lines[1].replace("|", "").strip()) <= set("-: ")
+    header = lines[:2] if has_header else []
+    rows = lines[2:] if has_header else lines
+    head = "\n".join(header)
+    budget = max(max_chars - len(head) - 1, max_chars // 2)
+    parts: list[str] = []
+    buf: list[str] = []
+    for row in rows:
+        for piece in _hard_split(row, budget) if len(row) > budget else [row]:
+            if buf and sum(len(r) + 1 for r in buf) + len(piece) > budget:
+                parts.append("\n".join([*header, *buf]))
+                buf = []
+            buf.append(piece)
+    if buf:
+        parts.append("\n".join([*header, *buf]))
+    return parts
+
+
 def _hash(path: tuple[str, ...], content: str) -> str:
     return hashlib.sha256(f"{PATH_SEP.join(path)}\n{content}".encode()).hexdigest()
 
@@ -199,6 +243,22 @@ def chunk(
     sections = _merge_tiny(_sections(elements), min_chars, max_chars)
     chunks: list[Chunk] = []
     for sec in sections:
+        if sec.table:
+            t = sec.blocks[0]
+            for content in _table_parts(t.text, max_chars):
+                chunks.append(
+                    Chunk(
+                        len(chunks),
+                        content,
+                        sec.path,
+                        t.page,
+                        _hash(sec.path, content),
+                        element_type="table",
+                        bbox=t.bbox,
+                        table_html=t.table_html,
+                    )
+                )
+            continue
         for content, page in _pack(sec, soft_chars, max_chars, overlap):
             chunks.append(Chunk(len(chunks), content, sec.path, page, _hash(sec.path, content)))
     return chunks

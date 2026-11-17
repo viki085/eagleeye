@@ -61,6 +61,10 @@ services:
     environment:
       <<: *internal-urls
       SERVICE: ingest-worker
+      # Docling's models use 2-3 GB while a PDF is parsed (one at a time: --pool=solo); the
+      # cap keeps a large PDF from starving the API and the agent worker on the 8 GB machine
+      OMP_NUM_THREADS: "2"
+    mem_limit: 3500m
     depends_on:
       redis: { condition: service_healthy }
 

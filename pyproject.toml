@@ -37,3 +37,11 @@ addopts = "--import-mode=importlib"
 markers = [
     "integration: needs live local services (Docker sandbox image, warehouse); skipped when absent",
 ]
+
+# Docling (the ingest worker's PDF parser) pulls in PyTorch. On Linux (the containers) take
+# the CPU-only wheels: the CUDA build is several GB larger and the machines have no GPU.
+# (uv applies sources to direct dependencies only, so apps/ingest-worker lists torch itself.)
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

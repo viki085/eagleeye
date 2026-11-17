@@ -63,6 +63,7 @@ class FakeRepo:
     statuses: list[tuple[str, str | None]] = field(default_factory=list)
     vectors_passed: list | None = None
     status: str = "UPLOADING"
+    report: dict | None = None
 
     async def get_document(self, conn, document_id):  # noqa: ANN001
         return {
@@ -81,6 +82,9 @@ class FakeRepo:
     async def set_page_count(self, conn, document_id, pages):  # noqa: ANN001
         return None
 
+    async def set_parse_report(self, conn, document_id, report):  # noqa: ANN001
+        self.report = report
+
     async def mark_ready(self, conn, document_id, n):  # noqa: ANN001
         self.statuses.append(("READY", None))
 
@@ -92,7 +96,15 @@ class FakeRepo:
 @pytest.fixture
 def fake_repo(monkeypatch: pytest.MonkeyPatch) -> FakeRepo:
     fake = FakeRepo()
-    for name in ("get_document", "set_status", "set_page_count", "mark_ready", "replace_chunks"):
+    names = (
+        "get_document",
+        "set_status",
+        "set_page_count",
+        "set_parse_report",
+        "mark_ready",
+        "replace_chunks",
+    )
+    for name in names:
         monkeypatch.setattr(pipeline.repo, name, getattr(fake, name))
     return fake
 
