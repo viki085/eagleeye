@@ -7,6 +7,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from eagleeye_core import app_cache
 from eagleeye_core.config import get_settings
@@ -16,9 +17,11 @@ from eagleeye_core.switches import DESCRIPTIONS, SWITCHES, Switch, killed_switch
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
+from app.errors import ApiException
 from app.repos import admin_metrics as metrics
 from app.repos import admin_overview, admin_presence, app_settings
 from app.repos import runs as runs_repo
+from app.services import demo_visits
 from app.services.health_checks import check_all, check_databases
 from app.services.permissions import AdminUser
 
@@ -143,6 +146,19 @@ async def users(
 async def demo_visitors(request: Request, _admin: AdminUser) -> dict:
     """The last 7 days' demo visits: time and spend against the allowances, masked network."""
     return ok(await admin_presence.demo_visitors(request.app.state.pool))
+
+
+@router.post("/demo-visitors/{visit_id}/reset")
+async def reset_demo_visit(visit_id: UUID, request: Request, admin: AdminUser) -> dict:
+    """Give a demo visit its full allowance back (time, budget, notebook analyses) for another
+    24 hours; its chats stay. The shared daily total for all visitors is unchanged."""
+    pool = request.app.state.pool
+    # audit first: if the audit write fails, the visit must not change unrecorded
+    await metrics.record_admin_action(pool, admin.id, "demo_visit_reset", {"visit": str(visit_id)})
+    if not await demo_visits.reset_visit(pool, str(visit_id)):
+        raise ApiException(404, "NOT_FOUND", "Demo visit not found.")
+    logger.warning("admin %s reset demo visit %s", admin.email, visit_id)
+    return ok({"id": str(visit_id), "reset": True})
 
 
 @router.get("/usage")

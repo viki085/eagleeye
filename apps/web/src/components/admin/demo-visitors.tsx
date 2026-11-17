@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { DataTable, Panel, Pill, SectionState, type Column } from "@/components/admin/parts";
 import { useAdminData } from "@/hooks/use-admin-data";
 import { count, money, when } from "@/lib/admin-format";
@@ -15,7 +17,52 @@ function minutes(seconds: number): string {
   return `${Math.min(Math.round(seconds / 60), 999)}`;
 }
 
-function columns(limitS: number, budget: number): Column<AdminDemoVisit>[] {
+/** Two clicks (Reset, then Confirm) so a stray click cannot reset a visit. */
+function ResetButton({ api, visit, onDone }: { api: ApiClient; visit: AdminDemoVisit; onDone: () => void }) {
+  const [step, setStep] = useState<"idle" | "confirm" | "busy" | "error">("idle");
+  if (visit.status === "expired") return <span className="text-neutral-400">—</span>;
+  const reset = () => {
+    setStep("busy");
+    api
+      .resetDemoVisit(visit.id)
+      .then(() => {
+        setStep("idle");
+        onDone();
+      })
+      .catch(() => setStep("error"));
+  };
+  const base = "rounded-md border px-2 py-0.5 text-[11px] font-medium disabled:opacity-60";
+  if (step === "confirm" || step === "busy")
+    return (
+      <span className="flex items-center gap-1">
+        <button onClick={reset} disabled={step === "busy"} className={`${base} border-[#9E8253] text-[#7A6440] dark:text-[#C5A368]`}>
+          {step === "busy" ? "Resetting…" : "Confirm"}
+        </button>
+        <button onClick={() => setStep("idle")} disabled={step === "busy"} className="text-[11px] text-neutral-500 hover:underline">
+          Cancel
+        </button>
+      </span>
+    );
+  return (
+    <span className="flex items-center gap-1">
+      <button
+        onClick={() => setStep("confirm")}
+        title="Give this visit its full time, AI budget and notebook analyses back for 24 hours (chats stay)"
+        className={`${base} border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900`}
+      >
+        Reset
+      </button>
+      {step === "error" && <span role="alert" className="text-[11px] text-red-600">failed</span>}
+    </span>
+  );
+}
+
+function columns(
+  limitS: number,
+  budget: number,
+  api: ApiClient,
+  onReset: () => void,
+): Column<AdminDemoVisit>[] {
   return [
     {
       key: "network",
@@ -41,12 +88,13 @@ function columns(limitS: number, budget: number): Column<AdminDemoVisit>[] {
         return <Pill tone={tone}>{text}</Pill>;
       },
     },
+    { key: "reset", label: "Limits", render: (v) => <ResetButton api={api} visit={v} onDone={onReset} /> },
   ];
 }
 
 /** The last 7 days' demo visits (one per visitor network per 24 h). No chat content. */
 export function DemoVisitorsPanel({ api, refreshKey }: { api: ApiClient; refreshKey: number }) {
-  const [state] = useAdminData(() => api.adminDemoVisitors(), [api, refreshKey]);
+  const [state, reload] = useAdminData(() => api.adminDemoVisitors(), [api, refreshKey]);
   return (
     <SectionState state={state}>
       {(d) => (
@@ -56,7 +104,7 @@ export function DemoVisitorsPanel({ api, refreshKey }: { api: ApiClient; refresh
         >
           <DataTable
             rows={d.items}
-            columns={columns(d.limits.visit_seconds, d.limits.visit_budget_usd)}
+            columns={columns(d.limits.visit_seconds, d.limits.visit_budget_usd, api, reload)}
             empty="No demo visits in the last 7 days."
           />
         </Panel>

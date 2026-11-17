@@ -45,10 +45,17 @@ async def load_user_role(pool: asyncpg.Pool, user_id: str) -> str:
 
 
 async def notebooks_used(pool: asyncpg.Pool, user_id: str) -> int:
-    """Notebooks this user has made (a demo visit is one user, so: this visit's notebooks)."""
+    """Notebooks this user has made (a demo visit is one user, so: this visit's notebooks),
+    counted from the visit's start or its last admin reset."""
     return int(
         await pool.fetchval(
-            "SELECT count(*) FROM artifacts WHERE user_id = $1 AND type = 'notebook'", user_id
+            """
+            SELECT count(*) FROM artifacts a
+             WHERE a.user_id = $1 AND a.type = 'notebook'
+               AND a.created_at >= coalesce(
+                   (SELECT v.window_start FROM demo_visits v WHERE v.user_id = $1), '-infinity')
+            """,
+            user_id,
         )
     )
 

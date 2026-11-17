@@ -41,7 +41,7 @@ export function UsagePanel({ state }: UsagePanelProps) {
           )}
           {usage !== null && (
             <>
-              <SpendMeter costUsd={usage.cost_usd} limitUsd={usage.limit_usd} />
+              {usage.limit_usd !== null && <SpendMeter costUsd={usage.cost_usd} limitUsd={usage.limit_usd} />}
               <TokenSplit tokensIn={usage.tokens_in} tokensOut={usage.tokens_out} />
               <DailyColumns days={usage.daily} />
             </>

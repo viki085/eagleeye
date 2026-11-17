@@ -67,7 +67,7 @@ async def test_a_new_session_gets_its_own_account_with_the_sample_files(db) -> N
     row = await db.fetchrow(
         "SELECT is_demo, usage_limit_usd, clerk_user_id FROM users WHERE id = $1", visitor
     )
-    assert row["is_demo"] and float(row["usage_limit_usd"]) == 0.5
+    assert row["is_demo"] and float(row["usage_limit_usd"]) == 1.0
     assert row["clerk_user_id"].startswith("demo-visit:")
     files = await db.fetch("SELECT s3_key FROM datasets WHERE owner_id = $1", visitor)
     assert [f["s3_key"] for f in files] == ["k/data.parquet"]  # shared, not re-processed
@@ -117,14 +117,14 @@ async def test_time_budget_and_daily_limits(db) -> None:  # noqa: ANN001
     assert gate["allowed"] is False and gate["reason"] == "time"
 
     spender = await dv.account_for_session(db, base, "sess_b", "203.0.113.10")
-    await spend(db, spender, 0.5)
+    await spend(db, spender, 1.0)
     assert (await dv.state_of(db, spender)).exhausted == "budget"
     assert (await db.fetchval("SELECT demo_gate('203.0.113.10')"))["reason"] == "budget"
 
     fresh = await dv.account_for_session(db, base, "sess_f", "203.0.113.11")
     assert (await dv.state_of(db, fresh)).exhausted is None
     assert (await db.fetchval("SELECT demo_gate('192.0.2.50')"))["allowed"] is True
-    await spend(db, fresh, 1.6)  # all demo visitors together now over $2 today
+    await spend(db, fresh, 2.1)  # all demo visitors together now over $3 today
     assert (await dv.state_of(db, fresh)).exhausted == "daily"
     gate = await db.fetchval("SELECT demo_gate('192.0.2.50')")
     assert gate["allowed"] is False and gate["reason"] == "daily"
@@ -191,3 +191,32 @@ async def test_ipv4_seen_through_ipv6_is_the_same_visitor(db) -> None:  # noqa: 
     a = await dv.account_for_session(db, base, "sess_v4", "203.0.113.7")
     b = await dv.account_for_session(db, base, "sess_mapped", "::ffff:203.0.113.7")
     assert a == b
+
+
+async def test_an_admin_reset_gives_a_used_up_visit_its_allowance_back(db) -> None:  # noqa: ANN001
+    base = await base_account(db)
+    visitor = await dv.account_for_session(db, base, "sess_r", "203.0.113.20")
+    # the visit started an hour ago, used its 30 minutes and its budget
+    await db.execute(
+        "UPDATE demo_visits SET window_start = now() - interval '1 hour', seconds_used = 1800"
+        " WHERE user_id = $1",
+        visitor,
+    )
+    await spend(db, visitor, 1.0)
+    await db.execute(
+        "UPDATE runs SET created_at = now() - interval '30 minutes' WHERE user_id = $1", visitor
+    )
+    await db.execute(
+        "INSERT INTO usage_ledger (user_id, model_id, cost_usd) VALUES ($1, 'm', 1.0)", visitor
+    )
+    assert (await dv.state_of(db, visitor)).exhausted == "time"
+    visit_id = await db.fetchval("SELECT id FROM demo_visits WHERE user_id = $1", visitor)
+
+    assert await dv.reset_visit(db, str(visit_id)) is True
+    state = await dv.state_of(db, visitor)
+    assert state.exhausted is None and state.seconds_left == 1800 and state.budget_left_usd == 1.0
+    assert (await db.fetchval("SELECT demo_gate('203.0.113.20')"))["allowed"] is True
+    cap = await db.fetchval("SELECT usage_limit_usd FROM users WHERE id = $1", visitor)
+    assert float(cap) == 2.0  # lifetime spend so far + one visit budget
+    assert await db.fetchval("SELECT count(*) FROM chats WHERE user_id = $1", visitor) == 1
+    assert await dv.reset_visit(db, str(uuid.uuid4())) is False

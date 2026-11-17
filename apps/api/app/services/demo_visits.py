@@ -5,7 +5,8 @@ session is mapped to the visit of the visitor's IP (IPv6: its /64) for the last 
 new visit is created with its own internal account (and references to the sample files). The
 API then acts as that account, so visitors never see each other's data, and the account's
 usage_limit_usd is the visit's budget. Time is counted from heartbeats sent while the app is
-open; the limits live in the database (demo_limits()).
+open; the limits live in the database (demo_limits()). Spend counts from the visit's
+window_start, which an admin's reset (reset_visit) moves to now.
 """
 
 import uuid
@@ -126,6 +127,35 @@ async def account_for_session(db: Any, base_user_id: str, session_id: str, ip: s
         return str(await db.fetchval("SELECT user_id FROM demo_visits WHERE id = $1", visit_id))
 
 
+async def reset_visit(db: Any, visit_id: str) -> bool:
+    """An admin gives a visit its full allowance back: time, budget and notebook analyses count
+    from now, for another 24 hours. Chats and files stay. The visit account's lifetime spend cap
+    moves up by one visit budget, so the general usage check lets it through too. False when
+    there is no such visit."""
+    if hasattr(db, "acquire"):
+        async with db.acquire() as conn:
+            return await reset_visit(conn, visit_id)
+    lim = await limits(db)
+    async with db.transaction():
+        user_id = await db.fetchval(
+            "UPDATE demo_visits SET window_start = now(), seconds_used = 0 WHERE id = $1"
+            " RETURNING user_id",
+            visit_id,
+        )
+        if user_id is None:
+            return False
+        await db.execute(
+            """
+            UPDATE users SET usage_limit_usd =
+                (SELECT coalesce(sum(cost_usd), 0) FROM usage_ledger WHERE user_id = $1) + $2
+             WHERE id = $1
+            """,
+            user_id,
+            lim.visit_budget_usd,
+        )
+    return True
+
+
 def _today_start(now: datetime) -> datetime:
     return now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -134,7 +164,8 @@ async def state_of(db: Any, user_id: str) -> VisitState | None:
     row = await db.fetchrow(
         """
         SELECT v.id, v.user_id, v.window_start, v.seconds_used,
-               (SELECT coalesce(sum(cost_usd), 0) FROM runs WHERE user_id = v.user_id) AS spent,
+               (SELECT coalesce(sum(cost_usd), 0) FROM runs
+                 WHERE user_id = v.user_id AND created_at >= v.window_start) AS spent,
                now() AS now
           FROM demo_visits v WHERE v.user_id = $1
         """,

@@ -40,7 +40,10 @@ async def my_usage(request: Request, user: CurrentUser) -> dict:
     days = await usage_repo.daily(pool, user.id)
     return ok(
         {
-            "limit_usd": usage_limit_for(user, get_settings().usage_limit_usd),
+            # demo visitors are never told the money limits (the app shows them time only)
+            "limit_usd": None
+            if user.is_demo
+            else usage_limit_for(user, get_settings().usage_limit_usd),
             "cost_usd": round(totals.cost_usd, 6),
             "tokens_in": totals.tokens_in,
             "tokens_out": totals.tokens_out,

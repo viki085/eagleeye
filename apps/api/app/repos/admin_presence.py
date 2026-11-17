@@ -72,7 +72,8 @@ async def demo_visitors(pool: asyncpg.Pool) -> dict[str, Any]:
                  WHERE l.user_id = v.user_id AND l.created_at >= v.window_start) AS spend_usd,
                (SELECT count(*) FROM runs r WHERE r.user_id = v.user_id) AS questions,
                EXISTS (SELECT 1 FROM artifacts a WHERE a.user_id = v.user_id
-                        AND a.type = 'notebook') AS notebook_used
+                        AND a.type = 'notebook' AND a.created_at >= v.window_start)
+                   AS notebook_used
           FROM demo_visits v
          WHERE v.window_start >= now() - interval '7 days'
          ORDER BY last_active DESC NULLS LAST

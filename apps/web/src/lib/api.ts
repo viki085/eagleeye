@@ -224,7 +224,7 @@ export interface DailyUsage {
 }
 
 export interface UsageSummary {
-  limit_usd: number;
+  limit_usd: number | null; // null for demo visitors (they are never shown money limits)
   cost_usd: number;
   tokens_in: number;
   tokens_out: number;
@@ -545,6 +545,11 @@ export class ApiClient {
 
   adminDemoVisitors(): Promise<AdminDemoVisitors> {
     return this.request<AdminDemoVisitors>("/v1/admin/demo-visitors");
+  }
+
+  /** Give a demo visit its full allowance (time, budget, notebook analyses) back for 24 h. */
+  resetDemoVisit(visitId: string): Promise<{ id: string; reset: boolean }> {
+    return this.request(`/v1/admin/demo-visitors/${visitId}/reset`, { method: "POST" });
   }
 
   adminUsage(range: AdminRange): Promise<AdminUsage> {

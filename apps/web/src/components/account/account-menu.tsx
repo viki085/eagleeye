@@ -43,7 +43,7 @@ function MenuIcon({ path }: { path: ReactNode }) {
 }
 
 function UsageRow({ usage }: { usage: UsageSummary | null }) {
-  if (!usage) return null;
+  if (!usage || usage.limit_usd === null) return null; // demo visitors: no money figures
   const share = usage.limit_usd > 0 ? Math.min(1, usage.cost_usd / usage.limit_usd) : 0;
   return (
     <div className="px-3 py-2.5">
