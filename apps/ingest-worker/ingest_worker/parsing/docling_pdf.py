@@ -12,6 +12,7 @@ the fallback when Docling itself fails on a file.
 import io
 import logging
 import math
+import re
 import threading
 from typing import Any
 
@@ -41,10 +42,19 @@ _KINDS: dict[str, ElementKind] = {
     "handwritten_text": "text",
     "key_value_region": "text",
     "list_item": "list",
+    # checklist lines in forms and publications ("[ ] Deposit FUTA tax if ... over $500")
+    "checkbox_selected": "list",
+    "checkbox_unselected": "list",
     "caption": "caption",
     "footnote": "footnote",
     "table": "table",
+    # tables of contents and indexes: kept as plain lines (see _index_lines), because they hold
+    # facts readers ask for ("FUTA tax if undeposited amount is over $500 ... 44")
+    "document_index": "text",
 }
+
+# dot leaders: "Introduction . . . . . 3" (four or more, so an ellipsis "..." stays)
+_LEADER = re.compile(r"(?:\s*\.){4,}\s*")
 
 _converter: Any = None
 _converter_lock = threading.Lock()
@@ -117,15 +127,44 @@ def _heading_level(label: str, item: Any) -> int:
     return min(int(level), MAX_HEADING_LEVEL)
 
 
+def _index_lines(item: Any) -> str:
+    """A table of contents or index as one line per row: the row's distinct cell texts with dot
+    leaders removed ("Appendix A. Estimates of Income 15"). As a Markdown table it would be mostly
+    dots and cells repeated across columns, which crowds real answers out of the results."""
+    lines = []
+    for row in item.data.grid:
+        cells: list[str] = []
+        for cell in row:
+            text = _LEADER.sub(" ", cell.text or "").strip()
+            if text and text not in cells:
+                cells.append(text)
+        if cells:
+            lines.append(" ".join(cells))
+    return "\n".join(lines)
+
+
+def _in_picture(item: Any) -> bool:
+    parent = getattr(getattr(item, "parent", None), "cref", "") or ""
+    return parent.startswith("#/pictures/")
+
+
 def to_elements(document: Any) -> list[ParsedElement]:
     """Docling's body items, in reading order, as our elements."""
     elements: list[ParsedElement] = []
-    for item, _level in document.iterate_items(with_groups=False):
+    # traverse_pictures: text Docling found inside a picture region is kept. A text block printed
+    # over a watermark can be taken for a picture (a whole page was lost that way in the eval),
+    # and chart labels sit there too.
+    for item, _level in document.iterate_items(with_groups=False, traverse_pictures=True):
         label = getattr(getattr(item, "label", None), "value", "")
         kind = _KINDS.get(label)
         if kind is None:
             continue
         page, bbox = _bbox(item)
+        if label == "document_index":
+            lines = _index_lines(item)
+            if lines:
+                elements.append(ParsedElement(lines, page=page, kind="text", bbox=bbox))
+            continue
         if kind == "table":
             markdown = item.export_to_markdown(doc=document).strip()
             if markdown:
@@ -139,8 +178,13 @@ def to_elements(document: Any) -> list[ParsedElement]:
                     )
                 )
             continue
-        text = (getattr(item, "text", "") or "").strip()
+        text = _LEADER.sub(" ", getattr(item, "text", "") or "").strip()
         if not text:
+            continue
+        if _in_picture(item):
+            # labels inside a diagram or chart ("GOVERN", "RECOVER") are never headings: as
+            # headings they would file the rest of the page under a diagram label
+            elements.append(ParsedElement(text, page=page, kind="text", bbox=bbox))
             continue
         level = _heading_level(label, item) if kind == "heading" else None
         if level is None and kind == "text":

@@ -1,7 +1,7 @@
 # Multimodal PDF eval (Phase 0 of the multimodal RAG plan)
 
-Test set for PDFs with tables, images, watermarks and scanned pages. Built 2026-11-17 in a side
-session and handed over to the main session; not yet committed.
+Test set and scorer for PDFs with tables, images, watermarks and scanned pages. Built 2026-11-17
+(the test set in a side session, the scorer in the main one).
 
 ## What is here
 
@@ -29,11 +29,51 @@ on scanned (laptop CPU); tables found; pictures classified (line/bar/pie charts,
 photos). DRAFT footer dropped as page furniture, but the diagonal CONFIDENTIAL leaks on 10 and 12
 pages of the two watermark files.
 
+## Scorer (`score.py`)
+
+`uv run --package eagleeye-ingest-worker python evals/multimodal/score.py` (local Supabase up,
+corpus built). Runs each parser through the real pipeline (shipped chunker, embedding text,
+pgvector + full text for a temporary eval user, the real Retriever, rewriting off) and reports
+READY documents, pages with text, table chunks, chunks holding a manifest watermark string (text
+or heading path), seconds per page, and budget_recall / recall@5 / MRR overall, per tag and per
+document kind. Spans match as whole words of letters and digits. Writes `out/scores.json`.
+
+## Scores (2026-11-17, 150 questions)
+
+| Parser | READY | Pages with text | Watermark chunks | budget_recall | without the date cluster |
+| --- | --- | --- | --- | --- | --- |
+| pypdf (before Phase 1) | 8/11 | 76/96 | 35 | 0.79 | 0.77 |
+| Docling as first shipped (a08e6bb) | 11/11 | 89/96 | 0 | 0.89 | 0.88 |
+| Docling with the eval fixes | 11/11 | 93/96 | 0 | 0.89 to 0.92 | **0.95** |
+
+Per tag, Docling with the fixes vs pypdf: image 1.00 vs 0.25, scanned 0.79 vs 0.29, text 0.93 vs
+0.94, table 0.73 vs 0.91 (8 vs 10 of 11).
+
+What the scorer found and fixed in the parser:
+- a text block printed over a watermark was taken for a picture, and the picture's 40 lines were
+  skipped: a whole page lost. Text inside pictures is now kept (`traverse_pictures`), which also
+  lifts the chart questions from 0.65 to 1.00;
+- diagram labels inside pictures ("GOVERN", "RECOVER") became headings and filed the cover page
+  under them: text inside a picture is never a heading;
+- tables of contents and indexes (`document_index`) and checklist lines (`checkbox_*`) were
+  skipped; they are kept as plain lines with dot leaders removed (as Markdown tables they were
+  mostly dots and crowded out real answers);
+- pypdf reads an ALL CAPS watermark as a heading, so it leaks through chunk breadcrumbs: the
+  watermark check covers heading paths.
+
+Caveats:
+- The date cluster: 10 of NIST's 18 questions share one answer ("February 26, 2024"). pypdf
+  always finds it because the date is in every page's running header; Docling drops running
+  headers, leaving the date in one short cover chunk, so those 10 swing between 0 and 5 from run
+  to run. Read the "without the date cluster" column; a fix to consider is keeping page 1's
+  header and footer text, which often carries the date and document number.
+- Remaining misses are mostly ranking, not parsing (the span is in a chunk that does not reach
+  the top results): wide tables embed poorly (Phase 2: embed caption, header and a preview) and
+  a reranker is Phase 4.
+- Runs vary by one or two questions outside the date cluster.
+
 ## Not done
 
-- A scorer: retrieval recall@10 / budgeted recall per tag and per doc kind, pypdf vs the SHIPPED
-  Docling parser (`ingest_worker.parsing.docling_pdf`, commit a08e6bb) with the shipped clean
-  step and table chunks, plus watermark strings found in chunks. `evals/retrieval_eval.py` is the
-  pattern to follow.
 - More table questions (only 11; the pypdf text of tables is jumbled, so the question writer
-  mostly chose prose). Figure-caption questions need Phase 3.
+  mostly chose prose), and fewer questions sharing one answer. Figure-caption questions need
+  Phase 3.
