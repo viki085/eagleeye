@@ -7,6 +7,7 @@ import { AccountMenu } from "@/components/account/account-menu";
 import { ModeSwitch } from "@/components/admin/mode-switch";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePanelOpen } from "@/hooks/use-panel-open";
+import type { AccountRole } from "@/lib/account-load";
 import type { ChatSummary } from "@/lib/api";
 
 interface SidebarProps {
@@ -17,8 +18,9 @@ interface SidebarProps {
   onSelect: (chatId: string) => void;
   onDelete: (chatId: string) => void;
   footer?: ReactNode;
-  /** Admins see the Chat | Admin console switch (the API enforces access regardless). */
-  isAdmin?: boolean;
+  /** Loaded role; undefined while the account loads. Admins see the Chat | Admin console
+   * switch (the API enforces access regardless). */
+  role?: AccountRole;
   /** Shared demo account: the account menu hides account settings. */
   isDemo?: boolean;
 }
@@ -27,11 +29,11 @@ const RAIL_BUTTON =
   "flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-200 hover:text-neutral-800 disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-200";
 
 /** Collapsed: a slim rail that keeps expand, new chat, theme and account one click away. */
-function CollapsedRail({ busy, onNewChat, onExpand, isAdmin, isDemo }: {
+function CollapsedRail({ busy, onNewChat, onExpand, role, isDemo }: {
   busy: boolean;
   onNewChat: () => void;
   onExpand: () => void;
-  isAdmin: boolean;
+  role?: AccountRole;
   isDemo: boolean;
 }) {
   return (
@@ -51,14 +53,14 @@ function CollapsedRail({ busy, onNewChat, onExpand, isAdmin, isDemo }: {
       >
         +
       </button>
-      {isAdmin && (
+      {role === "admin" && (
         <Link href="/admin" aria-label="Admin console" title="Admin console" className={RAIL_BUTTON}>
           ▦
         </Link>
       )}
       <div className="mt-auto flex flex-col items-center gap-2">
         <ThemeToggle />
-        <AccountMenu placement="right" role={isAdmin ? "admin" : "member"} isDemo={isDemo} />
+        <AccountMenu placement="right" role={role} isDemo={isDemo} />
       </div>
     </aside>
   );
@@ -72,7 +74,7 @@ export function Sidebar({
   onSelect,
   onDelete,
   footer,
-  isAdmin = false,
+  role,
   isDemo = false,
 }: SidebarProps) {
   const [open, setOpen] = usePanelOpen("chats");
@@ -82,7 +84,7 @@ export function Sidebar({
         busy={busy}
         onNewChat={onNewChat}
         onExpand={() => setOpen(true)}
-        isAdmin={isAdmin}
+        role={role}
         isDemo={isDemo}
       />
     );
@@ -93,7 +95,7 @@ export function Sidebar({
         <span className="text-sm font-semibold tracking-tight">EagleEye</span>
         <div className="flex items-center gap-1">
           <ThemeToggle />
-          <AccountMenu role={isAdmin ? "admin" : "member"} isDemo={isDemo} />
+          <AccountMenu role={role} isDemo={isDemo} />
           <button
             onClick={() => setOpen(false)}
             aria-label="Collapse chats panel"
@@ -104,7 +106,7 @@ export function Sidebar({
           </button>
         </div>
       </div>
-      {isAdmin && <ModeSwitch active="chat" />}
+      {role === "admin" && <ModeSwitch active="chat" />}
       <button
         onClick={onNewChat}
         disabled={busy}

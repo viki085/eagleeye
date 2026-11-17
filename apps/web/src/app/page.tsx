@@ -17,6 +17,7 @@ import { useApi } from "@/hooks/use-api";
 import { useDemoVisit } from "@/hooks/use-demo-visit";
 import { useDocuments } from "@/hooks/use-documents";
 import { useUsage } from "@/hooks/use-usage";
+import { accountLoadFailure, displayRole } from "@/lib/account-load";
 import { ApiError, type ArtifactView, type ChatSummary, type Citation } from "@/lib/api";
 import { fromRun, toUiMessage, userMessage, type UiMessage } from "@/lib/messages";
 import type { NotebookView } from "@/lib/notebook";
@@ -90,12 +91,14 @@ export default function ChatPage() {
       .catch((e: unknown) => {
         setMe(null);
         // 403 here means signed in with Clerk but no (live) EagleEye account
-        if (e instanceof ApiError && e.status === 403) setNoAccess(e.message.replace(/ \(request [^)]*\)$/, ""));
-        // no answer at all: the server is down or (in the cloud) asleep, so wake it
-        // (confirmed first, so another kind of failure can never loop through reloads)
-        else if (!(e instanceof ApiError)) {
-          void api.isUp().then((up) => (up ? setError("Couldn't load your account. Reload the page.") : setAsleep(true)));
+        if (accountLoadFailure(e) === "no_access") {
+          setNoAccess((e as Error).message.replace(/ \(request [^)]*\)$/, ""));
+          return;
         }
+        // no account: the server may be down or (in the cloud) asleep, whether there was no reply
+        // or CloudFront's error page, so wake it (confirmed first, so another kind of failure
+        // can never loop through reloads)
+        void api.isUp().then((up) => (up ? setError("Couldn't load your account. Reload the page.") : setAsleep(true)));
       });
   }, [api, refreshChats]);
 
@@ -247,7 +250,7 @@ export default function ChatPage() {
         chats={chats}
         activeChatId={activeChatId}
         busy={busy}
-        isAdmin={me?.isAdmin ?? false}
+        role={displayRole(me)}
         isDemo={isDemo}
         onNewChat={handleNewChat}
         onSelect={(id) => void openChat(id)}
