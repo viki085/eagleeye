@@ -53,7 +53,7 @@ export function SafetyTab({ api, range, refreshKey }: { api: ApiClient; range: A
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               <ChartPanel
                 title="Safety events by category"
-                spec={categoryBars(d.events.map((e) => ({ label: `${e.category} (${e.kind})`, value: e.events })), "events")}
+                chart={categoryBars(d.events.map((e) => ({ label: `${e.category} (${e.kind})`, value: e.events })), "events")}
                 rows={d.events}
                 columns={[
                   { key: "cat", label: "Category", render: (r: EventRow) => r.category },
@@ -63,7 +63,7 @@ export function SafetyTab({ api, range, refreshKey }: { api: ApiClient; range: A
               />
               <ChartPanel
                 title="SQL refusals and errors"
-                spec={categoryBars(d.sql_rejections.map((r) => ({ label: r.reason, value: r.queries })), "queries")}
+                chart={categoryBars(d.sql_rejections.map((r) => ({ label: r.reason, value: r.queries })), "queries")}
                 rows={d.sql_rejections}
                 columns={[
                   { key: "reason", label: "Reason", render: (r: SqlRow) => r.reason },

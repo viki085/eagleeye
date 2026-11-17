@@ -1,91 +1,110 @@
 import { describe, expect, it } from "vitest";
 
-import { categoryBars, costByModel, donut, outcomeBars, rankedBars, timeSeries } from "./admin-charts";
+import {
+  bucketTick,
+  categoryBars,
+  costByModel,
+  costPoints,
+  donut,
+  numberFormat,
+  outcomeBars,
+  rankedBars,
+  timeSeries,
+} from "./admin-charts";
 import { fileSize, money, pct, ratePct, seconds } from "./admin-format";
 
-describe("admin charts", () => {
-  it("builds a single-series line without a colour encoding", () => {
-    const spec = timeSeries([{ x: "2026-11-13", y: 3 }], "answers") as {
-      encoding: Record<string, unknown>;
-      mark: { type: string };
-    };
-    expect(spec.mark.type).toBe("line");
-    expect(spec.encoding.color).toBeUndefined();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = Record<string, any>;
+const light = (c: { option: (dark: boolean) => unknown }) => c.option(false) as Json;
+
+describe("admin charts (ECharts)", () => {
+  it("formats numbers the console uses", () => {
+    expect(numberFormat("$,.2f")(1234.5)).toBe("$1,234.50");
+    expect(numberFormat(",d")(12345.4)).toBe("12,345");
+    expect(numberFormat(".1f")(2.345)).toBe("2.3");
+    expect(numberFormat(".1%")(0.256)).toBe("25.6%");
   });
 
-  it("puts daily ticks on day boundaries, hourly every 3 hours", () => {
-    type S = { encoding: { x: { axis: { tickCount: unknown } } } };
-    const daily = timeSeries([{ x: "2026-11-13", y: 1 }], "answers") as S;
-    const hourly = timeSeries([{ x: "2026-11-13T01:00Z", y: 1 }], "answers", { hourly: true }) as S;
-    expect(daily.encoding.x.axis.tickCount).toEqual({ interval: "day", step: 1 });
-    expect(hourly.encoding.x.axis.tickCount).toEqual({ interval: "hours", step: 3 });
+  it("labels UTC buckets the same in every timezone", () => {
+    const ms = Date.parse("2026-11-13T14:00:00Z");
+    expect(bucketTick(ms, true)).toBe("14:00");
+    expect(bucketTick(ms, false)).toBe("13 Nov");
   });
 
-  it("only uses interval names Vega knows (an unknown one crashes the chart)", async () => {
-    // @ts-expect-error vega-time (a vega dependency) ships no type declarations
-    const { utcInterval } = (await import("vega-time")) as { utcInterval: (n: string) => unknown };
-    for (const opts of [{}, { hourly: true }]) {
-      const spec = timeSeries([{ x: "2026-11-13", y: 1 }], "answers", opts) as {
-        encoding: { x: { axis: { tickCount: { interval: string } } } };
-      };
-      expect(utcInterval(spec.encoding.x.axis.tickCount.interval)).toBeDefined();
-    }
+  it("a single-series line has no legend; ticks sit on whole buckets", () => {
+    const o = light(timeSeries([{ x: "2026-11-13", y: 3 }, { x: "2026-11-14", y: 5 }], "answers"));
+    expect(o.series).toHaveLength(1);
+    expect(o.series[0].type).toBe("line");
+    expect(o.legend.show).toBe(false);
+    expect(o.useUTC).toBe(true);
+    expect(o.xAxis.interval).toBe(86_400_000);
+    expect(o.series[0].data[0]).toEqual([Date.parse("2026-11-13T00:00:00Z"), 3]);
+    const hourly = light(timeSeries([{ x: "2026-11-13T01:00:00Z", y: 1 }], "answers", { hourly: true }));
+    expect(hourly.xAxis.interval).toBe(3 * 3_600_000);
+  });
+
+  it("series keep their colour by the fixed order, not by which ones have data", () => {
+    const order = ["Planning", "Search", "Answer"];
+    const one = light(timeSeries([{ x: "2026-11-13", y: 1, series: "Answer" }], "s", { seriesOrder: order }));
+    const all = light(
+      timeSeries(order.map((s) => ({ x: "2026-11-13", y: 1, series: s })), "s", { seriesOrder: order }),
+    );
+    expect(one.series[0].color).toBe(all.series[2].color);
+    expect(all.legend.show).not.toBe(false);
+  });
+
+  it("pins the x-axis to the period when a domain is given", () => {
+    const o = light(timeSeries([{ x: "2026-11-13", y: 1 }], "s", { domain: ["2026-11-01", "2026-11-14"] }));
+    expect(o.xAxis.min).toBe(Date.parse("2026-11-01T00:00:00Z"));
   });
 
   it("fills missing days per model so lines don't skip", () => {
-    const spec = costByModel([
+    const points = costPoints([
       { day: "2026-11-12", model_id: "a", cost_usd: 1 },
       { day: "2026-11-13", model_id: "b", cost_usd: 2 },
-    ]) as { data: { values: { x: string; y: number; series: string }[] } };
-    expect(spec.data.values).toHaveLength(4);
-    expect(spec.data.values.find((p) => p.x === "2026-11-12" && p.series === "b")?.y).toBe(0);
+    ]);
+    expect(points).toHaveLength(4);
+    expect(points.find((p) => p.x === "2026-11-12" && p.series === "b")?.y).toBe(0);
+    expect(light(costByModel([{ day: "2026-11-12", model_id: "a", cost_usd: 1 }])).yAxis.axisLabel.formatter(2)).toBe("$2.00");
   });
 
-  it("sorts category bars largest first and carries no colours", () => {
-    const spec = categoryBars(
-      [
-        { label: "small", value: 1 },
-        { label: "big", value: 9 },
-      ],
-      "events",
-    );
-    const enc = (spec as { encoding: { y: { sort: string[] } } }).encoding;
-    expect(enc.y.sort).toEqual(["big", "small"]);
-    expect(JSON.stringify(spec)).not.toContain("#");
+  it("category bars: largest first, whole-number ticks", () => {
+    const o = light(categoryBars([{ label: "small", value: 1 }, { label: "big", value: 9 }], "events"));
+    expect(o.yAxis.data).toEqual(["big", "small"]);
+    expect(o.series[0].data).toEqual([9, 1]);
+    expect(o.xAxis.minInterval).toBe(1);
   });
 
-  it("uses whole-number ticks on count bars", () => {
-    const spec = categoryBars([{ label: "a", value: 2 }], "events") as {
-      encoding: { x: { axis: { tickMinStep: number; format: string; tickCount: number } } };
-    };
-    expect(spec.encoding.x.axis).toEqual({ tickMinStep: 1, format: "d", tickCount: 6 });
-  });
-});
-
-describe("overview charts", () => {
   it("donut colours follow the model, not its rank, with Other last", () => {
-    const a = donut([{ label: "zeta", value: 9 }, { label: "alpha", value: 1 }, { label: "Other", value: 2 }], { value: "$12", caption: "total" }) as {
-      layer: { encoding?: { color?: { scale: { domain: string[] } } } }[];
-    };
-    expect(a.layer[0].encoding?.color?.scale.domain).toEqual(["alpha", "zeta", "Other"]);
+    const rows = [{ label: "zeta", value: 9 }, { label: "alpha", value: 1 }, { label: "Other", value: 2 }];
+    const o = light(donut(rows, { value: "$12", caption: "total" }));
+    expect(o.legend.data).toEqual(["alpha", "zeta", "Other"]);
+    const colour = (name: string) => o.series[0].data.find((d: Json) => d.name === name).itemStyle.color;
+    const swapped = light(donut([{ label: "zeta", value: 1 }, { label: "alpha", value: 9 }], { value: "", caption: "" }));
+    const colour2 = (name: string) => swapped.series[0].data.find((d: Json) => d.name === name).itemStyle.color;
+    expect(colour("alpha")).toBe(colour2("alpha"));
+    expect(o.title.text).toBe("$12");
   });
 
   it("outcome bars stack three outcomes in the fixed status colours", () => {
-    const spec = outcomeBars([{ bucket: "2026-11-13", succeeded: 5, failed: 1, other: 0 }], false) as {
-      data: { values: unknown[] };
-      encoding: { color: { scale: { range: string[] } } };
-    };
-    expect(spec.data.values).toHaveLength(3);
-    expect(spec.encoding.color.scale.range).toEqual(["#0ca30c", "#d03b3b", "#898781"]);
+    const o = light(outcomeBars([{ bucket: "2026-11-13", succeeded: 5, failed: 1, other: 0 }], false));
+    expect(o.series.map((s: Json) => s.color)).toEqual(["#0ca30c", "#d03b3b", "#898781"]);
+    expect(o.series.every((s: Json) => s.stack === "outcomes")).toBe(true);
+    expect(o.xAxis.data).toEqual(["13 Nov"]);
   });
 
-  it("ranked bars sort high to low and print values", () => {
-    const spec = rankedBars([{ label: "fast", value: 0.1 }, { label: "slow", value: 9.9 }], { title: "avg s", format: ".1f" }) as {
-      encoding: { y: { sort: string[] } };
-      layer: { mark: { type: string } }[];
-    };
-    expect(spec.encoding.y.sort).toEqual(["slow", "fast"]);
-    expect(spec.layer.map((l) => l.mark.type)).toEqual(["bar", "text"]);
+  it("ranked bars sort high to low and print their values", () => {
+    const o = light(rankedBars([{ label: "fast", value: 0.1 }, { label: "slow", value: 9.9 }], { title: "avg s", format: ".1f" }));
+    expect(o.yAxis.data).toEqual(["slow", "fast"]);
+    expect(o.series[0].label.show).toBe(true);
+    expect(o.series[0].label.formatter({ value: 9.9 })).toBe("9.9");
+  });
+
+  it("dark mode builds its own colours; the key changes only with the data", () => {
+    const chart = categoryBars([{ label: "a", value: 2 }], "events");
+    expect((chart.option(true) as Json).series[0].color).not.toBe(light(chart).series[0].color);
+    expect(categoryBars([{ label: "a", value: 2 }], "events").key).toBe(chart.key);
+    expect(categoryBars([{ label: "a", value: 3 }], "events").key).not.toBe(chart.key);
   });
 });
 

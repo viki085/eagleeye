@@ -21,7 +21,7 @@ export function UsageTab({ api, range, refreshKey }: { api: ApiClient; range: Ad
             className="xl:col-span-12"
             title="LLM cost per day by model"
             subtitle="Billed spend from the usage ledger (UTC days)"
-            spec={costByModel(d.by_model)}
+            chart={costByModel(d.by_model)}
             rows={d.by_model}
             columns={[
               { key: "day", label: "Day", render: (r: ModelRow) => r.day },

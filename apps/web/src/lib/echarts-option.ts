@@ -15,7 +15,7 @@ export type EChartsOption = Json;
 
 const LONG_SERIES = 40; // more points than this: add a zoom slider under the chart
 
-interface Theme {
+export interface Theme {
   palette: readonly string[];
   ramp: readonly string[];
   text: string;
@@ -25,7 +25,7 @@ interface Theme {
   surface: string;
 }
 
-function theme(dark: boolean): Theme {
+export function theme(dark: boolean): Theme {
   return dark
     ? { palette: CATEGORICAL_DARK, ramp: SEQUENTIAL_DARK, text: "#f0efec", muted: "#c3c2b7", grid: "#2c2c2a", axis: "#383835", surface: "#141413" }
     : { palette: CATEGORICAL_LIGHT, ramp: SEQUENTIAL_LIGHT, text: "#0b0b0b", muted: "#52514e", grid: "#e1e0d9", axis: "#c3c2b7", surface: "#ffffff" };
@@ -43,7 +43,7 @@ function fmt(v: unknown): string {
     : n.toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
 
-function axisStyle(t: Theme, name: string, extra: Json = {}): Json {
+export function axisStyle(t: Theme, name: string, extra: Json = {}): Json {
   return {
     name,
     nameLocation: "middle",
@@ -57,7 +57,7 @@ function axisStyle(t: Theme, name: string, extra: Json = {}): Json {
   };
 }
 
-function base(t: Theme, legend: boolean, trigger: "axis" | "item"): Json {
+export function base(t: Theme, legend: boolean, trigger: "axis" | "item"): Json {
   return {
     color: [...t.palette],
     backgroundColor: "transparent",

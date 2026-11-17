@@ -3,9 +3,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { CARD } from "@/components/admin/kpi";
-import { VegaView } from "@/components/charts/vega-view";
+import { EChartView } from "@/components/charts/echart-view";
 import type { Loadable } from "@/hooks/use-admin-data";
-import type { Spec } from "@/lib/admin-charts";
+import type { AdminChart } from "@/lib/admin-charts";
 
 export function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -83,16 +83,17 @@ export function DataTable<T>({ rows, columns, empty = "Nothing here yet." }: {
 }
 
 /** A chart with a "Table" toggle: the data is always available without the chart. */
-export function ChartPanel<T>({ title, subtitle, spec, rows, columns, className }: {
+export function ChartPanel<T>({ title, subtitle, chart, rows, columns, className }: {
   title: string;
   subtitle?: string;
-  spec: Spec;
+  chart: AdminChart;
   rows: readonly T[];
   columns: readonly Column<T>[];
   className?: string;
 }) {
   const [table, setTable] = useState(false);
-  const stableSpec = useMemo(() => spec, [JSON.stringify(spec)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a new option only when the data changes (the builders run on every render)
+  const option = useMemo(() => chart.option, [chart.key]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Panel
       title={title}
@@ -123,7 +124,7 @@ export function ChartPanel<T>({ title, subtitle, spec, rows, columns, className 
       ) : table ? (
         <DataTable rows={rows} columns={columns} />
       ) : (
-        <VegaView spec={stableSpec} />
+        <EChartView option={option} height={chart.height} />
       )}
     </Panel>
   );

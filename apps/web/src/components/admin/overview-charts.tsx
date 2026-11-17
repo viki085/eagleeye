@@ -22,7 +22,7 @@ export function OverviewCharts({ d, hourly }: { d: AdminOverview; hourly: boolea
         className="xl:col-span-8"
         title="Request volume and outcomes"
         subtitle={hourly ? "Requests per hour by final status (UTC)" : "Requests per day by final status (UTC)"}
-        spec={outcomeBars(
+        chart={outcomeBars(
           d.series.map((s) => ({
             bucket: s.bucket,
             succeeded: s.succeeded,
@@ -45,7 +45,7 @@ export function OverviewCharts({ d, hourly }: { d: AdminOverview; hourly: boolea
         className="xl:col-span-4"
         title="LLM cost by model"
         subtitle="Share of spend per model in this period"
-        spec={donut(
+        chart={donut(
           d.cost_by_model.map((m) => ({ label: m.model_id, value: m.cost_usd })),
           { value: money(totalCost), caption: "total spend" },
           { money: true },
@@ -65,7 +65,7 @@ export function OverviewCharts({ d, hourly }: { d: AdminOverview; hourly: boolea
         className="xl:col-span-5"
         title="Request routing distribution"
         subtitle="Execution path the orchestrator selected for each request"
-        spec={rankedBars(
+        chart={rankedBars(
           d.routes.map((r) => ({
             label: routeLabel(r.route),
             value: r.requests,
@@ -84,7 +84,7 @@ export function OverviewCharts({ d, hourly }: { d: AdminOverview; hourly: boolea
         className="xl:col-span-7"
         title="Slowest pipeline steps"
         subtitle="Mean duration per execution, highest first · agent steps include their sub-steps"
-        spec={rankedBars(
+        chart={rankedBars(
           d.slow_steps.map((s) => ({
             label: stepLabel(s.kind, s.name),
             value: Math.round(s.avg_ms) / 1000,

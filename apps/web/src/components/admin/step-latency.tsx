@@ -23,7 +23,7 @@ export function StepLatencyTrend({ d, hourly }: { d: AdminOverview; hourly: bool
       className="xl:col-span-8"
       title="Step latency trend"
       subtitle={`Mean duration of each major pipeline stage per ${hourly ? "hour" : "day"} (UTC) · sub-steps omitted`}
-      spec={timeSeries(
+      chart={timeSeries(
         d.step_trend.map((p) => ({ x: p.bucket, y: Math.round(p.avg_ms) / 1000, series: stepGroupLabel(p.step) })),
         "avg seconds",
         {
