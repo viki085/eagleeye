@@ -125,13 +125,14 @@ def line_chart(data: list[tuple[str, float]]) -> Drawing:
     plot.data = [[(i, v) for i, (_, v) in enumerate(data)]]
     plot.lines[0].strokeColor = GOLD
     plot.lines[0].strokeWidth = 2
-    plot.xValueAxis.valueMin, plot.xValueAxis.valueMax = 0, len(data) - 1
-    plot.xValueAxis.valueSteps = list(range(0, len(data), 3))
-    plot.xValueAxis.labelTextFormat = lambda i: data[int(i)][0]
+    # every printed value sits exactly on a labelled month tick (every third month and the last
+    # one): values between ticks were paired with the wrong months by the reader model
+    shown = sorted({*range(0, len(data), 3), len(data) - 1})
+    plot.xValueAxis.valueMin, plot.xValueAxis.valueMax = -0.7, len(data) - 0.3  # clear of the axis
+    plot.xValueAxis.valueSteps = shown
+    plot.xValueAxis.labelTextFormat = lambda i: data[round(i)][0]
     plot.xValueAxis.labels.fontSize = 7
     plot.yValueAxis.valueMin, plot.yValueAxis.valueMax = 60, 100
-    # the value printed every third month and on the last, so the chart can be read exactly
-    shown = {*range(3, len(data), 3), len(data) - 1}  # not month 0: it would sit on the y-axis
     plot.lineLabelFormat = "values"
     plot.lineLabelArray = [[f"{v:.1f}" if i in shown else "" for i, (_, v) in enumerate(data)]]
     plot.lineLabels.fontSize = 7

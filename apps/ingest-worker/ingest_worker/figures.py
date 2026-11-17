@@ -27,9 +27,12 @@ logger = logging.getLogger(__name__)
 PROMPT = (
     "Describe this figure from a document so it can be found by search and quoted accurately. "
     "Say what kind of figure it is and what it shows, then give every number, label, axis title "
-    "and legend entry you can read, and the main trend or takeaway. Report only values printed "
-    "in the figure; never estimate a value from a bar height or a line's position. Ignore "
-    "watermarks and stamps such as CONFIDENTIAL or DRAFT. Plain text, at most 150 words."
+    "and legend entry you can read, and the main trend or takeaway. When values are printed on "
+    "bars or points, pair each with its category or axis label in reading order "
+    '(e.g. "2025-01: 79.3; 2025-04: 68.1"), so no value is matched to the wrong label. Report '
+    "only values printed in the figure; never estimate a value from a bar height or a line's "
+    "position. Ignore watermarks and stamps such as CONFIDENTIAL or DRAFT. Plain text, at most "
+    "150 words."
 )
 MAX_TOKENS = 400
 TIMEOUT_S = 60
