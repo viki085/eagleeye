@@ -103,21 +103,26 @@ function bars(rows: Row[], enc: Json, t: Theme, mark: Json): EChartsOption | nul
   const order = Array.isArray(cat.sort) ? (cat.sort as unknown[]).map(String) : [...new Set(rows.map((r) => String(r.x)))];
   const names = seriesNames(rows);
   const grouped = Boolean(enc.xOffset || enc.yOffset);
-  const radius = num(mark.cornerRadiusEnd) ?? 3;
+  const r = (num(mark.cornerRadiusEnd) ?? 3) + 2;
+  // corners are rounded at the bar's outer end: up/right for a positive value, down/left for a
+  // negative one (a fixed top radius rounded the end that touches the axis on negative bars)
+  const outer = horizontal ? [0, r, r, 0] : [r, r, 0, 0];
+  const outerNegative = horizontal ? [r, 0, 0, r] : [0, 0, r, r];
   const series = names.map((name, i) => {
-    const mine = rows.filter((r) => String(r.series ?? "") === String(name ?? ""));
-    const byCat = new Map(mine.map((r) => [String(r.x), num(r.y)]));
-    const last = i === names.length - 1;
+    const mine = rows.filter((row) => String(row.series ?? "") === String(name ?? ""));
+    const byCat = new Map(mine.map((row) => [String(row.x), num(row.y)]));
+    const rounded = grouped || names.length === 1 || i === names.length - 1;
     return {
       type: "bar",
       name: name ?? str(val.title),
-      data: order.map((c) => byCat.get(c) ?? null),
+      data: order.map((c) => {
+        const v = byCat.get(c) ?? null;
+        return v === null || !rounded ? v : { value: v, itemStyle: { borderRadius: v < 0 ? outerNegative : outer } };
+      }),
       ...(grouped || names.length === 1 ? {} : { stack: "total" }),
       barMaxWidth: 46,
       emphasis: { focus: "series" },
-      itemStyle: {
-        borderRadius: grouped || names.length === 1 || last ? (horizontal ? [0, radius + 2, radius + 2, 0] : [radius + 2, radius + 2, 0, 0]) : 0,
-      },
+      itemStyle: { borderRadius: 0 },
     };
   });
   const catAxis = axisStyle(t, str(cat.title), { type: "category", data: order, splitLine: { show: false }, axisLabel: { color: t.muted, fontSize: 11, hideOverlap: true, ...(horizontal ? {} : { interval: "auto" }) } });
@@ -200,6 +205,8 @@ function scatter(spec: Json, t: Theme): EChartsOption | null {
   const point = (r: Row) => [r.x, r.y, r.size ?? null, r.series ?? null, r.label ?? null];
   const quantColor = color.type === "quantitative";
   const groups = color.type === "nominal" ? seriesNames(rows) : [null];
+  // the server adds a "labels" layer when there are few enough points to name each one
+  const named = layers.some((l) => l.name === "labels");
   const series: Json[] = groups.map((g) => ({
     type: "scatter",
     name: g ?? str(obj(enc.y).title),
@@ -207,6 +214,19 @@ function scatter(spec: Json, t: Theme): EChartsOption | null {
     symbolSize: (d: unknown[]) => (enc.size ? radius(d[2]) : 10),
     itemStyle: { opacity: 0.82, borderColor: t.surface, borderWidth: 1 },
     emphasis: { focus: "series", scale: 1.15 },
+    ...(named
+      ? {
+          label: {
+            show: true,
+            position: "right",
+            distance: 6,
+            color: t.text,
+            fontSize: 11,
+            formatter: (p: Json) => String(((p.data as unknown[]) ?? [])[4] ?? ""),
+          },
+          labelLayout: { hideOverlap: true },
+        }
+      : {}),
   }));
   const trend = layers.find((l) => l.name === "trend");
   const trendRows = (obj(trend?.data).values as Row[] | undefined) ?? [];

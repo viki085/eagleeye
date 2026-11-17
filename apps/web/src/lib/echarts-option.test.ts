@@ -5,6 +5,8 @@ import { toEChartsOption } from "./echarts-option";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = Record<string, any>;
 const opt = (spec: Json, dark = false) => toEChartsOption(spec, dark) as Json;
+// a bar's value (rounded bars carry their own style: {value, itemStyle})
+const values = (data: unknown[]) => data.map((d) => (d !== null && typeof d === "object" ? (d as Json).value : d));
 
 const bar = {
   mark: { type: "bar", cornerRadiusEnd: 3 },
@@ -29,7 +31,7 @@ describe("toEChartsOption", () => {
     const o = opt(bar);
     expect(o.xAxis.data).toEqual(["EMEA", "APAC"]);
     expect(o.series).toHaveLength(1);
-    expect(o.series[0].data).toEqual([310, 185.5]);
+    expect(values(o.series[0].data)).toEqual([310, 185.5]);
     expect(o.yAxis.name).toBe("sum of revenue");
   });
 
@@ -37,7 +39,7 @@ describe("toEChartsOption", () => {
     const color = { field: "series" };
     const stacked = opt({ ...bar, encoding: { ...bar.encoding, x: byMonth, color }, data: { values: monthly } });
     expect(stacked.series.map((s: Json) => s.stack)).toEqual(["total", "total"]);
-    expect(stacked.series[1].data).toEqual([2, 4]);
+    expect(values(stacked.series[1].data)).toEqual([2, 4]);
     const grouped = opt({
       ...bar,
       encoding: { ...bar.encoding, x: byMonth, color, xOffset: color },
@@ -128,6 +130,40 @@ describe("toEChartsOption", () => {
     expect(o.visualMap.dimension).toBe(3);
     expect(o.tooltip.renderMode).toBe("richText"); // drawn as text, never parsed as HTML
     expect(o.tooltip.formatter({ data: [14, 9, 7, 70, "<b>e</b>"] })).toContain("vessel: <b>e</b>");
+    expect(o.series[0].label).toBeUndefined(); // no labels layer: names stay in the tooltip
+  });
+
+  it("scatter: points are named on the chart when the server sends a labels layer", () => {
+    const spec = {
+      layer: [
+        {
+          name: "points",
+          mark: { type: "circle" },
+          encoding: {
+            x: { field: "x", type: "quantitative", title: "on-time %" },
+            y: { field: "y", type: "quantitative", title: "NPS" },
+            tooltip: [{ field: "label", title: "lane" }],
+          },
+        },
+        { name: "labels", mark: { type: "text" }, encoding: { text: { field: "label", type: "nominal" } } },
+      ],
+      data: { values: [{ x: 80, y: 12, label: "TAT" }, { x: 73, y: 9.6, label: "IAS" }] },
+    };
+    const s = opt(spec).series[0];
+    expect(s.label.show).toBe(true);
+    expect(s.label.formatter({ data: [80, 12, null, null, "TAT"] })).toBe("TAT");
+    expect(s.labelLayout.hideOverlap).toBe(true);
+  });
+
+  it("bars are rounded at their outer end, also when negative", () => {
+    const spec = { ...bar, data: { values: [{ x: "EMEA", series: null, y: 310 }, { x: "APAC", series: null, y: -40 }] } };
+    const [up, down] = opt(spec).series[0].data;
+    expect(up.itemStyle.borderRadius).toEqual([5, 5, 0, 0]);
+    expect(down.itemStyle.borderRadius).toEqual([0, 0, 5, 5]);
+    const flat = { ...spec, encoding: { x: { field: "y", type: "quantitative" }, y: { field: "x", type: "nominal", sort: ["EMEA", "APAC"] } } };
+    const [right, left] = opt(flat).series[0].data;
+    expect(right.itemStyle.borderRadius).toEqual([0, 5, 5, 0]);
+    expect(left.itemStyle.borderRadius).toEqual([5, 0, 0, 5]);
   });
 
   it("unknown shapes fall back to Vega (null)", () => {
