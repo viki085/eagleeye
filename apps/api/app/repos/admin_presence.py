@@ -65,7 +65,7 @@ async def demo_visitors(pool: asyncpg.Pool) -> dict[str, Any]:
     limits = await pool.fetchrow("SELECT * FROM demo_limits()")
     rows = await pool.fetch(
         """
-        SELECT v.id, v.ip_key, v.window_start, v.seconds_used,
+        SELECT v.id, v.ip_key, v.window_start, v.seconds_used, v.exempt,
                (SELECT max(s.last_seen_at) FROM demo_sessions s WHERE s.visit_id = v.id)
                    AS last_active,
                (SELECT coalesce(sum(l.cost_usd), 0) FROM usage_ledger l
@@ -96,7 +96,9 @@ async def demo_visitors(pool: asyncpg.Pool) -> dict[str, Any]:
     items = []
     for r in rows:
         spend = float(r["spend_usd"])
-        if r["window_start"] < expired_before:
+        if r["exempt"]:
+            status = "tester"
+        elif r["window_start"] < expired_before:
             status = "expired"
         elif r["seconds_used"] >= seconds or spend >= budget:
             status = "used_up"
