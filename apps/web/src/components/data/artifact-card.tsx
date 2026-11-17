@@ -58,7 +58,7 @@ export function ArtifactCard({ artifact, onViewAll, onDownload }: ArtifactCardPr
             <span className="font-medium">Assumptions:</span> {artifact.assumptions}
           </p>
         )}
-        <SqlBlock sql={artifact.sql} label={CODE_LABEL[artifact.mode ?? "sql"]} />
+        <SqlBlock sql={artifact.sql} label={CODE_LABEL[artifact.mode ?? "sql"]} mode={artifact.mode ?? "sql"} />
       </div>
     </details>
   );

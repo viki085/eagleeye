@@ -18,6 +18,7 @@
     "react-dom": "^19.1.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "sql-formatter": "15.9.0",
     "vega": "6.4.0",
     "vega-embed": "7.3.0",
     "vega-interpreter": "2.3.2",
