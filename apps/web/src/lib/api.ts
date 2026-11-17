@@ -68,6 +68,7 @@ export interface ChunkDetail {
   page: number | null;
   element_type: "text" | "table" | "image";
   has_image: boolean;
+  has_page: boolean; // a PDF page: getChunkImage(..., "page") shows it with the passage marked
   document: { id: string; title: string };
 }
 
@@ -723,12 +724,13 @@ export class ApiClient {
   }
 
   /** A cited figure (PNG), fetched with the bearer token and shown from a blob URL. */
-  async getChunkImage(documentId: string, chunkId: string): Promise<Blob> {
+  /** A cited figure ("image"), or the cited PDF page with the passage highlighted ("page"). */
+  async getChunkImage(documentId: string, chunkId: string, kind: "image" | "page" = "image"): Promise<Blob> {
     const token = await this.getToken();
-    const resp = await fetch(`${API_URL}/v1/documents/${documentId}/chunks/${chunkId}/image`, {
+    const resp = await fetch(`${API_URL}/v1/documents/${documentId}/chunks/${chunkId}/${kind}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!resp.ok) throw new ApiError(`Could not load the figure (${resp.status})`, resp.status);
+    if (!resp.ok) throw new ApiError(`Could not load the ${kind === "page" ? "page" : "figure"} (${resp.status})`, resp.status);
     return resp.blob();
   }
 
@@ -759,6 +761,14 @@ export class ApiClient {
     const form = new FormData();
     form.append("file", file);
     return this.request<DatasetSummary>("/v1/datasets", { method: "POST", body: form });
+  }
+
+  /** A cited table saved as a data file; `existing` when this table was saved before. */
+  datasetFromTable(documentId: string, chunkId: string): Promise<DatasetSummary & { existing: boolean }> {
+    return this.request("/v1/datasets/from-table", {
+      method: "POST",
+      body: JSON.stringify({ document_id: documentId, chunk_id: chunkId }),
+    });
   }
 
   deleteDataset(datasetId: string): Promise<{ id: string }> {

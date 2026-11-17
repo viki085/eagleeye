@@ -4,6 +4,7 @@ Files live in the documents bucket under `datasets/{owner}/{id}/`; the ingest wo
 them into Parquet + a profile. Another user's dataset id always returns 404.
 """
 
+import hashlib
 import logging
 import uuid
 from typing import Any
@@ -15,11 +16,14 @@ from eagleeye_core.storage import ObjectNotFoundError
 from eagleeye_datasets.models import Dataset, original_key
 from eagleeye_datasets.repo import DatasetRepo
 from fastapi import APIRouter, File, Query, Request, UploadFile
+from pydantic import BaseModel
 
-from app.auth import CurrentUser
+from app.auth import AuthedUser, CurrentUser
 from app.errors import ApiException
+from app.repos import documents as docs_repo
 from app.services import artifact_reader, uploads
 from app.services.guards import ensure_enabled, limit_action
+from app.services.table_csv import TableParseError, to_csv
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/datasets", tags=["datasets"])
@@ -89,34 +93,49 @@ async def upload_dataset(
     await ensure_enabled(request, "uploads")
     await limit_action(request, user, "uploads")
     filename = uploads.safe_filename(file.filename)
-    ext, origin, mime = _require_data_file(filename)
+    _require_data_file(filename)  # refuse an unsupported type before reading the body
     payload = await uploads.read_limited(file, get_settings().max_upload_mb * 1024 * 1024)
-    state, repo = request.app.state, _repo(request)
-    duplicate = await state.pool.fetchval(
-        "SELECT title FROM datasets WHERE owner_id = $1 AND sha256 = $2 LIMIT 1",
-        user.id,
-        payload.sha256,
-    )
+    duplicate = await _duplicate(request, user.id, payload.sha256)
     if duplicate is not None:
-        raise ApiException(409, "CONFLICT", f'This file was already uploaded as "{duplicate}".')
+        raise ApiException(
+            409, "CONFLICT", f'This file was already uploaded as "{duplicate.title}".'
+        )
+    ds = await _store_new(
+        request, user, payload.data, payload.sha256, filename, uploads.title_from(filename)
+    )
+    return ok(_public(ds))
 
+
+async def _duplicate(request: Request, user_id: str, sha256: str) -> Dataset | None:
+    dataset_id = await request.app.state.pool.fetchval(
+        "SELECT id FROM datasets WHERE owner_id = $1 AND sha256 = $2 LIMIT 1", user_id, sha256
+    )
+    return None if dataset_id is None else await _repo(request).get(str(dataset_id), user_id)
+
+
+async def _store_new(
+    request: Request, user: AuthedUser, data: bytes, sha256: str, filename: str, title: str
+) -> Dataset:
+    """Record, store and queue a new data file (the worker turns it into Parquet + a profile)."""
+    ext, origin, mime = _require_data_file(filename)
+    state, repo = request.app.state, _repo(request)
     dataset_id = str(uuid.uuid4())
     key = original_key(user.id, dataset_id, ext)
     created = await repo.create(
         dataset_id=dataset_id,
         owner_id=user.id,
         origin=origin,
-        title=uploads.title_from(filename),
+        title=title,
         filename=filename,
         sheet="",
         s3_key_original=key,
-        size_bytes=len(payload.data),
-        sha256=payload.sha256,
+        size_bytes=len(data),
+        sha256=sha256,
     )
     if not created:  # concurrent duplicate upload
         raise ApiException(409, "CONFLICT", "This file was already uploaded.")
     try:
-        await state.store.put(key, payload.data, mime)
+        await state.store.put(key, data, mime)
         await state.task_queue.enqueue_dataset(dataset_id)
     except Exception as exc:
         logger.exception("dataset upload %s: storing or enqueueing failed", dataset_id)
@@ -125,7 +144,38 @@ async def upload_dataset(
     ds = await repo.get(dataset_id, user.id)
     if ds is None:  # deleted in between; treat as gone
         raise ApiException(404, "NOT_FOUND", "Data file not found.")
-    return ok(_public(ds))
+    return ds
+
+
+class FromTable(BaseModel):
+    document_id: UUID
+    chunk_id: UUID
+
+
+@router.post("/from-table", status_code=201)
+async def dataset_from_table(body: FromTable, request: Request, user: CurrentUser) -> dict:
+    """A cited table as a data file ("Use as data file" in the source panel). Same visibility
+    rule as the source itself; saving the same table again returns the existing data file."""
+    await ensure_enabled(request, "uploads")
+    row = await docs_repo.get_visible_chunk(
+        request.app.state.pool, str(body.document_id), str(body.chunk_id), user.id
+    )
+    if row is None or row["element_type"] != "table":
+        raise ApiException(404, "NOT_FOUND", "Table not found.")
+    try:
+        data = to_csv(row.get("table_html"), row["content"])
+    except TableParseError as exc:
+        raise ApiException(422, "VALIDATION_ERROR", "This table could not be read.") from exc
+    sha256 = hashlib.sha256(data).hexdigest()
+    existing = await _duplicate(request, user.id, sha256)
+    if existing is not None:
+        return ok(_public(existing) | {"existing": True})
+    await limit_action(request, user, "uploads")
+    page = f" p{row['page']}" if row.get("page") is not None else ""
+    title = f"{row['title']} — table{page}"[:200]
+    filename = uploads.safe_filename(f"{row['title'][:80]} table{page}.csv")
+    ds = await _store_new(request, user, data, sha256, filename, title)
+    return ok(_public(ds) | {"existing": False})
 
 
 @router.get("")

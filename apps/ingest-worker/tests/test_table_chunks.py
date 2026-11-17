@@ -40,3 +40,21 @@ def test_text_only_documents_chunk_exactly_as_before() -> None:
     elements = [ParsedElement("Policy", heading_level=1), ParsedElement("Body text. " * 20)]
     (only,) = chunk(elements)
     assert only.element_type == "text" and only.bbox is None and only.table_html is None
+
+
+def test_text_chunks_get_the_box_around_their_paragraphs_on_the_first_page() -> None:
+    elements = [
+        ParsedElement("First paragraph. " * 5, page=4, bbox=(72, 700, 300, 650)),
+        ParsedElement("Second paragraph. " * 5, page=4, bbox=(60, 640, 520, 600)),
+        ParsedElement("Runs onto the next page. " * 3, page=5, bbox=(10, 800, 590, 20)),
+    ]
+    (only,) = chunk(elements)
+    assert only.page == 4
+    assert only.bbox == (60, 700, 520, 600)  # page 5's box is left out
+
+
+def test_union_box_handles_both_origins() -> None:
+    from ingest_worker.chunking import union_box
+
+    assert union_box([]) is None
+    assert union_box([(10, 100, 50, 120), (5, 130, 60, 150)]) == (5, 100, 60, 150)

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { DATASETS_CHANGED } from "@/hooks/use-datasets";
 import type { ApiClient, ChunkDetail, Citation } from "@/lib/api";
 import { isSourceGone } from "@/lib/citation";
 
@@ -19,8 +20,16 @@ type LoadState =
   | { kind: "saved" } // passage gone (re-indexed or deleted): show the snippet saved with the answer
   | { kind: "error"; message: string };
 
-/** A cited figure: fetched with the bearer token, shown from a blob URL (revoked on close). */
-function FigureImage({ api, documentId, chunkId }: { api: ApiClient; documentId: string; chunkId: string }) {
+interface PictureProps {
+  api: ApiClient;
+  documentId: string;
+  chunkId: string;
+  kind: "image" | "page";
+}
+
+/** A cited figure, or the cited page with the passage marked: fetched with the bearer token,
+ * shown from a blob URL (revoked on close). */
+function ChunkPicture({ api, documentId, chunkId, kind }: PictureProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -28,7 +37,7 @@ function FigureImage({ api, documentId, chunkId }: { api: ApiClient; documentId:
     let url: string | null = null;
     let cancelled = false;
     api
-      .getChunkImage(documentId, chunkId)
+      .getChunkImage(documentId, chunkId, kind)
       .then((blob) => {
         if (cancelled) return;
         url = URL.createObjectURL(blob);
@@ -39,17 +48,76 @@ function FigureImage({ api, documentId, chunkId }: { api: ApiClient; documentId:
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [api, documentId, chunkId]);
+  }, [api, documentId, chunkId, kind]);
 
-  if (failed) return <p className="mb-3 text-xs text-neutral-400">The figure could not be loaded.</p>;
-  if (src === null) return <p className="mb-3 text-xs text-neutral-400">Loading figure…</p>;
+  const what = kind === "page" ? "page" : "figure";
+  if (failed) return <p className="mb-3 text-xs text-neutral-400">The {what} could not be loaded.</p>;
+  if (src === null) return <p className="mb-3 text-xs text-neutral-400">Loading {what}…</p>;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a blob URL, not an optimisable asset
     <img
       src={src}
-      alt="Figure from the document"
+      alt={kind === "page" ? "The page, with the cited passage highlighted" : "Figure from the document"}
       className="mb-3 w-full rounded-md border border-neutral-200 bg-white dark:border-neutral-800"
     />
+  );
+}
+
+type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "done"; text: string } | { kind: "error"; text: string };
+
+/** "Use as data file": the cited table becomes a CSV data file the analysis tools can work on. */
+function UseAsDataFile({ api, documentId, chunkId }: Omit<PictureProps, "kind">) {
+  const [state, setState] = useState<SaveState>({ kind: "idle" });
+
+  const save = () => {
+    setState({ kind: "saving" });
+    api
+      .datasetFromTable(documentId, chunkId)
+      .then((ds) => {
+        window.dispatchEvent(new Event(DATASETS_CHANGED));
+        const text = ds.existing
+          ? `Already saved as the data file “${ds.title}”.`
+          : `Saved as the data file “${ds.title}”. Ask a question about it once it is ready.`;
+        setState({ kind: "done", text });
+      })
+      .catch((e: unknown) =>
+        setState({ kind: "error", text: e instanceof Error ? e.message : "Could not save the table" }),
+      );
+  };
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+      <button
+        onClick={save}
+        disabled={state.kind === "saving" || state.kind === "done"}
+        className="rounded-md border border-neutral-300 px-2 py-1 font-medium hover:bg-neutral-50 disabled:opacity-60 dark:border-neutral-700 dark:hover:bg-neutral-900"
+      >
+        {state.kind === "saving" ? "Saving…" : "Use as data file"}
+      </button>
+      {state.kind === "done" && <span className="text-neutral-500" role="status">{state.text}</span>}
+      {state.kind === "error" && <span className="text-red-600" role="alert">{state.text}</span>}
+    </div>
+  );
+}
+
+/** "Show on page": the page picture is only fetched when asked for (it is rendered on demand). */
+function PageView({ api, documentId, chunkId, page }: Omit<PictureProps, "kind"> & { page: number | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-4 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+      >
+        {open ? "Hide page" : `Show on page${page !== null ? ` ${page}` : ""}`}
+      </button>
+      {open && (
+        <div className="mt-2">
+          <ChunkPicture api={api} documentId={documentId} chunkId={chunkId} kind="page" />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -120,11 +188,28 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{state.chunk.content}</ReactMarkdown>
             </div>
           )}
+          {state.kind === "loaded" && state.chunk.element_type === "table" && (
+            <UseAsDataFile
+              key={citation.chunk_id}
+              api={api}
+              documentId={citation.document_id}
+              chunkId={citation.chunk_id}
+            />
+          )}
           {state.kind === "loaded" && state.chunk.has_image && (
-            <FigureImage api={api} documentId={citation.document_id} chunkId={citation.chunk_id} />
+            <ChunkPicture api={api} documentId={citation.document_id} chunkId={citation.chunk_id} kind="image" />
           )}
           {state.kind === "loaded" && state.chunk.element_type !== "table" && (
             <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{state.chunk.content}</p>
+          )}
+          {state.kind === "loaded" && state.chunk.has_page && (
+            <PageView
+              key={citation.chunk_id}
+              api={api}
+              documentId={citation.document_id}
+              chunkId={citation.chunk_id}
+              page={state.chunk.page}
+            />
           )}
         </div>
       </section>

@@ -423,3 +423,38 @@ def test_deleting_a_document_removes_its_figures(env: dict) -> None:
     env["docs"].figures = [figure]
     assert env["client"].delete(f"/v1/documents/{doc_id}").status_code == 200
     assert env["state"].store.objects == {}
+
+
+def test_a_cited_pdf_page_is_shown_with_its_passage(env: dict) -> None:
+    from test_page_render import blank_pdf
+
+    doc_id, chunk_id = _figure_chunk(env, None)
+    env["state"].store.objects["enterprise/d/original.pdf"] = blank_pdf(1)
+    env["docs"].chunk |= {
+        "mime": "application/pdf",
+        "s3_key": "enterprise/d/original.pdf",
+        "bbox": [72.0, 700.0, 300.0, 650.0],
+    }
+    data = env["client"].get(f"/v1/documents/{doc_id}/chunks/{chunk_id}").json()["data"]
+    assert data["has_page"] is True
+    resp = env["client"].get(f"/v1/documents/{doc_id}/chunks/{chunk_id}/page")
+    assert resp.status_code == 200 and resp.content.startswith(b"\x89PNG")
+    assert resp.headers["x-content-type-options"] == "nosniff"
+
+
+def test_page_is_404_for_non_pdfs_missing_pages_and_invisible_chunks(env: dict) -> None:
+    from test_page_render import blank_pdf
+
+    doc_id, chunk_id = _figure_chunk(env, None)
+    url = f"/v1/documents/{doc_id}/chunks/{chunk_id}/page"
+    env["docs"].chunk |= {"mime": "text/markdown", "s3_key": "k", "bbox": None}
+    assert (
+        env["client"].get(f"/v1/documents/{doc_id}/chunks/{chunk_id}").json()["data"]["has_page"]
+        is False
+    )
+    assert env["client"].get(url).status_code == 404
+    env["state"].store.objects["k"] = blank_pdf(1)
+    env["docs"].chunk |= {"mime": "application/pdf", "page": 5}  # beyond the last page
+    assert env["client"].get(url).status_code == 404
+    env["docs"].chunk = None
+    assert env["client"].get(url).status_code == 404

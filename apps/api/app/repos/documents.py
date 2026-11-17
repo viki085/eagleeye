@@ -133,7 +133,7 @@ async def get_visible_chunk(
     return await pool.fetchrow(
         """
         SELECT c.id, c.chunk_no, c.content, c.heading_path, c.page, c.element_type, c.asset_key,
-               d.id AS document_id, d.title
+               c.bbox, c.table_html, d.id AS document_id, d.title, d.mime, d.s3_key
         FROM document_chunks c JOIN documents d ON d.id = c.document_id
         WHERE c.id = $1 AND d.id = $2 AND d.status = 'READY'
           AND (c.scope = 'enterprise' OR (c.scope = 'personal' AND c.owner_id = $3::uuid))

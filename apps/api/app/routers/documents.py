@@ -16,6 +16,7 @@ from app.repos import admin_metrics
 from app.repos import documents as docs_repo
 from app.services import uploads
 from app.services.guards import ensure_enabled, limit_action
+from app.services.page_render import PageRenderError, render_page_async
 from app.services.permissions import can_manage_enterprise
 
 logger = logging.getLogger(__name__)
@@ -165,6 +166,7 @@ async def get_chunk(doc_id: UUID, chunk_id: UUID, request: Request, user: Curren
             "page": row["page"],
             "element_type": row["element_type"],  # "table": content is Markdown, show as a table
             "has_image": bool(row.get("asset_key")),  # a figure: GET .../image shows it
+            "has_page": _has_page(row),  # a PDF page: GET .../page shows it, passage marked
             "document": {"id": str(row["document_id"]), "title": row["title"]},
         }
     )
@@ -185,6 +187,37 @@ async def get_chunk_image(
         raise ApiException(404, "NOT_FOUND", "The figure is no longer available.") from exc
     return Response(
         content=data,
+        media_type="image/png",
+        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"},
+    )
+
+
+def _has_page(row: asyncpg.Record | dict) -> bool:
+    return row.get("mime") == "application/pdf" and row.get("page") is not None
+
+
+@router.get("/{doc_id}/chunks/{chunk_id}/page")
+async def get_chunk_page(
+    doc_id: UUID, chunk_id: UUID, request: Request, user: CurrentUser
+) -> Response:
+    """The cited PDF page (PNG) with the passage highlighted, under the chunk's visibility rule."""
+    state = request.app.state
+    row = await docs_repo.get_visible_chunk(state.pool, str(doc_id), str(chunk_id), user.id)
+    if row is None or not _has_page(row):
+        raise ApiException(404, "NOT_FOUND", "Page not found.")
+    try:
+        data = await state.store.get(row["s3_key"])
+    except ObjectNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", "The file is no longer available.") from exc
+    box = row.get("bbox")
+    bbox = (float(box[0]), float(box[1]), float(box[2]), float(box[3])) if box else None
+    try:
+        png = await render_page_async(data, int(row["page"]), bbox)
+    except PageRenderError as exc:
+        logger.info("page render refused for chunk %s: %s", chunk_id, exc)
+        raise ApiException(404, "NOT_FOUND", "This page cannot be shown.") from exc
+    return Response(
+        content=png,
         media_type="image/png",
         headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"},
     )

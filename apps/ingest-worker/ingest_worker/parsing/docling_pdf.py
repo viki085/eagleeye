@@ -297,7 +297,56 @@ def to_elements(document: Any) -> list[ParsedElement]:
         el = elements[index]
         elements[index] = replace(el, labels=line) if el.kind == "image" else replace(el, text=line)
     drop = _repeated(prints, elements)
-    return [el for i, el in enumerate(elements) if el.text and i not in drop]
+    return _continued_tables([el for i, el in enumerate(elements) if el.text and i not in drop])
+
+
+def _md_rows(markdown: str) -> list[str]:
+    return [line for line in markdown.splitlines() if line.strip()]
+
+
+def _md_cells(row: str) -> list[str]:
+    return [cell.strip() for cell in row.strip().strip("|").split("|")]
+
+
+_TR = re.compile(r"<tr>.*?</tr>", re.DOTALL)
+
+
+def _html_with_header(header_html: str, html: str | None) -> str | None:
+    """The continuation's rows under the first part's header row; its own first row (taken for a
+    header) becomes a data row."""
+    if not html:
+        return html
+    rows = [r.replace("<th", "<td").replace("</th>", "</td>") for r in _TR.findall(html)]
+    return f"<table><tbody>{header_html}{''.join(rows)}</tbody></table>"
+
+
+def _continued_tables(elements: list[ParsedElement]) -> list[ParsedElement]:
+    """A table that runs onto the next page comes out of Docling as two tables, and the second
+    takes its first data row for a header ("| Ningbo | Montevideo | 40HC | 5,227 |"). Without the
+    real header that part is hard to find and to read, so it gets the first part's header row.
+    It stays its own element, so its page and position are still right."""
+    out: list[ParsedElement] = []
+    for el in elements:
+        prev = out[-1] if out else None
+        if (
+            el.kind == "table"
+            and prev is not None
+            and prev.kind == "table"
+            and prev.page is not None
+            and el.page == prev.page + 1
+        ):
+            first, rows = _md_rows(prev.text), _md_rows(el.text)
+            if len(first) >= 2 and len(rows) >= 2:
+                header, own = first[0], rows[0]
+                same_width = len(_md_cells(header)) == len(_md_cells(own))
+                if same_width and _md_cells(header) != _md_cells(own):
+                    body = [own, *rows[2:]]  # its "header" is a data row; drop its rule line
+                    text = "\n".join([header, first[1], *body])
+                    header_html = next(iter(_TR.findall(prev.table_html or "")), "")
+                    html = _html_with_header(header_html, el.table_html) if header_html else None
+                    el = replace(el, text=text, table_html=html or el.table_html)
+        out.append(el)
+    return out
 
 
 def _ocr_pages(result: Any) -> tuple[tuple[int, ...], tuple[int, ...]]:

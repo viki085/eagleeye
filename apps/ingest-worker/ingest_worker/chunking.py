@@ -40,7 +40,7 @@ class Chunk:
     page: int | None
     chunk_hash: str
     element_type: str = "text"  # "text" | "table" | "image"
-    bbox: BBox | None = None  # tables and figures: position on the page
+    bbox: BBox | None = None  # position on the page (text: its paragraphs on the first page)
     table_html: str | None = None  # tables: the whole table's structure
     asset_key: str | None = None  # figures: the stored picture
 
@@ -91,7 +91,7 @@ def _sections(elements: list[ParsedElement] | tuple[ParsedElement, ...]) -> list
             block = _Block(text, el.page, el.bbox, el.table_html, el.asset_key, el.kind)
             sections.append(_Section(path(), (block,), table=True))
         else:
-            blocks.append(_Block(text, el.page))
+            blocks.append(_Block(text, el.page, el.bbox))
     if blocks:
         sections.append(_Section(path(), tuple(blocks)))
     return sections
@@ -184,26 +184,49 @@ def _tail(text: str, overlap: int) -> str:
     return window[space + 1 :] if space >= 0 else window
 
 
-def _pack(sec: _Section, soft: int, max_chars: int, overlap: int) -> list[tuple[str, int | None]]:
-    if sec.size <= max_chars:
-        return [(PARA_SEP.join(b.text for b in sec.blocks), sec.blocks[0].page)]
+def union_box(boxes: list[BBox]) -> BBox | None:
+    """The smallest box around all of them. PDF boxes from Docling have the origin at the bottom
+    (top > bottom); top-origin boxes (top < bottom) are handled too."""
+    if not boxes:
+        return None
+    left, right = min(b[0] for b in boxes), max(b[2] for b in boxes)
+    if boxes[0][1] >= boxes[0][3]:
+        return (left, max(b[1] for b in boxes), right, min(b[3] for b in boxes))
+    return (left, min(b[1] for b in boxes), right, max(b[3] for b in boxes))
 
-    units = [(p, b.page) for b in sec.blocks for p in _pieces(b.text, soft)]
-    packed: list[tuple[str, int | None]] = []
+
+def _first_page_box(units: list[tuple[int | None, BBox | None]]) -> BBox | None:
+    page = next((pg for pg, _ in units if pg is not None), None)
+    return union_box([box for pg, box in units if box is not None and pg == page])
+
+
+_Packed = tuple[str, int | None, BBox | None]
+
+
+def _pack(sec: _Section, soft: int, max_chars: int, overlap: int) -> list[_Packed]:
+    if sec.size <= max_chars:
+        box = _first_page_box([(b.page, b.bbox) for b in sec.blocks])
+        return [(PARA_SEP.join(b.text for b in sec.blocks), sec.blocks[0].page, box)]
+
+    units = [(p, b.page, b.bbox) for b in sec.blocks for p in _pieces(b.text, soft)]
+    packed: list[_Packed] = []
     buf: list[str] = []
+    where: list[tuple[int | None, BBox | None]] = []
     page: int | None = None
-    for text, pg in units:
+    for text, pg, box in units:
         projected = sum(len(x) for x in buf) + len(PARA_SEP) * len(buf) + len(text)
         if buf and projected > soft:
-            packed.append((PARA_SEP.join(buf), page))
+            packed.append((PARA_SEP.join(buf), page, _first_page_box(where)))
             tail = _tail(packed[-1][0], overlap)
             buf = [tail] if tail else []
+            where = []
             page = None
         if page is None:
             page = pg
         buf.append(text)
+        where.append((pg, box))
     if buf:
-        packed.append((PARA_SEP.join(buf), page))
+        packed.append((PARA_SEP.join(buf), page, _first_page_box(where)))
     return packed
 
 
@@ -266,6 +289,8 @@ def chunk(
                     )
                 )
             continue
-        for content, page in _pack(sec, soft_chars, max_chars, overlap):
-            chunks.append(Chunk(len(chunks), content, sec.path, page, _hash(sec.path, content)))
+        for content, page, box in _pack(sec, soft_chars, max_chars, overlap):
+            chunks.append(
+                Chunk(len(chunks), content, sec.path, page, _hash(sec.path, content), bbox=box)
+            )
     return chunks

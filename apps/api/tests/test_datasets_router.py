@@ -68,7 +68,7 @@ class FakePool:
         if "sha256" in sql:
             owner, sha = args
             hit = [r for r in self.rows.values() if r["owner_id"] == owner and r["sha256"] == sha]
-            return hit[0]["title"] if hit else None
+            return hit[0]["id"] if hit else None
         return None  # original no longer used
 
     async def execute(self, sql: str, *args: object) -> str:
@@ -221,3 +221,47 @@ def test_deleting_a_shared_file_keeps_the_shared_data(client: TestClient) -> Non
     shared_key = client.app.state.pool.rows[ds]["s3_key"]
     assert client.delete(f"/v1/datasets/{ds}").status_code == 200
     assert shared_key not in client.app.state.store.removed
+
+
+def _cited_table(monkeypatch: pytest.MonkeyPatch, row: dict | None) -> None:
+    from app.repos import documents as docs_repo
+
+    async def fake(pool, doc_id, chunk_id, user_id):  # noqa: ANN001, ANN202
+        return row
+
+    monkeypatch.setattr(docs_repo, "get_visible_chunk", fake)
+
+
+TABLE_ROW = {
+    "element_type": "table",
+    "content": "| Origin | Rate |\n| --- | --- |\n| Santos | 1,262 |",
+    "table_html": None,
+    "title": "Service Agreement GLC-1",
+    "page": 2,
+}
+
+
+def test_a_cited_table_becomes_a_data_file_once(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _cited_table(monkeypatch, TABLE_ROW)
+    body = {"document_id": str(uuid.uuid4()), "chunk_id": str(uuid.uuid4())}
+    resp = client.post("/v1/datasets/from-table", json=body)
+    assert resp.status_code == 201
+    data = resp.json()["data"]
+    assert data["existing"] is False and data["title"] == "Service Agreement GLC-1 — table p2"
+    assert client.app.state.task_queue.datasets == [data["id"]]
+    (stored,) = client.app.state.store.objects.values()
+    assert stored == b'Origin,Rate\nSantos,"1,262"\n'
+    again = client.post("/v1/datasets/from-table", json=body).json()["data"]
+    assert again["existing"] is True and again["id"] == data["id"]
+    assert len(client.app.state.task_queue.datasets) == 1
+
+
+@pytest.mark.parametrize("row", [None, {**TABLE_ROW, "element_type": "text"}])
+def test_only_a_visible_table_can_be_saved(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, row: dict | None
+) -> None:
+    _cited_table(monkeypatch, row)
+    body = {"document_id": str(uuid.uuid4()), "chunk_id": str(uuid.uuid4())}
+    assert client.post("/v1/datasets/from-table", json=body).status_code == 404

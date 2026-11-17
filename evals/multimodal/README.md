@@ -9,6 +9,7 @@ Test set and scorer for PDFs with tables, images, watermarks and scanned pages. 
 | --- | --- |
 | `build_corpus.py` | Downloads 10 public-domain US government PDFs into `pdfs/` and writes `corpus/`: 11 test documents, 96 pages, plus `corpus/manifest.json`. Kinds: `text`, `scanned` (no text layer, skewed), `mixed` (first 3 pages scanned), `watermark` (diagonal CONFIDENTIAL + DRAFT footer), `deck` (chart pages as images, title only). |
 | `build_golden.py` | Writes `golden.jsonl`: 150 questions, each with a short answer span checked verbatim against the ORIGINAL page text, plus doc, page and tag (`text` 105, `table` 11, `image` 20, `scanned` 14). Run with the main `.venv` (uses the app's LLM gateway, about $0.05). |
+| `build_table_golden.py` | Adds table questions (`t001`...): each test PDF is parsed, and for up to 4 tables per document the fast model writes questions answered by one cell. An answer is kept only if it is in the ORIGINAL page text, has a digit or two or more words, and is not repeated on that page. 32 questions (24 `table`, 8 `scanned` from the scanned copper report), about $0.03. Re-running replaces them. |
 | `run_docling.py` | Standalone Docling run (default settings, RapidOCR, picture classification) into `out/docling/`, with `summary.json`. Not the shipped parser. |
 | `.venv/` | Own Python 3.12 env (docling 2.150.1, CPU torch, docling-parse, rapidocr, reportlab, pypdf). Git-ignored, as are `pdfs/`, `corpus/*.pdf` and `out/`. |
 
@@ -88,8 +89,19 @@ Phase 4: the fast model reorders the fused candidates (25 previews of 600 charac
 keeps 20, production 5 of 20). recall@5 0.89 -> 0.98, MRR 0.78 -> 0.95, and the date cluster
 10/10: the answers were already retrieved, only ranked too low. Costs one fast call per question.
 
+## 182 questions (2026-11-17, table questions added)
+
+`build_table_golden.py` added 32 table questions (table-tagged answers 11 -> 35). Docling with
+the continued-table fix, `--describe --rerank`: budget_recall 0.978, recall@5 0.978, MRR 0.939;
+by tag image 0.95, scanned 0.955, table 0.971, text 0.990. Misses: m035, m088, m142, t015 (a
+"3-month average" cell in the BLS industry table).
+
+Continued tables: a table that runs onto the next page comes out of Docling as two tables, and the
+second takes its first data row for a header. The second part now gets the first part's header
+row (it stays its own chunk with its own page). Found in the live library: all 80 service
+agreements have a rate table that breaks across pages 1 and 2, and the page-2 rows could not be
+found.
+
 ## Not done
 
-- More table questions (only 11; the pypdf text of tables is jumbled, so the question writer
-  mostly chose prose), and fewer questions sharing one answer. Figure-caption questions need
-  Phase 3.
+- Fewer questions sharing one answer (the NIST date cluster).

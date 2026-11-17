@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ApiClient, DatasetStatus, DatasetSummary } from "@/lib/api";
 
 const POLL_MS = 2000;
+/** Fired on window when a data file is added elsewhere (e.g. a table saved from a source). */
+export const DATASETS_CHANGED = "eagleeye:datasets-changed";
 const TERMINAL: ReadonlySet<DatasetStatus> = new Set(["READY", "FAILED"]);
 
 export interface DatasetsState {
@@ -36,6 +38,9 @@ export function useDatasets(api: ApiClient): DatasetsState {
 
   useEffect(() => {
     void refresh();
+    const onChanged = () => void refresh();
+    window.addEventListener(DATASETS_CHANGED, onChanged);
+    return () => window.removeEventListener(DATASETS_CHANGED, onChanged);
   }, [refresh]);
 
   const processing = useMemo(() => datasets.some((d) => !TERMINAL.has(d.status)), [datasets]);
