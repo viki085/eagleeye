@@ -59,7 +59,7 @@ async def hydrate(
     rows = await pool.fetch(
         f"""
         SELECT c.id, c.document_id, d.title, c.scope, c.chunk_no, c.page,
-               c.heading_path, c.content
+               c.heading_path, c.content, c.element_type, c.asset_key
         FROM document_chunks c JOIN documents d ON d.id = c.document_id
         WHERE c.id = ANY($1::uuid[]) AND {access_predicate(2, scope)}
         """,  # noqa: S608 — predicate is built from constants, values are bound
@@ -83,6 +83,8 @@ async def hydrate(
                 heading_path=tuple(row["heading_path"] or ()),
                 content=truncate(row["content"]),
                 score=score,
+                element_type=row.get("element_type") or "text",
+                asset_key=row.get("asset_key"),
             )
         )
     return chunks

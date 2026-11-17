@@ -48,6 +48,8 @@ class RetrievedChunk:
     heading_path: tuple[str, ...]
     content: str
     score: float
+    element_type: str = "text"  # "text" | "table" | "image"
+    asset_key: str | None = None  # figures: the stored picture (shown to the answer model)
 
 
 @dataclass(frozen=True)

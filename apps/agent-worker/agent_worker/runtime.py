@@ -103,6 +103,7 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         top_k=s.rag_top_k,
         min_score=s.rag_min_score,
         cache=cache if cache.enabled else None,
+        rerank_candidates=s.rag_rerank_candidates,
     )
     return RunnerDeps(
         pool=pool,
@@ -125,6 +126,7 @@ async def _build_deps(s: Settings) -> RunnerDeps:
         python_analysis=s.enable_python_analysis,
         sandbox_runs_per_hour=s.sandbox_runs_per_hour,
         cache=cache if cache.enabled else None,
+        figure_loader=build_object_store().get if s.rag_figures_to_model else None,
     )
 
 

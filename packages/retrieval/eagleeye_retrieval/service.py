@@ -1,4 +1,5 @@
-"""Retriever: rewrite → (vector ∥ vector ∥ keyword) per query → RRF → hydrate (C4 §4)."""
+"""Retriever: rewrite → (vector ∥ vector ∥ keyword) per query → RRF → hydrate → rerank
+(C4 §4; rerank: multimodal plan Phase 4)."""
 
 import asyncio
 import logging
@@ -10,6 +11,7 @@ from eagleeye_llm.gateway import ChatMessage, LLMGateway
 
 from eagleeye_retrieval import access
 from eagleeye_retrieval.keyword_search import keyword_search
+from eagleeye_retrieval.rerank import rerank
 from eagleeye_retrieval.rewrite import MAX_QUERY_CHARS, rewrite_query
 from eagleeye_retrieval.rrf import fuse
 from eagleeye_retrieval.stores.base import VectorStore
@@ -48,6 +50,7 @@ class Retriever:
         keyword_fn: KeywordFn | None = None,
         hydrate_fn: HydrateFn | None = None,
         cache: object | None = None,  # eagleeye_core.app_cache.AppCache for query rewrites
+        rerank_candidates: int = 0,  # > top_k: the fast model orders this many fused results
     ) -> None:
         self._llm = llm
         self._cache = cache
@@ -55,6 +58,7 @@ class Retriever:
         self._stores = (enterprise_store, personal_store)
         self._top_k = top_k
         self._min_score = min_score
+        self._rerank_candidates = rerank_candidates if llm is not None else 0
         self._keyword = keyword_fn or (lambda q, s: keyword_search(pool, q, s))
         self._hydrate = hydrate_fn or (lambda scored, s: access.hydrate(pool, scored, s))
 
@@ -77,12 +81,18 @@ class Retriever:
 
         fused_rankings = [ranking for ranking, _ in per_query]
         best_score = max((score for _, score in per_query), default=0.0)
-        final = fuse(fused_rankings)[: self._top_k]
+        reranking = self._rerank_candidates > self._top_k
+        final = fuse(fused_rankings)[: self._rerank_candidates if reranking else self._top_k]
         chunks = await self._hydrate(final, scope)
+        if reranking:
+            chunks = (await rerank(self._llm, question, chunks))[: self._top_k]
         low = not chunks or best_score < self._min_score
         logger.info(
             "retrieval: %d queries, %d chunks, best cosine %.3f, low_relevance=%s",
-            len(queries), len(chunks), best_score, low,
+            len(queries),
+            len(chunks),
+            best_score,
+            low,
         )
         return RetrievalResult(
             chunks=tuple(chunks), low_relevance=low, queries=tuple(queries), best_score=best_score

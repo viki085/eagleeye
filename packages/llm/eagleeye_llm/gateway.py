@@ -28,6 +28,7 @@ class ChatMessage:
     content: str
     tool_calls: tuple[ToolCall, ...] = ()
     tool_call_id: str | None = None
+    images: tuple[str, ...] = ()  # user turns only: data: URLs of pictures the model should see
 
 
 @dataclass(frozen=True)

@@ -51,6 +51,7 @@ class RunnerDeps:
     python_analysis: bool = True
     sandbox_runs_per_hour: int = 60
     cache: Any = None  # eagleeye_core.app_cache.AppCache (None = no caching)
+    figure_loader: Any = None  # async (object key) -> PNG bytes (cited figures to the model)
 
 
 @dataclass(frozen=True)
@@ -186,6 +187,7 @@ def _build_context(deps: RunnerDeps, run: asyncpg.Record, sink: EventSink) -> Ru
         python_analysis=deps.python_analysis,
         sandbox_runs_per_hour=deps.sandbox_runs_per_hour,
         cache=deps.cache,
+        figure_loader=deps.figure_loader,
     )
 
 

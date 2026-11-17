@@ -64,6 +64,7 @@ PARSERS = {
     "pypdf": lambda data: sanitize(PdfParser().parse(data)),
     "docling": lambda data: pipeline.parse("pdf", data),
 }
+LLM = None  # --rerank: the fast model reorders the top results (Phase 4)
 DESCRIBE = False  # --describe: real figure descriptions (OpenAI vision, about $0.01 per run)
 
 
@@ -202,7 +203,8 @@ async def evaluate(name: str, questions: list[dict], pool: asyncpg.Pool, embedde
         await ingest(pool, embedder, docs, user)
         retriever = Retriever(
             pool,
-            llm=None,
+            llm=LLM,
+            rerank_candidates=TOP_N + 5 if LLM is not None else 0,  # rerank 25, keep 20
             embedder=embedder,
             enterprise_store=NoEnterpriseStore(),
             personal_store=PgVectorPersonalStore(pool),
@@ -278,9 +280,16 @@ async def main() -> None:
     ap.add_argument("--parsers", default="pypdf,docling")
     ap.add_argument("--json", type=Path, default=OUT / "scores.json")
     ap.add_argument("--describe", action="store_true", help="real figure descriptions (~$0.01)")
+    ap.add_argument("--rerank", action="store_true", help="rerank with the fast model (~$0.05)")
     args = ap.parse_args()
-    global DESCRIBE
+    global DESCRIBE, LLM
     DESCRIBE = args.describe
+    if args.rerank:
+        from eagleeye_llm.env import export_provider_keys
+        from eagleeye_llm.factory import build_llm
+
+        export_provider_keys(get_settings().openai_api_key, get_settings().anthropic_api_key)
+        LLM = build_llm(get_settings())
     if not any(CORPUS.glob("*.pdf")):
         sys.exit("No corpus PDFs: run evals/multimodal/build_corpus.py first.")
     questions = [json.loads(line) for line in GOLDEN.read_text(encoding="utf-8").splitlines()]

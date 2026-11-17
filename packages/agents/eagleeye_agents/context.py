@@ -91,6 +91,7 @@ class RunContext:
     notebook_quota_exhausted: bool = False  # demo visit used its notebook(s): say so if asked
     notebooks: list[dict[str, Any]] = field(default_factory=list)  # notebook event payloads
     cache: Any = None  # eagleeye_core.app_cache.AppCache (None = no caching)
+    figure_loader: Any = None  # async (object key) -> PNG bytes; None = figures not sent
     answer_key: tuple | None = None  # set when this run's answer may be reused or stored
     data_files: list[Any] = field(default_factory=list)  # the user's READY data files
     references: list[Any] = field(default_factory=list)  # references.FileRef named as [file]

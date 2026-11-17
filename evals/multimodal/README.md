@@ -47,6 +47,7 @@ document kind. Spans match as whole words of letters and digits. Writes `out/sco
 | Docling with the eval fixes | 11/11 | 93/96 | 0 | 0.89 to 0.92 | 0.95 |
 | + compact tables (Phase 2) | 11/11 | 93/96 | 0 | 0.92 | **0.99** |
 | + figures saved and described (Phase 3) | 11/11 | 93/96 | 0 | 0.89 to 0.94 | 0.95 to 0.97 |
+| + reranker (Phase 4, `--rerank`) | 11/11 | 93/96 | 0 | **0.98** | **0.98** |
 
 Per tag, Docling with compact tables vs pypdf: image 1.00 vs 0.25, scanned 0.93 vs 0.29, table
 1.00 vs 0.91 (11 vs 10 of 11), text 0.90 vs 0.94 (the date cluster is all text questions).
@@ -82,6 +83,10 @@ it) with the stored PNG. Retrieval stays within noise of Phase 2 (one to three q
 about 35 figure chunks now compete for the top results; the answers are still in the chunks, so
 the Phase 4 reranker is the fix). The vision model can name a watermark it sees; the stamps the
 clean step removed are stripped from descriptions too (watermark chunks back to 0).
+
+Phase 4: the fast model reorders the fused candidates (25 previews of 600 characters; the scorer
+keeps 20, production 5 of 20). recall@5 0.89 -> 0.98, MRR 0.78 -> 0.95, and the date cluster
+10/10: the answers were already retrieved, only ranked too low. Costs one fast call per question.
 
 ## Not done
 

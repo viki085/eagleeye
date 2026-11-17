@@ -91,6 +91,9 @@ class Settings(BaseSettings):
     # true → every user may add/delete enterprise docs; false → knowledge_admin/admin only
     enterprise_upload_open: bool = False
     rag_top_k: int = 5
+    rag_rerank_candidates: int = 20  # fused results the fast model reorders; 0 = off
+    # cited figures (up to 3) are shown to the answer model as pictures, not only their text
+    rag_figures_to_model: bool = True
     rag_min_score: float = 0.25  # cosine floor below which retrieval is "low relevance"
 
     # Agent budgets (C3 §2.3), checked before every supervisor LLM call

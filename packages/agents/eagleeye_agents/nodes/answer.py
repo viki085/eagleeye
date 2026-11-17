@@ -1,5 +1,8 @@
 """Single-call paths: simple chat (no tools) and the fixed RAG pipeline (C3 §2.2)."""
 
+import base64
+import logging
+
 from eagleeye_llm.gateway import ChatMessage
 from eagleeye_retrieval.types import AccessScope, RetrievedChunk
 
@@ -10,6 +13,9 @@ from eagleeye_agents.state import RunState
 from eagleeye_agents.streaming import stream_turn
 
 MAX_HISTORY_MESSAGES = 20
+MAX_FIGURES = 3  # cited figures shown to the model as pictures (low detail: ~100-300 tokens each)
+
+logger = logging.getLogger(__name__)
 
 NO_COVERAGE = """<context>
 (no relevant passages were found in the user's documents)
@@ -18,9 +24,40 @@ Tell the user their documents don't appear to cover this question, and suggest r
 selecting different documents, or uploading the right one. Do not answer from general knowledge."""
 
 
-def conversation(state: RunState, system_prompt: str) -> list[ChatMessage]:
+def conversation(
+    state: RunState, system_prompt: str, figures: tuple[tuple[int, str], ...] = ()
+) -> list[ChatMessage]:
+    """`figures`: (source number, data URL) of cited figures the model should also see."""
     history = state.get("history", [])[-MAX_HISTORY_MESSAGES:]
-    return [ChatMessage("system", system_prompt), *history, ChatMessage("user", state["question"])]
+    question = state["question"]
+    if figures:
+        listed = ", ".join(f"[{n}]" for n, _ in figures)
+        question = f"{question}\n\n(Attached in order: the figures of sources {listed}.)"
+    user = ChatMessage("user", question, images=tuple(url for _, url in figures))
+    return [ChatMessage("system", system_prompt), *history, user]
+
+
+async def cited_figures(
+    ctx: RunContext, numbered: list[tuple[int, RetrievedChunk]]
+) -> tuple[tuple[int, str], ...]:
+    """The pictures of the first few figure sources, as data URLs; best effort (a figure that
+    cannot be loaded is simply described by its text)."""
+    if ctx.figure_loader is None:
+        return ()
+    figures: list[tuple[int, str]] = []
+    seen: set[str] = set()
+    for n, chunk in numbered:
+        key = chunk.asset_key
+        if not key or key in seen or len(figures) >= MAX_FIGURES:
+            continue
+        seen.add(key)
+        try:
+            png = await ctx.figure_loader(key)
+        except Exception:  # noqa: BLE001
+            logger.warning("cited figure %s could not be loaded", key, exc_info=True)
+            continue
+        figures.append((n, "data:image/png;base64," + base64.b64encode(png).decode()))
+    return tuple(figures)
 
 
 def make_simple_node(ctx: RunContext) -> Node:
@@ -53,13 +90,11 @@ def make_rag_node(ctx: RunContext) -> Node:
             await stream_turn(ctx, "answer", conversation(state, ctx.prompts.text("simple")))
             return {"grounded": False}
         use = chunks if explicit or not low else ()
-        context = (
-            f"<context>\n{format_sources(ctx.sources.register_all(use))}\n</context>"
-            if use
-            else NO_COVERAGE
-        )
+        numbered = ctx.sources.register_all(use)
+        context = f"<context>\n{format_sources(numbered)}\n</context>" if use else NO_COVERAGE
         system = f"{ctx.prompts.text('rag')}\n\n{context}"
-        await stream_turn(ctx, "answer", conversation(state, system))
+        figures = await cited_figures(ctx, numbered)
+        await stream_turn(ctx, "answer", conversation(state, system, figures))
         return {"grounded": True}
 
     return rag_node

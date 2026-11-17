@@ -21,6 +21,14 @@ def to_wire(messages: Sequence[ChatMessage]) -> list[dict[str, Any]]:
     wire: list[dict[str, Any]] = []
     for m in messages:
         msg: dict[str, Any] = {"role": m.role, "content": m.content}
+        if m.images:  # OpenAI-style content parts; LiteLLM translates them per provider
+            msg["content"] = [
+                {"type": "text", "text": m.content},
+                *(
+                    {"type": "image_url", "image_url": {"url": u, "detail": "low"}}
+                    for u in m.images
+                ),
+            ]
         if m.tool_calls:
             msg["tool_calls"] = [
                 {
