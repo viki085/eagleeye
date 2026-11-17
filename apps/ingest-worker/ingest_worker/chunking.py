@@ -39,9 +39,10 @@ class Chunk:
     heading_path: tuple[str, ...]
     page: int | None
     chunk_hash: str
-    element_type: str = "text"  # "text" | "table"
-    bbox: BBox | None = None  # tables: position on the page
+    element_type: str = "text"  # "text" | "table" | "image"
+    bbox: BBox | None = None  # tables and figures: position on the page
     table_html: str | None = None  # tables: the whole table's structure
+    asset_key: str | None = None  # figures: the stored picture
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,8 @@ class _Block:
     page: int | None
     bbox: BBox | None = None
     table_html: str | None = None
+    asset_key: str | None = None
+    kind: str = "text"
 
 
 @dataclass(frozen=True)
@@ -81,12 +84,12 @@ def _sections(elements: list[ParsedElement] | tuple[ParsedElement, ...]) -> list
                 blocks = []
             kept = tuple(s for s in stack if s[0] < el.heading_level)
             stack = (*kept, (el.heading_level, text[:MAX_HEADING_CHARS]))
-        elif el.kind == "table":
+        elif el.kind in ("table", "image"):  # each its own chunk, never mixed with text
             if blocks:
                 sections.append(_Section(path(), tuple(blocks)))
                 blocks = []
-            table = _Block(text, el.page, el.bbox, el.table_html)
-            sections.append(_Section(path(), (table,), table=True))
+            block = _Block(text, el.page, el.bbox, el.table_html, el.asset_key, el.kind)
+            sections.append(_Section(path(), (block,), table=True))
         else:
             blocks.append(_Block(text, el.page))
     if blocks:
@@ -245,7 +248,10 @@ def chunk(
     for sec in sections:
         if sec.table:
             t = sec.blocks[0]
-            for content in _table_parts(t.text, max_chars):
+            parts = (
+                _table_parts(t.text, max_chars) if t.kind == "table" else _pieces(t.text, max_chars)
+            )
+            for content in parts:
                 chunks.append(
                     Chunk(
                         len(chunks),
@@ -253,9 +259,10 @@ def chunk(
                         sec.path,
                         t.page,
                         _hash(sec.path, content),
-                        element_type="table",
+                        element_type=t.kind,
                         bbox=t.bbox,
                         table_html=t.table_html,
+                        asset_key=t.asset_key,
                     )
                 )
             continue

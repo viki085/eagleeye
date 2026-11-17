@@ -77,6 +77,13 @@ class Settings(BaseSettings):
     docling_table_mode: str = "accurate"  # "accurate" | "fast"
     docling_timeout_s: int = 600  # per document; partial output is kept when it runs out
     docling_artifacts_path: str = ""  # baked-in models (the image sets it); empty = download
+    # Figures (multimodal plan, Phase 3): each chart or picture is saved to the object store and
+    # described by an OpenAI vision model so it can be found and shown. Empty model = model_fast.
+    figures_enabled: bool = True
+    figure_max_per_doc: int = 30  # figures past this are kept as their printed words only
+    figure_min_points: float = 72.0  # smaller pictures (icons, bullets) are skipped (1 inch)
+    vision_model: str = ""
+    vision_fallback_model: str = ""  # empty = model_fast_fallback
 
     docs_bucket: str = "eagleeye-local-docs"
     max_upload_mb: int = 25

@@ -14,6 +14,7 @@ import logging
 import math
 import re
 import threading
+from dataclasses import replace
 from typing import Any
 
 from eagleeye_core.config import get_settings
@@ -27,6 +28,13 @@ from ingest_worker.parsing.pdf import PdfParser, heading_level
 logger = logging.getLogger(__name__)
 
 LOW_OCR_CONFIDENCE = 0.5
+FIGURE_SCALE = 1.5  # picture crops at 108 dpi: legible for a vision model, small to store
+FIGURE_MAX_PX = 1600  # longest side of a saved figure
+REPEAT_MIN_PAGES = 3  # a picture on this many pages and half of them is a logo or decoration
+_PICTURE_LABELS = frozenset({"picture", "chart"})
+# text inside a picture region with this many words is a sentence (a slide's paragraph printed
+# over its picture), kept as ordinary text; shorter fragments are the figure's labels
+SENTENCE_WORDS = 8
 MAX_HEADING_LEVEL = 6
 
 # Docling label -> (our kind, is a heading). Labels not listed (pictures, charts, forms) are
@@ -74,7 +82,8 @@ def _build_converter() -> Any:
         do_ocr=s.docling_ocr,
         ocr_options=RapidOcrOptions(lang=["latin"]),
         do_table_structure=True,
-        generate_picture_images=False,
+        generate_picture_images=s.figures_enabled,  # figures are saved and described
+        images_scale=FIGURE_SCALE,
         document_timeout=float(s.docling_timeout_s),
     )
     options.table_structure_options.mode = (
@@ -155,9 +164,68 @@ def _index_lines(item: Any) -> str:
     return "\n".join(lines)
 
 
+def _parent(item: Any) -> str:
+    return getattr(getattr(item, "parent", None), "cref", "") or ""
+
+
 def _in_picture(item: Any) -> bool:
-    parent = getattr(getattr(item, "parent", None), "cref", "") or ""
-    return parent.startswith("#/pictures/")
+    return _parent(item).startswith("#/pictures/")
+
+
+def _png(image: Any) -> bytes:
+    image = image.convert("RGB")
+    image.thumbnail((FIGURE_MAX_PX, FIGURE_MAX_PX))
+    buf = io.BytesIO()
+    image.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+def _fingerprint(image: Any) -> str:
+    """Average hash (8 x 8): the same logo on every page gets the same value."""
+    small = list(image.convert("L").resize((8, 8)).getdata())
+    mean = sum(small) / len(small)
+    return str(sum(1 << i for i, v in enumerate(small) if v > mean))
+
+
+def _figure(
+    item: Any, document: Any, page: int | None, bbox: BBox | None
+) -> tuple[ParsedElement, str] | None:
+    """A chart or picture as an image element (+ its fingerprint), or None when it is too small
+    or its image is unavailable."""
+    s = get_settings()
+    if not s.figures_enabled or bbox is None:
+        return None
+    left, top, right, bottom = bbox
+    if min(abs(right - left), abs(top - bottom)) < s.figure_min_points:
+        return None
+    try:
+        image = item.get_image(document)
+    except Exception:  # noqa: BLE001 - a picture we cannot crop is kept as its words only
+        logger.debug("figure image unavailable", exc_info=True)
+        image = None
+    if image is None:
+        return None
+    caption = (item.caption_text(document) or "").strip()
+    element = ParsedElement(
+        caption or "Figure", page=page, kind="image", bbox=bbox, image_png=_png(image)
+    )
+    return element, _fingerprint(image)
+
+
+def _repeated(prints: dict[int, str], elements: list[ParsedElement]) -> set[int]:
+    """Indexes of figures whose picture recurs on many pages (logos, decorations)."""
+    pages_by_print: dict[str, set[int]] = {}
+    for index, fp in prints.items():
+        page = elements[index].page
+        if page is not None:
+            pages_by_print.setdefault(fp, set()).add(page)
+    page_count = max((el.page or 0 for el in elements), default=0)
+    common = {
+        fp
+        for fp, pages in pages_by_print.items()
+        if len(pages) >= REPEAT_MIN_PAGES and len(pages) * 2 >= page_count
+    }
+    return {index for index, fp in prints.items() if fp in common}
 
 
 def to_elements(document: Any) -> list[ParsedElement]:
@@ -166,8 +234,24 @@ def to_elements(document: Any) -> list[ParsedElement]:
     # traverse_pictures: text Docling found inside a picture region is kept. A text block printed
     # over a watermark can be taken for a picture (a whole page was lost that way in the eval),
     # and chart labels sit there too.
+    pictures: dict[str, int] = {}  # picture ref -> index of its element (a figure or a word line)
+    words: dict[str, list[str]] = {}  # picture ref -> the words printed inside it
+    prints: dict[int, str] = {}  # figure element index -> picture fingerprint
     for item, _level in document.iterate_items(with_groups=False, traverse_pictures=True):
         label = getattr(getattr(item, "label", None), "value", "")
+        if label in _PICTURE_LABELS:
+            page, bbox = _bbox(item)
+            ref = getattr(item, "self_ref", "") or f"#/pictures/{len(pictures)}"
+            pictures[ref] = len(elements)
+            words[ref] = []
+            figure = _figure(item, document, page, bbox)
+            if figure is None:
+                # a picture too small to keep still contributes its words, as one line of text
+                elements.append(ParsedElement("", page=page, kind="text", bbox=bbox))
+            else:
+                prints[len(elements)] = figure[1]
+                elements.append(figure[0])
+            continue
         kind = _KINDS.get(label)
         if kind is None:
             continue
@@ -194,9 +278,12 @@ def to_elements(document: Any) -> list[ParsedElement]:
         if not text:
             continue
         if _in_picture(item):
-            # labels inside a diagram or chart ("GOVERN", "RECOVER") are never headings: as
-            # headings they would file the rest of the page under a diagram label
-            elements.append(ParsedElement(text, page=page, kind="text", bbox=bbox))
+            # words inside a chart or diagram ("GOVERN", "RECOVER", axis ticks) belong to it: one
+            # line with the figure, never a heading (that filed a whole cover page under "RECOVER")
+            if _parent(item) in words and len(text.split()) < SENTENCE_WORDS:
+                words[_parent(item)].append(text)
+            else:
+                elements.append(ParsedElement(text, page=page, kind="text", bbox=bbox))
             continue
         level = _heading_level(label, item) if kind == "heading" else None
         if level is None and kind == "text":
@@ -205,7 +292,12 @@ def to_elements(document: Any) -> list[ParsedElement]:
             level = heading_level(text)
             kind = "heading" if level is not None else kind
         elements.append(ParsedElement(text, page=page, heading_level=level, kind=kind, bbox=bbox))
-    return elements
+    for ref, index in pictures.items():
+        line = " · ".join(words[ref])
+        el = elements[index]
+        elements[index] = replace(el, labels=line) if el.kind == "image" else replace(el, text=line)
+    drop = _repeated(prints, elements)
+    return [el for i, el in enumerate(elements) if el.text and i not in drop]
 
 
 def _ocr_pages(result: Any) -> tuple[tuple[int, ...], tuple[int, ...]]:

@@ -29,6 +29,8 @@ import sys
 import time
 import uuid
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 
 import asyncpg
@@ -37,7 +39,7 @@ from eagleeye_llm.embeddings import LiteLLMEmbedder
 from eagleeye_retrieval.service import Retriever
 from eagleeye_retrieval.stores.pgvector_store import PgVectorPersonalStore
 from eagleeye_retrieval.types import AccessScope
-from ingest_worker import pipeline, repo
+from ingest_worker import figures, pipeline, repo
 from ingest_worker.chunking import Chunk, chunk
 from ingest_worker.errors import PermanentIngestError
 from ingest_worker.parsing.base import ParsedDocument, sanitize
@@ -62,6 +64,33 @@ PARSERS = {
     "pypdf": lambda data: sanitize(PdfParser().parse(data)),
     "docling": lambda data: pipeline.parse("pdf", data),
 }
+DESCRIBE = False  # --describe: real figure descriptions (OpenAI vision, about $0.01 per run)
+
+
+class _MemoryStore:
+    async def put(self, key: str, data: bytes, content_type: str) -> None:
+        return None
+
+
+def with_figures(parsed: ParsedDocument, slug: str) -> ParsedDocument:
+    """Figures as the pipeline stores them: described (--describe), else caption + printed words,
+    which is what a user gets when the vision call fails (a lower bound)."""
+    if DESCRIBE:
+        # parse_doc runs inside the scorer's event loop: describe in a thread with its own loop
+        with ThreadPoolExecutor(1) as pool:
+            coro = figures.describe(parsed, _MemoryStore(), f"eval/{slug}")
+            return pool.submit(asyncio.run, coro).result()
+    elements = tuple(
+        replace(
+            e,
+            text=figures.figure_text("" if e.text == figures.PLACEHOLDER else e.text, "", e.labels),
+            image_png=None,
+        )
+        if e.kind == "image"
+        else e
+        for e in parsed.elements
+    )
+    return replace(parsed, elements=elements)
 
 
 def loose(text: str) -> str:
@@ -100,7 +129,7 @@ def parse_doc(name: str, doc: dict) -> dict:
     pages = len(doc["source_pages"])
     start = time.perf_counter()
     try:
-        parsed = PARSERS[name](data)
+        parsed = with_figures(PARSERS[name](data), doc["slug"])
         chunks = _chunks(parsed)
         error = None if chunks else "no chunks"
     except PermanentIngestError as exc:
@@ -248,7 +277,10 @@ async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--parsers", default="pypdf,docling")
     ap.add_argument("--json", type=Path, default=OUT / "scores.json")
+    ap.add_argument("--describe", action="store_true", help="real figure descriptions (~$0.01)")
     args = ap.parse_args()
+    global DESCRIBE
+    DESCRIBE = args.describe
     if not any(CORPUS.glob("*.pdf")):
         sys.exit("No corpus PDFs: run evals/multimodal/build_corpus.py first.")
     questions = [json.loads(line) for line in GOLDEN.read_text(encoding="utf-8").splitlines()]

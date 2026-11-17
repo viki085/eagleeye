@@ -139,11 +139,13 @@ async def delete_document(doc_id: UUID, request: Request, user: CurrentUser) -> 
         except Exception as exc:
             logger.exception("delete %s: vector store cleanup failed", doc_id)
             raise ApiException(502, "UPSTREAM_ERROR", DELETE_FAILED) from exc
+    figures = await docs_repo.figure_keys(state.pool, str(doc_id))
     await docs_repo.delete_document(state.pool, str(doc_id))
-    try:
-        await state.store.delete(row["s3_key"])
-    except Exception:
-        logger.warning("delete %s: object %s not removed", doc_id, row["s3_key"], exc_info=True)
+    for key in [row["s3_key"], *figures]:
+        try:
+            await state.store.delete(key)
+        except Exception:
+            logger.warning("delete %s: object %s not removed", doc_id, key, exc_info=True)
     return ok({"id": str(doc_id), "deleted": True})
 
 
@@ -162,8 +164,29 @@ async def get_chunk(doc_id: UUID, chunk_id: UUID, request: Request, user: Curren
             "heading_path": list(row["heading_path"] or []),
             "page": row["page"],
             "element_type": row["element_type"],  # "table": content is Markdown, show as a table
+            "has_image": bool(row.get("asset_key")),  # a figure: GET .../image shows it
             "document": {"id": str(row["document_id"]), "title": row["title"]},
         }
+    )
+
+
+@router.get("/{doc_id}/chunks/{chunk_id}/image")
+async def get_chunk_image(
+    doc_id: UUID, chunk_id: UUID, request: Request, user: CurrentUser
+) -> Response:
+    """A cited figure (PNG), under the same visibility rule as its chunk."""
+    state = request.app.state
+    row = await docs_repo.get_visible_chunk(state.pool, str(doc_id), str(chunk_id), user.id)
+    if row is None or not row.get("asset_key"):
+        raise ApiException(404, "NOT_FOUND", "Figure not found.")
+    try:
+        data = await state.store.get(row["asset_key"])
+    except ObjectNotFoundError as exc:
+        raise ApiException(404, "NOT_FOUND", "The figure is no longer available.") from exc
+    return Response(
+        content=data,
+        media_type="image/png",
+        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=300"},
     )
 
 

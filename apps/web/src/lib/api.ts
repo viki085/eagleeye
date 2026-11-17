@@ -67,6 +67,7 @@ export interface ChunkDetail {
   heading_path: string[];
   page: number | null;
   element_type: "text" | "table" | "image";
+  has_image: boolean;
   document: { id: string; title: string };
 }
 
@@ -718,6 +719,16 @@ export class ApiClient {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!resp.ok) throw new ApiError(`Could not open the document (${resp.status})`, resp.status);
+    return resp.blob();
+  }
+
+  /** A cited figure (PNG), fetched with the bearer token and shown from a blob URL. */
+  async getChunkImage(documentId: string, chunkId: string): Promise<Blob> {
+    const token = await this.getToken();
+    const resp = await fetch(`${API_URL}/v1/documents/${documentId}/chunks/${chunkId}/image`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) throw new ApiError(`Could not load the figure (${resp.status})`, resp.status);
     return resp.blob();
   }
 

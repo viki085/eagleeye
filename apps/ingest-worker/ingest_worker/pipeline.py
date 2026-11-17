@@ -18,7 +18,7 @@ from eagleeye_retrieval.stores.base import VectorStore
 from eagleeye_retrieval.stores.qdrant_store import QdrantEnterpriseStore, build_qdrant_client
 from eagleeye_retrieval.types import VectorPoint
 
-from ingest_worker import repo
+from ingest_worker import figures, repo
 from ingest_worker.chunking import PATH_SEP, Chunk, chunk
 from ingest_worker.errors import PermanentIngestError, TransientIngestError
 from ingest_worker.parsing.base import ParsedDocument, sanitize
@@ -108,6 +108,19 @@ async def _upsert(
         raise TransientIngestError("The vector store is temporarily unavailable.") from exc
 
 
+def figure_prefix(doc: asyncpg.Record) -> str:
+    """Where a document's figures are stored: beside its original upload."""
+    key = str(doc["s3_key"] or "")
+    return key.rsplit("/", 1)[0] if "/" in key else f"figures/{doc['id']}"
+
+
+async def parse_and_describe(
+    deps: "PipelineDeps", doc: asyncpg.Record, data: bytes
+) -> ParsedDocument:
+    parsed = parse(sniff(doc["filename"], data), data)
+    return await figures.describe(parsed, deps.store, figure_prefix(doc))
+
+
 def parse(kind: FileKind, data: bytes) -> ParsedDocument:
     return clean(sanitize(parser_for(kind).parse(data)))
 
@@ -140,7 +153,7 @@ async def reindex(document_id: str, deps: PipelineDeps) -> bool:
         return False
     try:
         data = await _load_bytes(deps, doc["s3_key"])
-        parsed = parse(sniff(doc["filename"], data), data)
+        parsed = await parse_and_describe(deps, doc, data)
         chunks = _chunks(parsed)
         vectors = await _embed(deps, doc["title"], chunks)
         await _upsert(deps, doc, chunks, vectors)
@@ -165,7 +178,7 @@ async def process(document_id: str, deps: PipelineDeps) -> None:
         kind = sniff(doc["filename"], data)
 
         await repo.set_status(deps.conn, document_id, "PARSING")
-        parsed = parse(kind, data)
+        parsed = await figures.describe(parse(kind, data), deps.store, figure_prefix(doc))
         await repo.set_page_count(deps.conn, document_id, parsed.page_count)
         await repo.set_parse_report(deps.conn, document_id, parsed.report())
 

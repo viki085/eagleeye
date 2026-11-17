@@ -142,11 +142,19 @@ async def clear_visitor_data(
 ) -> tuple[int, int, int]:
     """Deletes the account's chats, personal documents and non-seed data files."""
     chats = await pool.execute("DELETE FROM chats WHERE user_id = $1", user_id)
+    figures = await pool.fetch(
+        """
+        SELECT DISTINCT c.asset_key FROM document_chunks c JOIN documents d ON d.id = c.document_id
+         WHERE d.uploaded_by = $1 AND d.scope = 'personal' AND c.asset_key IS NOT NULL
+        """,
+        user_id,
+    )
     docs = await pool.fetch(
         "DELETE FROM documents WHERE uploaded_by = $1 AND scope = 'personal' RETURNING s3_key",
         user_id,
     )
     await _delete_objects(store, [r["s3_key"] for r in docs if r["s3_key"]])
+    await _delete_objects(store, [r["asset_key"] for r in figures])
     repo = DatasetRepo(pool)
     removed = 0
     for ds in await repo.list_for(user_id):

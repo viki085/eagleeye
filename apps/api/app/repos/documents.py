@@ -91,6 +91,16 @@ async def mark_failed(pool: asyncpg.Pool, doc_id: str, error: str) -> None:
     )
 
 
+async def figure_keys(pool: asyncpg.Pool, doc_id: str) -> list[str]:
+    """Object-store keys of the document's saved figures (deleted with the document)."""
+    rows = await pool.fetch(
+        "SELECT DISTINCT asset_key FROM document_chunks"
+        " WHERE document_id = $1 AND asset_key IS NOT NULL",
+        doc_id,
+    )
+    return [r["asset_key"] for r in rows]
+
+
 async def delete_document(pool: asyncpg.Pool, doc_id: str) -> None:
     await pool.execute("DELETE FROM documents WHERE id = $1", doc_id)
 
@@ -122,7 +132,7 @@ async def get_visible_chunk(
 ) -> asyncpg.Record | None:
     return await pool.fetchrow(
         """
-        SELECT c.id, c.chunk_no, c.content, c.heading_path, c.page, c.element_type,
+        SELECT c.id, c.chunk_no, c.content, c.heading_path, c.page, c.element_type, c.asset_key,
                d.id AS document_id, d.title
         FROM document_chunks c JOIN documents d ON d.id = c.document_id
         WHERE c.id = $1 AND d.id = $2 AND d.status = 'READY'

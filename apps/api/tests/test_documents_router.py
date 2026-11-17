@@ -104,9 +104,13 @@ class FakeDocs:
         self.failed[doc_id] = error
 
     chunk: dict | None = None
+    figures: list[str] = []
 
     async def get_visible_chunk(self, pool, doc_id, chunk_id, user_id):  # noqa: ANN001
         return self.chunk
+
+    async def figure_keys(self, pool, doc_id):  # noqa: ANN001
+        return list(self.figures)
 
     async def list_visible_chunks(self, pool, doc_id, user_id):  # noqa: ANN001
         if self.rows.get(doc_id, {}).get("status") != "READY":
@@ -129,6 +133,7 @@ def env(monkeypatch: pytest.MonkeyPatch) -> dict:
         "mark_failed",
         "get_visible_chunk",
         "list_visible_chunks",
+        "figure_keys",
     ):
         monkeypatch.setattr(docs_repo, name, getattr(fake, name))
     audit: list[tuple[str, str, dict]] = []
@@ -374,3 +379,47 @@ def test_text_returns_chunks_in_reading_order(env: dict) -> None:
     body = env["client"].get(f"/v1/documents/{doc_id}/text").json()["data"]
     assert [c["content"] for c in body] == ["First part", "Second part"]
     assert body[0]["heading_path"] == ["A"] and body[1]["page"] == 2
+
+
+def _figure_chunk(env: dict, asset_key: str | None) -> tuple[uuid.UUID, uuid.UUID]:
+    doc_id, chunk_id = uuid.uuid4(), uuid.uuid4()
+    env["docs"].chunk = {
+        "id": chunk_id,
+        "chunk_no": 0,
+        "content": "Line chart of LNG exports, 2023-2027.",
+        "heading_path": [],
+        "page": 1,
+        "element_type": "image",
+        "asset_key": asset_key,
+        "document_id": doc_id,
+        "title": "Deck",
+    }
+    return doc_id, chunk_id
+
+
+def test_a_cited_figure_is_served_as_png_under_the_chunk_rule(env: dict) -> None:
+    key = "personal/d1/figures/000.png"
+    env["state"].store.objects[key] = b"\x89PNG fake"
+    doc_id, chunk_id = _figure_chunk(env, key)
+    data = env["client"].get(f"/v1/documents/{doc_id}/chunks/{chunk_id}").json()["data"]
+    assert data["has_image"] is True and data["element_type"] == "image"
+    resp = env["client"].get(f"/v1/documents/{doc_id}/chunks/{chunk_id}/image")
+    assert resp.status_code == 200 and resp.content == b"\x89PNG fake"
+    assert resp.headers["content-type"] == "image/png"
+    assert resp.headers["x-content-type-options"] == "nosniff"
+
+
+def test_no_figure_or_an_invisible_chunk_is_404(env: dict) -> None:
+    doc_id, chunk_id = _figure_chunk(env, None)
+    assert env["client"].get(f"/v1/documents/{doc_id}/chunks/{chunk_id}/image").status_code == 404
+    env["docs"].chunk = None  # not visible to this user
+    assert env["client"].get(f"/v1/documents/{doc_id}/chunks/{chunk_id}/image").status_code == 404
+
+
+def test_deleting_a_document_removes_its_figures(env: dict) -> None:
+    doc_id = _upload(env["client"]).json()["data"]["id"]
+    figure = f"personal/{doc_id}/figures/000.png"
+    env["state"].store.objects[figure] = b"png"
+    env["docs"].figures = [figure]
+    assert env["client"].delete(f"/v1/documents/{doc_id}").status_code == 200
+    assert env["state"].store.objects == {}

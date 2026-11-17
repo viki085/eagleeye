@@ -19,6 +19,40 @@ type LoadState =
   | { kind: "saved" } // passage gone (re-indexed or deleted): show the snippet saved with the answer
   | { kind: "error"; message: string };
 
+/** A cited figure: fetched with the bearer token, shown from a blob URL (revoked on close). */
+function FigureImage({ api, documentId, chunkId }: { api: ApiClient; documentId: string; chunkId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let url: string | null = null;
+    let cancelled = false;
+    api
+      .getChunkImage(documentId, chunkId)
+      .then((blob) => {
+        if (cancelled) return;
+        url = URL.createObjectURL(blob);
+        setSrc(url);
+      })
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [api, documentId, chunkId]);
+
+  if (failed) return <p className="mb-3 text-xs text-neutral-400">The figure could not be loaded.</p>;
+  if (src === null) return <p className="mb-3 text-xs text-neutral-400">Loading figure…</p>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- a blob URL, not an optimisable asset
+    <img
+      src={src}
+      alt="Figure from the document"
+      className="mb-3 w-full rounded-md border border-neutral-200 bg-white dark:border-neutral-800"
+    />
+  );
+}
+
 export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
 
@@ -85,6 +119,9 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
             <div className="overflow-x-auto text-xs text-neutral-800 dark:text-neutral-200 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-neutral-200 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-neutral-200 [&_th]:bg-neutral-50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left dark:[&_td]:border-neutral-800 dark:[&_th]:border-neutral-800 dark:[&_th]:bg-neutral-900">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{state.chunk.content}</ReactMarkdown>
             </div>
+          )}
+          {state.kind === "loaded" && state.chunk.has_image && (
+            <FigureImage api={api} documentId={citation.document_id} chunkId={citation.chunk_id} />
           )}
           {state.kind === "loaded" && state.chunk.element_type !== "table" && (
             <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{state.chunk.content}</p>

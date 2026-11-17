@@ -10,7 +10,7 @@ elements without one pass through untouched. Rules (multimodal RAG plan, "Waterm
   heading must repeat word for word;
 - removed ALL CAPS strings are also cut out of other text, where a watermark drawn over a
   paragraph bleeds into the middle of its sentences.
-Tables are never removed or edited.
+Tables and figures are never removed or edited here (repeated logos are dropped by the parser).
 """
 
 import re
@@ -27,6 +27,7 @@ REPEAT_MIN_PAGES = 3
 REPEAT_PAGE_SHARE = 0.6
 POSITION_GRID = 20.0  # points; boxes within the same grid cell count as "the same spot"
 
+KEEP_KINDS = frozenset({"table", "image"})
 _DIGITS = re.compile(r"\d+")
 _SPACE = re.compile(r"\s+")
 
@@ -37,7 +38,7 @@ def _norm(el: ParsedElement) -> str:
 
 
 def _is_rotated_or_huge(el: ParsedElement) -> bool:
-    if el.bbox is None or el.kind == "table":
+    if el.bbox is None or el.kind in KEEP_KINDS:
         return False
     left, top, right, bottom = el.bbox
     height, width = abs(top - bottom), abs(right - left)
@@ -63,7 +64,7 @@ def _repeated_keys(elements: tuple[ParsedElement, ...], page_count: int) -> set[
     pages_by_key: dict[tuple, set[int]] = defaultdict(set)
     for el in elements:
         spot = _spot(el)
-        if spot is None or el.page is None or el.kind == "table":
+        if spot is None or el.page is None or el.kind in KEEP_KINDS:
             continue
         if len(el.text.strip()) > REPEAT_MAX_CHARS:
             continue
@@ -76,6 +77,30 @@ def _strip_inline(text: str, stamps: list[re.Pattern[str]]) -> str:
     for pattern in stamps:
         text = pattern.sub(" ", text)
     return _SPACE.sub(" ", text).strip()
+
+
+def _stamp_patterns(removed: tuple[str, ...] | list[str]) -> list[re.Pattern[str]]:
+    """ALL CAPS stamps among the removed strings ("CONFIDENTIAL"), as whole-word patterns."""
+    return [
+        re.compile(rf"(?<!\w){re.escape(s)}(?!\w)")
+        for s in removed
+        if s.isupper() and len(s) >= 4 and not _DIGITS.search(s)
+    ]
+
+
+def strip_stamps(text: str, removed: tuple[str, ...]) -> str:
+    """Cut the document's removed stamps out of other text (kept line breaks)."""
+    for pattern in _stamp_patterns(removed):
+        text = pattern.sub("", text)
+    return re.sub(r"[ 	]{2,}", " ", text).strip()
+
+
+def _without_stamps(el: ParsedElement, stamps: list[re.Pattern[str]]) -> ParsedElement:
+    if el.kind == "table":
+        return el
+    if el.kind == "image":  # a stamp printed over a picture is read as one of its words
+        return replace(el, labels=_strip_inline(el.labels, stamps))
+    return replace(el, text=_strip_inline(el.text, stamps))
 
 
 def clean(doc: ParsedDocument) -> ParsedDocument:
@@ -91,15 +116,8 @@ def clean(doc: ParsedDocument) -> ParsedDocument:
         kept.append(el)
 
     # an ALL CAPS stamp that bled into paragraphs ("... the CONFIDENTIAL board approved ...")
-    stamps = [
-        re.compile(rf"(?<!\w){re.escape(s)}(?!\w)")
-        for s in removed
-        if s.isupper() and len(s) >= 4 and not _DIGITS.search(s)
-    ]
+    stamps = _stamp_patterns(list(removed))
     if stamps:
-        kept = [
-            el if el.kind == "table" else replace(el, text=_strip_inline(el.text, stamps))
-            for el in kept
-        ]
+        kept = [_without_stamps(el, stamps) for el in kept]
         kept = [el for el in kept if el.text]
     return replace(doc, elements=tuple(kept), removed=(*doc.removed, *removed))

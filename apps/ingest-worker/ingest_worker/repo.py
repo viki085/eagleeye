@@ -72,8 +72,8 @@ async def replace_chunks(
             """
             INSERT INTO document_chunks
                 (document_id, chunk_no, content, heading_path, page, scope, owner_id,
-                 chunk_hash, embedding, element_type, bbox, table_html)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector, $10, $11, $12)
+                 chunk_hash, embedding, element_type, bbox, table_html, asset_key)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector, $10, $11, $12, $13)
             RETURNING id
             """,
             doc["id"],
@@ -88,6 +88,7 @@ async def replace_chunks(
             c.element_type,
             list(c.bbox) if c.bbox else None,
             c.table_html,
+            c.asset_key,
         )
         ids.append(str(chunk_id))
     return ids

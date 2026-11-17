@@ -46,6 +46,7 @@ document kind. Spans match as whole words of letters and digits. Writes `out/sco
 | Docling as first shipped (a08e6bb) | 11/11 | 89/96 | 0 | 0.89 | 0.88 |
 | Docling with the eval fixes | 11/11 | 93/96 | 0 | 0.89 to 0.92 | 0.95 |
 | + compact tables (Phase 2) | 11/11 | 93/96 | 0 | 0.92 | **0.99** |
+| + figures saved and described (Phase 3) | 11/11 | 93/96 | 0 | 0.89 to 0.94 | 0.95 to 0.97 |
 
 Per tag, Docling with compact tables vs pypdf: image 1.00 vs 0.25, scanned 0.93 vs 0.29, table
 1.00 vs 0.91 (11 vs 10 of 11), text 0.90 vs 0.94 (the date cluster is all text questions).
@@ -74,6 +75,13 @@ Caveats:
   the top results): wide tables embed poorly (Phase 2: embed caption, header and a preview) and
   a reranker is Phase 4.
 - Runs vary by one or two questions outside the date cluster.
+
+Phase 3 (`--describe` runs real figure descriptions, about $0.01): every chart or picture of at
+least 1 inch becomes its own chunk (caption, the vision model's description, the words printed in
+it) with the stored PNG. Retrieval stays within noise of Phase 2 (one to three questions lower:
+about 35 figure chunks now compete for the top results; the answers are still in the chunks, so
+the Phase 4 reranker is the fix). The vision model can name a watermark it sees; the stamps the
+clean step removed are stripped from descriptions too (watermark chunks back to 0).
 
 ## Not done
 

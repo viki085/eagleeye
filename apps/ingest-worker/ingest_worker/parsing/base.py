@@ -8,7 +8,7 @@ _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
 # What a parsed block is. Tables are kept whole (text = Markdown, table_html = structure).
-ElementKind = Literal["text", "heading", "list", "table", "caption", "footnote"]
+ElementKind = Literal["text", "heading", "list", "table", "caption", "footnote", "image"]
 BBox = tuple[float, float, float, float]  # left, top, right, bottom in PDF points
 
 
@@ -25,6 +25,11 @@ class ParsedElement:
     kind: ElementKind = "text"
     bbox: BBox | None = None
     table_html: str | None = None
+    # figures (kind "image"): the picture as PNG, the words printed in it (chart labels), and
+    # after the describe step its object-store key; `text` is the caption, then the description
+    image_png: bytes | None = None
+    labels: str = ""
+    asset_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,7 @@ class ParsedDocument:
             "parser": self.parser,
             "elements": len(self.elements),
             "tables": sum(1 for e in self.elements if e.kind == "table"),
+            "images": sum(1 for e in self.elements if e.kind == "image"),
             "ocr_pages": list(self.ocr_pages),
             "low_confidence_pages": list(self.low_confidence_pages),
             "removed": list(self.removed),
