@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import type { ApiClient, ChunkDetail, Citation } from "@/lib/api";
 import { isSourceGone } from "@/lib/citation";
@@ -78,7 +80,13 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
               <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{citation.snippet}</p>
             </>
           )}
-          {state.kind === "loaded" && (
+          {state.kind === "loaded" && state.chunk.element_type === "table" && (
+            // a table chunk is Markdown (from the PDF parser): shown as a table; raw HTML is not rendered
+            <div className="overflow-x-auto text-xs text-neutral-800 dark:text-neutral-200 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-neutral-200 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-neutral-200 [&_th]:bg-neutral-50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left dark:[&_td]:border-neutral-800 dark:[&_th]:border-neutral-800 dark:[&_th]:bg-neutral-900">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{state.chunk.content}</ReactMarkdown>
+            </div>
+          )}
+          {state.kind === "loaded" && state.chunk.element_type !== "table" && (
             <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">{state.chunk.content}</p>
           )}
         </div>

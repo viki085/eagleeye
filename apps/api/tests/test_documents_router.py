@@ -103,8 +103,10 @@ class FakeDocs:
     async def mark_failed(self, pool, doc_id, error):  # noqa: ANN001
         self.failed[doc_id] = error
 
+    chunk: dict | None = None
+
     async def get_visible_chunk(self, pool, doc_id, chunk_id, user_id):  # noqa: ANN001
-        return None
+        return self.chunk
 
     async def list_visible_chunks(self, pool, doc_id, user_id):  # noqa: ANN001
         if self.rows.get(doc_id, {}).get("status") != "READY":
@@ -299,6 +301,24 @@ def test_invalid_uuid_is_422_envelope(env: dict) -> None:
 def test_missing_chunk_is_404(env: dict) -> None:
     resp = env["client"].get(f"/v1/documents/{uuid.uuid4()}/chunks/{uuid.uuid4()}")
     assert resp.status_code == 404
+
+
+def test_a_table_chunk_says_it_is_a_table(env: dict) -> None:
+    doc_id, chunk_id = uuid.uuid4(), uuid.uuid4()
+    env["docs"].chunk = {
+        "id": chunk_id,
+        "chunk_no": 3,
+        "content": "| Region | 2025 |\n| --- | --- |\n| North | 150 |",
+        "heading_path": ["Revenue"],
+        "page": 2,
+        "element_type": "table",
+        "document_id": doc_id,
+        "title": "Report",
+    }
+    resp = env["client"].get(f"/v1/documents/{doc_id}/chunks/{chunk_id}")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["element_type"] == "table" and data["content"].startswith("| Region")
 
 
 def _stored_doc(env: dict, *, scope: str, owner: str | None, mime: str, data: bytes) -> str:

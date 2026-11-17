@@ -161,6 +161,7 @@ async def get_chunk(doc_id: UUID, chunk_id: UUID, request: Request, user: Curren
             "content": row["content"],
             "heading_path": list(row["heading_path"] or []),
             "page": row["page"],
+            "element_type": row["element_type"],  # "table": content is Markdown, show as a table
             "document": {"id": str(row["document_id"]), "title": row["title"]},
         }
     )

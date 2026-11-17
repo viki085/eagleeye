@@ -122,7 +122,8 @@ async def get_visible_chunk(
 ) -> asyncpg.Record | None:
     return await pool.fetchrow(
         """
-        SELECT c.id, c.chunk_no, c.content, c.heading_path, c.page, d.id AS document_id, d.title
+        SELECT c.id, c.chunk_no, c.content, c.heading_path, c.page, c.element_type,
+               d.id AS document_id, d.title
         FROM document_chunks c JOIN documents d ON d.id = c.document_id
         WHERE c.id = $1 AND d.id = $2 AND d.status = 'READY'
           AND (c.scope = 'enterprise' OR (c.scope = 'personal' AND c.owner_id = $3::uuid))

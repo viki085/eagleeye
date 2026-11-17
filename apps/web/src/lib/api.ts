@@ -66,6 +66,7 @@ export interface ChunkDetail {
   content: string;
   heading_path: string[];
   page: number | null;
+  element_type: "text" | "table" | "image";
   document: { id: string; title: string };
 }
 
