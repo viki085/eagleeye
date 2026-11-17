@@ -199,3 +199,30 @@ async def test_access_policy_matches_grant(role_pii: bool) -> None:
     svc = CatalogService(FakeStore(Grant("x", None, role_pii)))
     acc = await svc.access("s1", "x")
     assert acc is not None and acc.policy.can_see_pii is role_pii
+
+
+def test_definitions_survive_and_tables_are_dropped_whole_when_space_runs_out() -> None:
+    from eagleeye_catalog.models import SchemaContext
+
+    def big(name: str) -> TableInfo:
+        cols = tuple(
+            ColumnInfo(f"c{i}", "text", "a long column description " * 3) for i in range(60)
+        )
+        return replace(ORDERS, name=name, columns=cols)
+
+    on_time = Metric("on_time_rate", "Official on-time arrival", "avg(arrived <= eta + 24h)")
+    ctx = SchemaContext(SOURCE, tuple(big(f"t{i}") for i in range(12)), metrics=(on_time,))
+    text = render_context(ctx)
+    assert len(text) <= MAX_CHARS
+    assert "BUSINESS DEFINITIONS" in text and "Official on-time arrival" in text
+    assert "TABLE sales.t0" in text  # the most relevant tables come first
+    assert "Left out for length" in text and "sales.t11" in text.split("Left out")[1]
+    assert "schema truncated" not in text
+
+
+def test_a_table_that_does_not_fit_in_full_is_shown_compact() -> None:
+    from eagleeye_catalog.models import SchemaContext
+
+    cols = tuple(ColumnInfo(f"c{i}", "text", "d" * 120, sample_values=("x",)) for i in range(120))
+    text = render_context(SchemaContext(SOURCE, (replace(ORDERS, columns=cols),)))
+    assert "c119 text" in text and "d" * 120 not in text

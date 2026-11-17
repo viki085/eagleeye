@@ -9,7 +9,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class BudgetLimits:
-    max_steps: int = 14  # supervisor LLM turns
+    max_steps: int = 20  # supervisor LLM turns + SQL-writing steps
     max_tool_calls: int = 12
     max_cost_usd: float = 0.25
     max_seconds: float = 120.0

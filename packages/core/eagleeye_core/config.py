@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     rag_min_score: float = 0.25  # cosine floor below which retrieval is "low relevance"
 
     # Agent budgets (C3 §2.3), checked before every supervisor LLM call
-    agent_max_steps: int = 14
+    agent_max_steps: int = 20  # supervisor turns + SQL-writing steps (4-part question ~12)
     agent_max_tool_calls: int = 12
     agent_max_cost_usd: float = 0.25
     agent_max_seconds: int = 120
