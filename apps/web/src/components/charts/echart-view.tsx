@@ -25,7 +25,7 @@ function loadECharts(): Promise<Core> {
       import("echarts/renderers"),
     ]);
     core.use([
-      charts.BarChart, charts.LineChart, charts.ScatterChart,
+      charts.BarChart, charts.LineChart, charts.ScatterChart, charts.HeatmapChart,
       components.GridComponent, components.TooltipComponent, components.LegendComponent,
       components.DataZoomComponent, components.VisualMapComponent,
       renderers.CanvasRenderer, renderers.SVGRenderer,

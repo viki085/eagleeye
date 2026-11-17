@@ -267,6 +267,59 @@ function scatter(spec: Json, t: Theme): EChartsOption | null {
   };
 }
 
+// ---- heatmap --------------------------------------------------------------------------------
+
+const HEATMAP_LABEL_MAX_CELLS = 60; // a value in every cell only while they stay readable
+
+function heatmap(rows: Row[], enc: Json, t: Theme): EChartsOption | null {
+  const x = obj(enc.x);
+  const y = obj(enc.y);
+  const measure = str(obj(enc.color).title);
+  const xs = Array.isArray(x.sort) ? (x.sort as unknown[]).map(String) : [...new Set(rows.map((r) => String(r.x)))];
+  const ys = Array.isArray(y.sort) ? (y.sort as unknown[]).map(String) : [...new Set(rows.map((r) => String(r.series)))];
+  const cells = rows
+    .map((r) => [xs.indexOf(String(r.x)), ys.indexOf(String(r.series)), num(r.y)] as const)
+    .filter(([xi, yi, v]) => xi >= 0 && yi >= 0 && v !== null);
+  if (!cells.length) return null;
+  const values = cells.map((c) => c[2] as number);
+  const [lo, hi] = [Math.min(...values), Math.max(...values)];
+  const labelled = cells.length <= HEATMAP_LABEL_MAX_CELLS;
+  return {
+    ...base(t, false, "item"),
+    tooltip: {
+      ...obj(base(t, false, "item").tooltip),
+      formatter: (p: Json) => {
+        const [xi, yi, v] = (p.data as [number, number, number]) ?? [];
+        return `${str(y.title)}: ${ys[yi]}\n${str(x.title)}: ${xs[xi]}\n${measure}: ${fmt(v)}`;
+      },
+    },
+    grid: { left: 34, right: 20, top: 44, bottom: 34, containLabel: true },
+    xAxis: axisStyle(t, str(x.title), { type: "category", data: xs, splitLine: { show: false }, axisLine: { show: false } }),
+    yAxis: axisStyle(t, str(y.title), { type: "category", data: ys, inverse: true, splitLine: { show: false }, axisLine: { show: false }, nameGap: 0, name: "" }),
+    visualMap: {
+      type: "continuous", min: lo, max: hi === lo ? lo + 1 : hi, dimension: 2, calculable: false,
+      inRange: { color: [...t.ramp] }, orient: "horizontal", left: "center", top: 0, itemHeight: 90, itemWidth: 10,
+      text: [fmt(hi), `${measure}  ${fmt(lo)}`], textStyle: { color: t.muted, fontSize: 11 },
+    },
+    series: [
+      {
+        type: "heatmap",
+        name: measure,
+        data: cells,
+        // the 2px surface gap between cells, rounded corners
+        itemStyle: { borderColor: t.surface, borderWidth: 2, borderRadius: 3 },
+        emphasis: { itemStyle: { borderColor: t.text, borderWidth: 1 } },
+        label: labelled
+          ? {
+              show: true, fontSize: 10, color: t.text, textBorderColor: t.surface, textBorderWidth: 2,
+              formatter: (p: Json) => fmt(((p.data as unknown[]) ?? [])[2]),
+            }
+          : { show: false },
+      },
+    ],
+  };
+}
+
 /** The ECharts option for a server chart spec, or null to fall back to Vega. */
 export function toEChartsOption(spec: Record<string, unknown>, dark: boolean): EChartsOption | null {
   try {
@@ -280,6 +333,7 @@ export function toEChartsOption(spec: Record<string, unknown>, dark: boolean): E
     if (type === "bar" && enc.x2) return histogram(rows as Row[], enc, t);
     if (type === "bar") return bars(rows as Row[], enc, t, mark);
     if (type === "line" || type === "area") return lines(rows as Row[], enc, t, type === "area");
+    if (type === "rect") return heatmap(rows as Row[], enc, t);
     return null;
   } catch {
     return null;

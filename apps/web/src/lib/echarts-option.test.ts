@@ -166,6 +166,26 @@ describe("toEChartsOption", () => {
     expect(left.itemStyle.borderRadius).toEqual([5, 0, 0, 5]);
   });
 
+  it("heatmap: cells on two category axes, one sequential hue, values while few", () => {
+    const spec = {
+      mark: { type: "rect", tooltip: true },
+      encoding: {
+        x: { field: "x", type: "nominal", sort: ["2026-01", "2026-02"], title: "month" },
+        y: { field: "series", type: "nominal", sort: ["TAT", "AEU"], title: "lane" },
+        color: { field: "y", type: "quantitative", title: "mean of delay" },
+      },
+      data: { values: [{ x: "2026-02", series: "AEU", y: 3 }, { x: "2026-01", series: "TAT", y: 4 }] },
+    };
+    const o = opt(spec);
+    expect(o.series[0].type).toBe("heatmap");
+    expect(o.xAxis.data).toEqual(["2026-01", "2026-02"]);
+    expect(o.yAxis.data).toEqual(["TAT", "AEU"]);
+    expect(o.series[0].data).toEqual([[1, 1, 3], [0, 0, 4]]);
+    expect(o.visualMap.inRange.color.length).toBeGreaterThan(1);
+    expect(o.series[0].label.show).toBe(true);
+    expect(o.tooltip.formatter({ data: [1, 1, 3] })).toBe("lane: AEU\nmonth: 2026-02\nmean of delay: 3");
+  });
+
   it("unknown shapes fall back to Vega (null)", () => {
     expect(toEChartsOption({ mark: { type: "arc" }, encoding: {}, data: { values: [{ x: 1 }] } }, false)).toBeNull();
     expect(toEChartsOption({ mark: "bar", data: { values: [] } }, false)).toBeNull();

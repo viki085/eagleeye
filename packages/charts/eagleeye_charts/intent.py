@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-ChartType = Literal["bar", "line", "area", "scatter", "histogram"]
+ChartType = Literal["bar", "line", "area", "scatter", "histogram", "heatmap"]
 Aggregate = Literal["sum", "mean", "median", "count", "min", "max"]
 Sort = Literal["x", "-x", "y", "-y"]
 
@@ -21,7 +21,8 @@ class ChartIntent(BaseModel):
     type: ChartType = Field(
         description="bar: compare categories; line/area: change over an ordered x (time or "
         "number); scatter: relation between two numeric columns; histogram: distribution of "
-        "one numeric column."
+        "one numeric column; heatmap: one measure across two categories (x = columns, color = "
+        "rows, y = the measure), e.g. average delay by lane and month."
     )
     x: str = Field(max_length=100, description="Column for the x axis (histogram: the column).")
     y: str | list[str] | None = Field(
@@ -33,7 +34,8 @@ class ChartIntent(BaseModel):
         default=None,
         max_length=100,
         description="Optional category column: one series per value. In a scatter it may also "
-        "be a numeric column, shown as a colour gradient (e.g. average delay).",
+        "be a numeric column, shown as a colour gradient (e.g. average delay). In a heatmap: the "
+        "rows (required).",
     )
     size: str | None = Field(
         default=None,

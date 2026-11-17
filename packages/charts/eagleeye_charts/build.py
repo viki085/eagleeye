@@ -24,6 +24,7 @@ from eagleeye_charts.aggregate import (
 )
 from eagleeye_charts.bars import build_bar
 from eagleeye_charts.downsample import lttb
+from eagleeye_charts.heatmap import build_heatmap
 from eagleeye_charts.intent import MAX_POINTS, Chart, ChartError, ChartIntent
 from eagleeye_charts.scatter import build_scatter
 from eagleeye_charts.spec import (
@@ -142,6 +143,8 @@ def build_chart(parquet: bytes, columns: list[dict[str, str]], intent: ChartInte
             return _histogram(con, r, intent)
         if intent.type == "scatter":
             return build_scatter(con, r, intent)
+        if intent.type == "heatmap":
+            return build_heatmap(con, r, intent)
         rows = grouped(con, r)
         if not rows:
             raise ChartError("There is no data to plot for these columns.")
