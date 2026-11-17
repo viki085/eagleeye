@@ -21,7 +21,7 @@ def test_query_filters_are_fixed_or_escaped() -> None:
     # the text can't close its string literal and start a new command
     assert '| filter @message like "boom\\" | fields secret \\\\"' in q
     assert q.endswith(f"| sort @timestamp desc\n| limit {sl.MAX_EVENTS}")
-    plain = sl.build_query(sl.LogQuery())
+    plain = sl.build_query(sl.LogQuery(hide_health=False))
     assert "filter" not in plain
 
 
@@ -130,3 +130,15 @@ def test_route_returns_events(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sl, "recent", fake_recent)
     data = _client().get("/v1/admin/logs?service=api&window=6h&level=error&q=boom").json()["data"]
     assert data["available"] is True and data["events"][0]["message"] == "boom"
+
+
+def test_health_checks_are_hidden_by_default_and_plain_lines_have_levels() -> None:
+    q = sl.build_query(sl.LogQuery())
+    assert '@message not like "GET /v1/health" and @message not like "GET /health"' in q
+    assert "health" not in sl.build_query(sl.LogQuery(hide_health=False))
+    warn = sl.build_query(sl.LogQuery(level="warning", hide_health=False))
+    assert "or @message like /^(WARNING|ERROR|CRITICAL):/" in warn
+    e = sl.parse_event(
+        {"@logStream": "eagleeye-demo-api-1", "@message": 'WARNING:  "GET /v1/x" 500'}
+    )
+    assert (e["level"], e["message"]) == ("WARNING", '"GET /v1/x" 500')

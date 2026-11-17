@@ -71,6 +71,7 @@ export interface ServerLogFilters {
   window: ServerLogWindow;
   level: ServerLogLevel;
   text: string;
+  health: boolean; // include the frequent health-check lines (hidden by default)
 }
 
 export interface ServerLogEvent {
@@ -577,7 +578,13 @@ export class ApiClient {
 
   /** Newest server log lines (System tab); `available` is false where logs aren't kept. */
   adminLogs(filters: ServerLogFilters): Promise<ServerLogs> {
-    const q = new URLSearchParams({ service: filters.service, window: filters.window, level: filters.level, q: filters.text });
+    const q = new URLSearchParams({
+      service: filters.service,
+      window: filters.window,
+      level: filters.level,
+      q: filters.text,
+      health: String(filters.health),
+    });
     return this.request<ServerLogs>(`/v1/admin/logs?${q.toString()}`);
   }
 

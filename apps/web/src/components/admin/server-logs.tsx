@@ -65,7 +65,13 @@ function Row({ event }: { event: ServerLogEvent }) {
 /** Server logs from CloudWatch, newest first. Loads on demand (filters or Refresh), never on
  * the System tab's 30-second timer, so it doesn't run a log search every half minute. */
 export function ServerLogs({ api }: { api: ApiClient }) {
-  const [filters, setFilters] = useState<ServerLogFilters>({ service: "all", window: "1h", level: "all", text: "" });
+  const [filters, setFilters] = useState<ServerLogFilters>({
+    service: "all",
+    window: "1h",
+    level: "all",
+    text: "",
+    health: false,
+  });
   const [draft, setDraft] = useState("");
   const [logs, setLogs] = useState<Logs | null>(null);
   const [loading, setLoading] = useState(false);
@@ -131,6 +137,10 @@ export function ServerLogs({ api }: { api: ApiClient }) {
         <button type="submit" className="rounded border border-neutral-300 px-2 py-1 text-[11px] hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800">
           Search
         </button>
+        <label className="flex items-center gap-1.5 text-[11px] text-neutral-600 dark:text-neutral-400">
+          <input type="checkbox" checked={filters.health} onChange={(e) => set("health", e.target.checked)} />
+          Show health checks
+        </label>
       </form>
       {error && <p className="py-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
       {!error && logs && !logs.available && <p className="py-2 text-xs text-neutral-500">{logs.reason ?? "Server logs are not available here."}</p>}

@@ -8,6 +8,7 @@ Without a log group (a laptop) the panel says logs are not available here.
 
 import asyncio
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -42,6 +43,7 @@ class LogQuery:
     window: Window = "1h"
     level: Level = "all"
     text: str = ""
+    hide_health: bool = True  # the health checks every few seconds drown everything else
 
 
 def _literal(text: str) -> str:
@@ -51,13 +53,27 @@ def _literal(text: str) -> str:
     return '"' + clean.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+# plain-text lines (uvicorn, celery) start with their level: "WARNING:  ..."
+_PLAIN_LEVEL = re.compile(r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL):?\s+")
+HEALTH_PATHS = ("GET /v1/health", "GET /health")
+
+
 def build_query(q: LogQuery) -> str:
     lines = ["fields @timestamp, @logStream, @message, level"]
     if q.service != "all":
         lines.append(f"| filter @logStream like {_literal(STREAM_PREFIX + q.service + '-')}")
+    if q.hide_health:
+        lines.append(
+            "| filter " + " and ".join(f"@message not like {_literal(p)}" for p in HEALTH_PATHS)
+        )
     levels = LEVELS[q.level]
     if levels:
-        lines.append(f"| filter level in [{', '.join(_literal(v) for v in levels)}]")
+        # JSON lines have a level field; plain-text lines start with it (a fixed pattern)
+        names = "|".join(levels)
+        lines.append(
+            f"| filter level in [{', '.join(_literal(v) for v in levels)}]"
+            f" or @message like /^({names}):/"
+        )
     if q.text.strip():
         lines.append(f"| filter @message like {_literal(q.text.strip())}")
     lines += ["| sort @timestamp desc", f"| limit {MAX_EVENTS}"]
@@ -80,13 +96,18 @@ def parse_event(fields: dict[str, str]) -> dict[str, Any]:
     except ValueError:
         data = {}
     message = str(data.get("message", raw if not data else ""))
+    plain_level = None
+    if not data:
+        m = _PLAIN_LEVEL.match(raw)
+        if m:
+            plain_level, message = m.group(1), raw[m.end() :]
     details = {
         k: v for k, v in data.items() if k not in {"time", "level", "service", "logger", "message"}
     }
     return {
         "time": fields.get("@timestamp", ""),
         "service": str(data.get("service") or _service_of(fields.get("@logStream", ""))),
-        "level": str(data.get("level") or fields.get("level") or "").upper() or None,
+        "level": str(data.get("level") or fields.get("level") or plain_level or "").upper() or None,
         "logger": data.get("logger"),
         "message": message[:MAX_MESSAGE_CHARS],
         "details": details or None,

@@ -205,6 +205,7 @@ async def server_logs(
     window: server_logs_svc.Window = "1h",
     level: server_logs_svc.Level = "all",
     q: Annotated[str, Query(max_length=server_logs_svc.MAX_QUERY_CHARS)] = "",
+    health: bool = False,
 ) -> dict:
     """The newest server log lines (System tab). Views are not audited, like the rest of the
     console. No questions or answers are logged (ids, counts, timings and errors); an identity
@@ -218,7 +219,9 @@ async def server_logs(
                 "reason": "Server logs are kept in the cloud deployment only.",
             }
         )
-    query = server_logs_svc.LogQuery(service=service, window=window, level=level, text=q)
+    query = server_logs_svc.LogQuery(
+        service=service, window=window, level=level, text=q, hide_health=not health
+    )
     try:
         events = await server_logs_svc.recent(settings.log_group, settings.aws_region, query)
     except server_logs_svc.LogsUnavailableError as exc:
