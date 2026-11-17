@@ -1,0 +1,214 @@
+[
+  {
+    "slug": "eia_steo",
+    "path": "eia_steo.pdf",
+    "source": "https://www.eia.gov/outlooks/steo/pdf/steo_full.pdf",
+    "source_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "kind": "text",
+    "watermark_strings": [],
+    "source_name": "eia_steo"
+  },
+  {
+    "slug": "deck_eia_charts",
+    "path": "deck_eia_charts.pdf",
+    "source": "https://www.eia.gov/outlooks/steo/pdf/steo_full.pdf",
+    "source_pages": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "kind": "deck",
+    "watermark_strings": [],
+    "source_name": "eia_steo"
+  },
+  {
+    "slug": "bls_empsit_mixed",
+    "path": "bls_empsit_mixed.pdf",
+    "source": "https://www.bls.gov/news.release/pdf/empsit.pdf",
+    "source_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "kind": "mixed",
+    "watermark_strings": [],
+    "source_name": "bls_empsit"
+  },
+  {
+    "slug": "census_income_wm",
+    "path": "census_income_wm.pdf",
+    "source": "https://www2.census.gov/library/publications/2024/demo/p60-282.pdf",
+    "source_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "kind": "watermark",
+    "watermark_strings": [
+      "CONFIDENTIAL",
+      "DRAFT - INTERNAL USE ONLY"
+    ],
+    "source_name": "census_income"
+  },
+  {
+    "slug": "fed_mpr",
+    "path": "fed_mpr.pdf",
+    "source": "https://www.federalreserve.gov/monetarypolicy/files/20250620_mprfullreport.pdf",
+    "source_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "kind": "text",
+    "watermark_strings": [],
+    "source_name": "fed_mpr"
+  },
+  {
+    "slug": "irs_p15",
+    "path": "irs_p15.pdf",
+    "source": "https://www.irs.gov/pub/irs-pdf/p15.pdf",
+    "source_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "kind": "text",
+    "watermark_strings": [],
+    "source_name": "irs_p15"
+  },
+  {
+    "slug": "nhc_ian",
+    "path": "nhc_ian.pdf",
+    "source": "https://www.nhc.noaa.gov/data/tcr/AL092022_Ian.pdf",
+    "source_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62
+    ],
+    "kind": "text",
+    "watermark_strings": [],
+    "source_name": "nhc_ian"
+  },
+  {
+    "slug": "nist_csf2_wm",
+    "path": "nist_csf2_wm.pdf",
+    "source": "https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf",
+    "source_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "kind": "watermark",
+    "watermark_strings": [
+      "CONFIDENTIAL",
+      "DRAFT - INTERNAL USE ONLY"
+    ],
+    "source_name": "nist_csf2"
+  },
+  {
+    "slug": "usgs_copper_scan",
+    "path": "usgs_copper_scan.pdf",
+    "source": "https://pubs.usgs.gov/periodicals/mcs2024/mcs2024-copper.pdf",
+    "source_pages": [
+      1,
+      2
+    ],
+    "kind": "scanned",
+    "watermark_strings": [],
+    "source_name": "usgs_copper"
+  },
+  {
+    "slug": "usgs_lithium",
+    "path": "usgs_lithium.pdf",
+    "source": "https://pubs.usgs.gov/periodicals/mcs2024/mcs2024-lithium.pdf",
+    "source_pages": [
+      1,
+      2
+    ],
+    "kind": "text",
+    "watermark_strings": [],
+    "source_name": "usgs_lithium"
+  },
+  {
+    "slug": "irs_f1040_scan",
+    "path": "irs_f1040_scan.pdf",
+    "source": "https://www.irs.gov/pub/irs-pdf/f1040.pdf",
+    "source_pages": [
+      1,
+      2
+    ],
+    "kind": "scanned",
+    "watermark_strings": [],
+    "source_name": "irs_f1040"
+  }
+]

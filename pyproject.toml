@@ -29,6 +29,8 @@ ignore = ["S101"]
 "infra/warehouse/**" = ["E501", "S608", "B905", "UP017", "B007"]
 "data/**" = ["E501", "S608", "S310", "S324", "B905"]
 "scripts/**" = ["E501", "S310"]
+# multimodal PDF eval: fixed https source URLs, long result lines
+"evals/multimodal/**" = ["E501", "S310"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

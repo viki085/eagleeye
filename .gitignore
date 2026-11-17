@@ -58,3 +58,9 @@ logs/
 infra/terraform/base/.build/
 # web app settings to paste into Vercel (holds secrets; never committed)
 .env.vercel
+
+# multimodal RAG eval: downloaded PDFs, built corpus, parser outputs, own venv
+evals/multimodal/.venv/
+evals/multimodal/pdfs/
+evals/multimodal/corpus/*.pdf
+evals/multimodal/out/
