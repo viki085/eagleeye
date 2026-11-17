@@ -403,7 +403,7 @@ export interface AdminDemoVisit {
   spend_usd: number;
   questions: number;
   notebook_used: boolean;
-  status: "active" | "used_up" | "expired" | "tester";
+  status: "active" | "used_up" | "expired";
 }
 
 export interface AdminDemoVisitors {

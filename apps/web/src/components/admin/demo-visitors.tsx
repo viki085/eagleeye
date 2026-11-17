@@ -9,7 +9,6 @@ const STATUS: Record<AdminDemoVisit["status"], [string, "ok" | "warn" | "muted"]
   active: ["Active", "ok"],
   used_up: ["Used up", "warn"],
   expired: ["Expired", "muted"],
-  tester: ["Tester", "ok"], // an exempt network (the owner's own testing): no limits
 };
 
 function minutes(seconds: number): string {

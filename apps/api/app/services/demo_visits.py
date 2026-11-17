@@ -6,9 +6,6 @@ new visit is created with its own internal account (and references to the sample
 API then acts as that account, so visitors never see each other's data, and the account's
 usage_limit_usd is the visit's budget. Time is counted from heartbeats sent while the app is
 open; the limits live in the database (demo_limits()).
-
-Visits from a network on the exempt list (demo_exempt_networks, scripts/demo_exempt.py: the
-owner's own connection) have no time or budget limit and are left out of the daily cap.
 """
 
 import uuid
@@ -36,7 +33,6 @@ class VisitState:
     window_ends_at: datetime
     exhausted: str | None  # "time" | "budget" | "daily" | None
     available_at: datetime | None
-    exempt: bool = False  # a tester network: no limits
 
     def public(self) -> dict[str, Any]:
         """For the app: time left and whether the visit is over (no money figures)."""
@@ -119,7 +115,6 @@ async def account_for_session(db: Any, base_user_id: str, session_id: str, ip: s
             visit_id = await _create_visit(db, base_user_id, key, lim.visit_budget_usd)
         else:
             visit_id = str(visit["id"])
-        await _apply_exemption(db, visit_id, ip)
         await db.execute(
             """
             INSERT INTO demo_sessions (clerk_session_id, visit_id) VALUES ($1, $2)
@@ -131,24 +126,6 @@ async def account_for_session(db: Any, base_user_id: str, session_id: str, ip: s
         return str(await db.fetchval("SELECT user_id FROM demo_visits WHERE id = $1", visit_id))
 
 
-async def _apply_exemption(db: Any, visit_id: str, ip: str) -> None:
-    """Re-checked at every new sign-in session, so a network added to (or removed from) the
-    list takes effect at the next sign-in. An exempt visit's account has no demo budget (the
-    organisation's normal spend limit applies instead)."""
-    exempt = bool(await db.fetchval("SELECT demo_exempt($1)", ip))
-    lim = await limits(db)
-    await db.execute(
-        """
-        WITH v AS (UPDATE demo_visits SET exempt = $2 WHERE id = $1 RETURNING user_id)
-        UPDATE users SET usage_limit_usd = CASE WHEN $2 THEN NULL ELSE $3::numeric END
-         WHERE id = (SELECT user_id FROM v)
-        """,
-        visit_id,
-        exempt,
-        lim.visit_budget_usd,
-    )
-
-
 def _today_start(now: datetime) -> datetime:
     return now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -156,7 +133,7 @@ def _today_start(now: datetime) -> datetime:
 async def state_of(db: Any, user_id: str) -> VisitState | None:
     row = await db.fetchrow(
         """
-        SELECT v.id, v.user_id, v.window_start, v.seconds_used, v.exempt,
+        SELECT v.id, v.user_id, v.window_start, v.seconds_used,
                (SELECT coalesce(sum(cost_usd), 0) FROM runs WHERE user_id = v.user_id) AS spent,
                now() AS now
           FROM demo_visits v WHERE v.user_id = $1
@@ -171,7 +148,6 @@ async def state_of(db: Any, user_id: str) -> VisitState | None:
         """
         SELECT coalesce(sum(r.cost_usd), 0) FROM runs r JOIN users u ON u.id = r.user_id
          WHERE u.is_demo AND r.created_at >= $1
-           AND NOT EXISTS (SELECT 1 FROM demo_visits ev WHERE ev.user_id = u.id AND ev.exempt)
         """,
         _today_start(now),
     )
@@ -179,10 +155,7 @@ async def state_of(db: Any, user_id: str) -> VisitState | None:
     seconds_left = max(lim.visit_seconds - int(row["seconds_used"]), 0)
     budget_left = max(lim.visit_budget_usd - float(row["spent"]), 0.0)
     exhausted, available = None, None
-    exempt = bool(row["exempt"])
-    if exempt:  # a tester network: the full allowance, always
-        seconds_left, budget_left = lim.visit_seconds, lim.visit_budget_usd
-    elif float(today) >= lim.daily_budget_usd:
+    if float(today) >= lim.daily_budget_usd:
         exhausted, available = "daily", _today_start(now) + timedelta(days=1)
     elif seconds_left <= 0:
         exhausted, available = "time", window_ends
@@ -196,7 +169,6 @@ async def state_of(db: Any, user_id: str) -> VisitState | None:
         window_ends,
         exhausted,
         available,
-        exempt,
     )
 
 

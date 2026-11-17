@@ -191,35 +191,3 @@ async def test_ipv4_seen_through_ipv6_is_the_same_visitor(db) -> None:  # noqa: 
     a = await dv.account_for_session(db, base, "sess_v4", "203.0.113.7")
     b = await dv.account_for_session(db, base, "sess_mapped", "::ffff:203.0.113.7")
     assert a == b
-
-
-async def test_an_exempt_network_has_no_limits_and_does_not_use_the_daily_cap(db) -> None:  # noqa: ANN001
-    await db.execute(
-        "INSERT INTO demo_exempt_networks (network, note) VALUES ('198.51.100.0/24', 'owner')"
-    )
-    base = await base_account(db)
-    tester = await dv.account_for_session(db, base, "sess_x", "198.51.100.77")
-    limit = await db.fetchval("SELECT usage_limit_usd FROM users WHERE id = $1", tester)
-    assert limit is None  # the organisation's normal limit, not the $0.50 demo budget
-    await db.execute("UPDATE demo_visits SET seconds_used = 99999 WHERE user_id = $1", tester)
-    await spend(db, tester, 5.0)  # far over the visit budget and the $2 daily cap
-    state = await dv.state_of(db, tester)
-    assert state.exempt and state.exhausted is None and state.seconds_left == 1800
-    assert (await db.fetchval("SELECT demo_gate('198.51.100.77')"))["allowed"] is True
-
-    stranger = await dv.account_for_session(db, base, "sess_y", "203.0.113.200")
-    assert (await dv.state_of(db, stranger)).exhausted is None  # the tester's $5 is not counted
-    assert (await db.fetchval("SELECT demo_gate('203.0.113.201')"))["allowed"] is True
-
-
-async def test_removing_a_network_restores_the_limits_at_the_next_sign_in(db) -> None:  # noqa: ANN001
-    await db.execute("INSERT INTO demo_exempt_networks (network) VALUES ('198.51.100.0/24')")
-    base = await base_account(db)
-    tester = await dv.account_for_session(db, base, "sess_r1", "198.51.100.8")
-    await db.execute("DELETE FROM demo_exempt_networks")
-    assert await dv.account_for_session(db, base, "sess_r2", "198.51.100.8") == tester
-    state = await dv.state_of(db, tester)
-    assert not state.exempt
-    limit = await db.fetchval("SELECT usage_limit_usd FROM users WHERE id = $1", tester)
-    assert float(limit) == 0.5
-    assert await db.fetchval("SELECT demo_exempt('not an ip')") is False
