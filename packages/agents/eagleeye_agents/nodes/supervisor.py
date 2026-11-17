@@ -35,8 +35,8 @@ NOTEBOOK_QUOTA_NOTE = (
     "This is a demo visit and its detailed-analysis (notebook) allowance is used up, so "
     "explore_data is not available. If the user asks for a detailed or exploratory analysis, do "
     "the analysis with analyze_data instead, and end your answer with this sentence: "
-    '"Detailed analysis (notebook mode) is limited to one question per demo visit, so this is '
-    'the basic analysis."'
+    '"This demo visit has used up its detailed analyses (notebook mode), so this is the basic '
+    'analysis."'
 )
 
 

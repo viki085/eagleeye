@@ -145,7 +145,7 @@ class Settings(BaseSettings):
     notebook_sandbox_timeout_s: int = 120
     agent_max_seconds_notebook: int = 300
     # a demo visit's notebook questions; after that it gets the light analysis with a note
-    demo_notebook_runs: int = 1
+    demo_notebook_runs: int = 5
     dataset_max_rows: int = 2_000_000
     dataset_max_columns: int = 200
 

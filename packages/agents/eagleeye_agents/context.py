@@ -50,7 +50,7 @@ class AgentSettings:
     answer_max_tokens: int = 2048
     analysis_max_seconds: float = 240.0  # run deadline when analysis tools are offered
     notebook_max_seconds: float = 300.0  # run deadline when notebook mode is offered
-    demo_notebook_runs: int = 1  # notebooks a demo visit may make (then the light analysis)
+    demo_notebook_runs: int = 5  # notebooks a demo visit may make (then the light analysis)
 
 
 @dataclass
