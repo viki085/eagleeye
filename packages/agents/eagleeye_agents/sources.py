@@ -20,6 +20,7 @@ class Citation:
     heading_path: tuple[str, ...]
     scope: str
     snippet: str
+    element_type: str = "text"  # "table" | "image": the answer shows the table or figure too
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -119,6 +120,7 @@ class SourceRegistry:
                     c.heading_path,
                     c.scope,
                     _snippet(c.content),
+                    c.element_type,
                 )
             )
         return out

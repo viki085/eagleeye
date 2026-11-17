@@ -310,6 +310,7 @@ export default function ChatPage() {
                 onOpenCitation={setOpenCitation}
                 onViewArtifact={setOpenArtifact}
                 onDownloadArtifact={downloadArtifact}
+                api={api}
               />
             ))}
             {stream !== null && (

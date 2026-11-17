@@ -58,6 +58,8 @@ export interface Citation {
   heading_path: string[];
   scope: DocumentScope;
   snippet: string;
+  /** "table" | "image": the answer shows the cited table or figure (absent on older answers) */
+  element_type?: "text" | "table" | "image";
 }
 
 export const IS_UP_TIMEOUT_MS = 6_000;

@@ -4,12 +4,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { CitationChips } from "@/components/chat/citation-chips";
+import { SourceVisuals } from "@/components/chat/source-visuals";
 import { StepTree } from "@/components/chat/step-tree";
 import { ChartCard } from "@/components/charts/chart-card";
 import { NotebookCard, type FigureLoader } from "@/components/notebook/notebook-card";
 import type { NotebookView } from "@/lib/notebook";
 import { ArtifactList } from "@/components/data/artifact-list";
-import type { ArtifactView, ChartView, Citation } from "@/lib/api";
+import type { ApiClient, ArtifactView, ChartView, Citation } from "@/lib/api";
 import type { StepView } from "@/lib/run-fold";
 
 interface MessageBubbleProps {
@@ -31,6 +32,8 @@ interface MessageBubbleProps {
   onOpenCitation?: (citation: Citation) => void;
   onViewArtifact?: (artifact: ArtifactView) => void;
   onDownloadArtifact?: (artifact: ArtifactView) => void;
+  /** set: the answer shows the charts and tables it cited (see SourceVisuals) */
+  api?: ApiClient;
 }
 
 function Notice({ tone, children }: { tone: "warn" | "muted"; children: React.ReactNode }) {
@@ -83,6 +86,7 @@ export function MessageBubble({
   onDownloadArtifact,
   onLoadFigure,
   onDownloadNotebook,
+  api,
 }: MessageBubbleProps) {
   if (role === "user") {
     return (
@@ -125,6 +129,9 @@ export function MessageBubble({
           onView={(x) => onViewArtifact?.(x)}
           onDownload={(x) => onDownloadArtifact?.(x)}
         />
+        {api && onOpenCitation && !streaming && (
+          <SourceVisuals api={api} citations={citations} answer={text} onOpen={onOpenCitation} />
+        )}
         {onOpenCitation && <CitationChips citations={citations} onOpen={onOpenCitation} />}
         {!streaming && (
           <Notices status={status} degraded={degraded} replaced={replaced} warnings={warnings} />

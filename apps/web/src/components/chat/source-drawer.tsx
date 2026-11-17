@@ -20,7 +20,7 @@ type LoadState =
   | { kind: "saved" } // passage gone (re-indexed or deleted): show the snippet saved with the answer
   | { kind: "error"; message: string };
 
-interface PictureProps {
+export interface PictureProps {
   api: ApiClient;
   documentId: string;
   chunkId: string;
@@ -29,7 +29,7 @@ interface PictureProps {
 
 /** A cited figure, or the cited page with the passage marked: fetched with the bearer token,
  * shown from a blob URL (revoked on close). */
-function ChunkPicture({ api, documentId, chunkId, kind }: PictureProps) {
+export function ChunkPicture({ api, documentId, chunkId, kind }: PictureProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
