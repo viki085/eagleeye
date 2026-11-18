@@ -80,7 +80,7 @@ evals/load/questions.json  the load-test question pool (shared by k6 and the bro
 
 | Person | Role in EagleEye | Does |
 |---|---|---|
-| Vikram Karthikeyan, Operations Analyst | member | Document, chart, database, combined and analysis questions; uploads a file |
+| Vikram K, Operations Analyst | member | Document, chart, database, combined and analysis questions; uploads a file |
 | Sam Rivera, Intern | member | Tries to break the rules (guardrail scene) |
 
 The accounts are created off camera, through the admin console's Add user. Every email is a made-up `+clerk_test` address.

@@ -22,7 +22,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "apps" / "api"))
 
 EMPLOYEES = [
-    {"email": "vikram.karthikeyan@grandlineshipping.com", "first_name": "Vikram", "last_name": "Karthikeyan", "username": "vikram_k"},
+    {"email": "vikram.k@grandlineshipping.com", "first_name": "Vikram", "last_name": "K", "username": "vikram_k"},
     {"email": "sam.rivera@grandlineshipping.com", "first_name": "Sam", "last_name": "Rivera", "username": "sam_rivera"},
 ]
 SECRETS = REPO / "media" / ".secrets" / "employees.json"
