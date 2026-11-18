@@ -64,3 +64,9 @@ evals/multimodal/.venv/
 evals/multimodal/pdfs/
 evals/multimodal/corpus/*.pdf
 evals/multimodal/out/
+
+# Media (showcase videos): recordings, audio and renders stay local
+media/audio/
+media/raw/
+media/out/
+media/.secrets/

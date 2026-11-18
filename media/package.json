@@ -1,0 +1,18 @@
+{
+  "name": "eagleeye-media",
+  "private": true,
+  "description": "Recording, voice and editing tools for the EagleEye showcase videos (see docs/video-production-plan.md)",
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio remotion/src/index.ts",
+    "render": "remotion render remotion/src/index.ts"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.340",
+    "ffmpeg-static": "5.2.0",
+    "playwright": "1.55.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.340"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "_note": "Original characters for the EagleEye videos. They are not imitations of any real person, and no real actor is named. Tone: professional and confident; no gimmick catchphrases. Voices chosen at the audition on 2026-11-18.",
+  "narrator": {
+    "name": "The Narrator",
+    "voice": "ballad",
+    "candidates": ["onyx", "ash", "cedar", "ballad"],
+    "instructions": "Speak as a seasoned documentary narrator: a warm, resonant, unhurried voice with quiet confidence and gravitas. Leave short pauses between phrases and land the last word of each sentence softly. Professional, never theatrical.",
+    "audition": "Every company is drowning in documents, databases and spreadsheets. EagleEye reads them all, and shows you exactly where every answer came from."
+  },
+  "expert": {
+    "name": "The Expert",
+    "voice": "ash",
+    "candidates": ["verse", "coral", "ash", "nova"],
+    "instructions": "Speak as a senior solutions engineer giving a polished product walkthrough: clear, articulate and confident, with genuine but measured enthusiasm and a slightly brisker pace than the narrator. Professional and precise; no slang and no exaggerated excitement.",
+    "audition": "Here is what happens behind the scenes. When a PDF arrives, every chart in it is described in words, so the search can find it like any other passage, and the answer brings the original picture back with it."
+  }
+}
