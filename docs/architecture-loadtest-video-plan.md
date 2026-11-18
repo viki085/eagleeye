@@ -138,9 +138,9 @@ pace, and the step names match the "steps" panel seen in the product video.
   |---|---|---|
   | Smoke | 1 | 2 min |
   | Hold | 50 | 3 min |
-  | Ramp to 1,000 (passing 500) | 50 → 1,000 | 5 min |
-  | Hold | 1,000 | 4 min |
-  | Ramp | 1,000 → 2,000 | 4 min |
+  | Step to 500, hold | 50 → 500 | 1 min + 3 min hold |
+| Step to 1,000, hold | 500 → 1,000 | 1 min + 3 min hold |
+    | Step to 2,000 | 1,000 → 2,000 | 2 min |
   | Hold | 2,000 | 5 min |
   | Ramp down (servers removed) | 2,000 → 0 | 3 min |
 
@@ -216,6 +216,25 @@ checkpoint explains a different group of metrics**, so the three never repeat:
 
 Between checkpoints, an overlay graph shows **servers per service** rising, using CloudWatch's real
 counts.
+
+**Efficiency before and after scaling (added 2026-11-18).** The video shows what scaling buys:
+- **Setup:**
+  - every service starts at one task;
+  - users arrive in steps (50 → 500 → 1,000 → 2,000);
+  - autoscaling reacts within about a minute.
+- **What it shows:** at each step, response time rises while the queue fills, then falls as workers
+  are added.
+- **The graph:** an animated chart of **p95 response time (k6)** against **agent workers and API tasks
+  (CloudWatch)** over the whole run, all real figures.
+- **Callouts at each step**, comparing the peak just before scale-out with the settled time after it,
+  for example "500 users · 1 worker: 6.2 s → 4 workers: 1.9 s".
+- **Narration** explains the cause: more questions than workers means a queue, and the queue metric
+  triggers new workers.
+- **The results card** adds:
+  - **response time with and without scaling at 2,000 users**: the settled time, against the peak
+    seen before the cluster caught up;
+  - **answers per minute per worker**.
+
 
 **End of the test:**
 - users ramp down; the graphs show servers being removed;
