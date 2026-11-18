@@ -10,22 +10,21 @@
     "id": "chart",
     "scene": 3,
     "who": "vikram.k@grandlineshipping.com",
-    "text": "How did the Brent oil price move during 2025, according to the chart in the Fleet and Market Review 2025?",
+    "text": "In two or three sentences: how did the Brent oil price move during 2025, according to the chart in the Fleet and Market Review 2025?",
     "want": "Reads the values off the chart; the chart picture appears in the answer"
   },
   {
     "id": "database",
     "scene": 4,
     "who": "vikram.k@grandlineshipping.com",
-    "text": "Which trade lane had the worst schedule reliability in 2024, and how did reliability trend month by month on that lane? Show it as a chart.",
+    "text": "Which trade lane had the worst schedule reliability in 2024, and how did it trend month by month on that lane? Show it as a chart and keep the answer short.",
     "want": "Names the lane; formatted SQL; table; a monthly line chart"
   },
   {
     "id": "brief",
     "scene": 5,
     "who": "vikram.k@grandlineshipping.com",
-    "upload": "Trial/data/documents/account-review-notes-hunt-williams-francis.docx",
-    "text": "Using my account review notes, prepare me for Thursday's meeting with Hunt, Williams and Francis: their 2025 TEU by trade lane and their 2025 claims by type, what our Reefer SOP and Demurrage and Detention Policy say in plain words, and Asia - North Europe schedule reliability in 2024 compared with 2026.",
+    "text": "Using my account review notes, give me a short brief for Thursday's meeting with Hunt, Williams and Francis: their 2025 claims by type, what our Reefer SOP says about temperature alarms, and Asia - North Europe schedule reliability in 2024 compared with 2026. Keep it concise.",
     "want": "One answer from three sources: the uploaded notes, enterprise policies (cited) and the database (tables/chart)"
   },
   {
@@ -54,7 +53,7 @@
     "scene": 6,
     "who": "vikram.k@grandlineshipping.com",
     "upload": "Trial/data/data-files/vessel_fuel_and_emissions.csv",
-    "text": "Do a full exploratory analysis of my vessel_fuel_and_emissions data: data quality, distributions and outliers, how speed, vessel class and routing relate to carbon intensity, and the three findings that matter most for cutting emissions.",
+    "text": "Do a full exploratory analysis of my vessel_fuel_and_emissions data: data quality, distributions and outliers, how speed, vessel class and routing relate to carbon intensity. Keep the written summary short: the three findings that matter most for cutting emissions.",
     "want": "A notebook: data-quality cell, distribution/box plots, correlation heatmap, speed vs carbon intensity by class, grouped table, findings"
   },
   {

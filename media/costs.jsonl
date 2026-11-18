@@ -10,3 +10,44 @@
 {"t": "2026-11-18T11:29:16", "kind": "tts", "usd": 0.00179, "detail": "gatekeeper-echo.wav 7.2s"}
 {"t": "2026-11-18T11:29:18", "kind": "tts", "usd": 0.00204, "detail": "gatekeeper-ballad.wav 8.2s"}
 {"t": "2026-11-18T11:29:19", "kind": "tts", "usd": 0.00205, "detail": "gatekeeper-sage.wav 8.2s"}
+{"t":"2026-11-18T06:37:09","kind":"answers","usd":0.00027,"detail":"rehearsal policy 12s"}
+{"t":"2026-11-18T06:37:44","kind":"answers","usd":0.00024,"detail":"rehearsal chart 10s"}
+{"t":"2026-11-18T06:38:03","kind":"answers","usd":0.00214,"detail":"rehearsal database 18s"}
+{"t":"2026-11-18T06:38:37","kind":"answers","usd":0.00426,"detail":"rehearsal combined_a 32s"}
+{"t":"2026-11-18T06:39:02","kind":"answers","usd":0.00317,"detail":"rehearsal combined_b 24s"}
+{"t":"2026-11-18T06:40:07","kind":"answers","usd":0.0024,"detail":"rehearsal eda 57s"}
+{"t":"2026-11-18T06:40:21","kind":"answers","usd":0.00001,"detail":"rehearsal guard_injection 5s"}
+{"t":"2026-11-18T06:40:30","kind":"answers","usd":0.00056,"detail":"rehearsal guard_salary 8s"}
+{"t":"2026-11-18T06:47:15","kind":"answers","usd":0.0068,"detail":"rehearsal brief 37s"}
+{"t":"2026-11-18T06:47:31","kind":"answers","usd":0.00198,"detail":"rehearsal db_aeu 14s"}
+{"t":"2026-11-18T07:14:25","kind":"answers","usd":0.0032,"detail":"rehearsal eda 65s"}
+{"t": "2026-11-18T13:08:28", "kind": "tts", "usd": 0.00259, "detail": "s0-01.wav 10.3s"}
+{"t": "2026-11-18T13:08:30", "kind": "tts", "usd": 0.0021, "detail": "s1-01.wav 8.4s"}
+{"t": "2026-11-18T13:08:34", "kind": "tts", "usd": 0.00409, "detail": "s2-01.wav 16.4s"}
+{"t": "2026-11-18T13:08:36", "kind": "tts", "usd": 0.00248, "detail": "s2-02.wav 9.9s"}
+{"t": "2026-11-18T13:08:39", "kind": "tts", "usd": 0.00224, "detail": "s3-01.wav 8.9s"}
+{"t": "2026-11-18T13:08:41", "kind": "tts", "usd": 0.00281, "detail": "s3-02.wav 11.2s"}
+{"t": "2026-11-18T13:08:43", "kind": "tts", "usd": 0.00139, "detail": "s3-03.wav 5.5s"}
+{"t": "2026-11-18T13:08:45", "kind": "tts", "usd": 0.00337, "detail": "s4-01.wav 13.5s"}
+{"t": "2026-11-18T13:08:48", "kind": "tts", "usd": 0.00261, "detail": "s5-01.wav 10.4s"}
+{"t": "2026-11-18T13:08:51", "kind": "tts", "usd": 0.00359, "detail": "s6-01.wav 14.3s"}
+{"t": "2026-11-18T13:08:54", "kind": "tts", "usd": 0.00354, "detail": "s6-02.wav 14.2s"}
+{"t": "2026-11-18T13:08:56", "kind": "tts", "usd": 0.00136, "detail": "s6-03.wav 5.5s"}
+{"t": "2026-11-18T13:08:57", "kind": "tts", "usd": 0.00154, "detail": "s7-01.wav 6.2s"}
+{"t": "2026-11-18T13:09:00", "kind": "tts", "usd": 0.00327, "detail": "s7-02.wav 13.1s"}
+{"t": "2026-11-18T13:09:02", "kind": "tts", "usd": 0.00169, "detail": "s8-01.wav 6.8s"}
+{"t": "2026-11-18T13:24:42", "kind": "tts", "usd": 0.00242, "detail": "s6-02.wav 9.7s"}
+{"t": "2026-11-18T13:24:45", "kind": "tts", "usd": 0.00256, "detail": "s6-03.wav 10.2s"}
+{"t": "2026-11-18T13:24:47", "kind": "tts", "usd": 0.003, "detail": "s6-04.wav 12.0s"}
+{"t": "2026-11-18T13:24:50", "kind": "tts", "usd": 0.00237, "detail": "s6-05.wav 9.5s"}
+{"t": "2026-11-18T13:24:51", "kind": "tts", "usd": 0.00119, "detail": "s6-06.wav 4.8s"}
+{"t": "2026-11-18T13:25:38", "kind": "tts", "usd": 0.00239, "detail": "s2-01.wav 9.6s"}
+{"t": "2026-11-18T13:25:40", "kind": "tts", "usd": 0.00228, "detail": "s2-02.wav 9.1s"}
+{"t": "2026-11-18T13:25:43", "kind": "tts", "usd": 0.00229, "detail": "s2-03.wav 9.2s"}
+{"t": "2026-11-18T13:25:45", "kind": "tts", "usd": 0.00279, "detail": "s2-04.wav 11.2s"}
+{"t":"2026-11-18T08:02:54","kind":"answers","usd":0.00411,"detail":"rehearsal brief 21s"}
+{"t":"2026-11-18T08:03:22","kind":"answers","usd":0.00403,"detail":"rehearsal brief 20s"}
+{"t":"2026-11-18T08:03:50","kind":"answers","usd":0.0045,"detail":"rehearsal brief 19s"}
+{"t":"2026-11-18T08:04:29","kind":"answers","usd":0.00024,"detail":"rehearsal chart 11s"}
+{"t":"2026-11-18T08:04:48","kind":"answers","usd":0.00219,"detail":"rehearsal database 17s"}
+{"t":"2026-11-18T08:05:37","kind":"answers","usd":0.0029,"detail":"rehearsal eda 43s"}

@@ -15,8 +15,10 @@
         margin: -7px 0 0 -7px; border-radius: 9999px; border: 2px solid rgba(42,120,214,0.9);
         animation: ee-ripple 520ms ease-out forwards; }
       @keyframes ee-ripple { from { transform: scale(0.6); opacity: 1; } to { transform: scale(3.4); opacity: 0; } }
-      #ee-spotlight { position: fixed; z-index: 2147483645; pointer-events: none; border-radius: 12px;
-        box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); transition: all 400ms ease; opacity: 0; }
+      #ee-spotlight { position: fixed; z-index: 2147483645; pointer-events: none; border-radius: 10px;
+        border: 2px solid rgba(197,163,104,0.95); background: rgba(197,163,104,0.07);
+        box-shadow: 0 0 0 9999px rgba(0,0,0,0.38), 0 0 28px rgba(197,163,104,0.35);
+        transition: all 380ms ease; opacity: 0; }
     `;
     document.documentElement.appendChild(style);
 
@@ -37,6 +39,10 @@
       const t = `translate(${e.clientX - 2}px, ${e.clientY - 1}px)`;
       cursor.style.transform = t;
       try { sessionStorage.setItem("ee-cursor-pos", t); } catch {}
+    }, true);
+    // while dragging, the browser sends drag events instead of mousemove: keep following
+    window.addEventListener("dragover", (e) => {
+      cursor.style.transform = `translate(${e.clientX - 2}px, ${e.clientY - 1}px)`;
     }, true);
     window.addEventListener("mousedown", (e) => {
       const r = document.createElement("div");

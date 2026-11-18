@@ -52,7 +52,7 @@ export async function startCapture(page, { out }) {
     for (; written < due; written++) ffmpeg.stdin.write(latest);
   }, 1000 / FPS / 2);
 
-  return async () => {
+  const stop = async () => {
     clearInterval(timer);
     await cdp.send("Page.stopScreencast").catch(() => {});
     await cdp.detach().catch(() => {});
@@ -62,4 +62,6 @@ export async function startCapture(page, { out }) {
     });
     return { out, seconds: written / FPS };
   };
+  stop.startedAt = started; // video time 0, for scene markers
+  return stop;
 }

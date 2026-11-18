@@ -1,0 +1,102 @@
+[
+  {
+    "id": "s0-01",
+    "character": "narrator",
+    "text": "Every company runs on knowledge scattered across documents, databases and spreadsheets. Finding an answer usually means finding the right person."
+  },
+  {
+    "id": "s1-01",
+    "character": "narrator",
+    "text": "Vikram is a key account manager. His company runs EagleEye, and only invited employees can sign in."
+  },
+  {
+    "id": "s2-01",
+    "character": "narrator",
+    "text": "On Thursday he meets one of the company's largest customers, so he adds his own meeting notes. They stay private to him."
+  },
+  {
+    "id": "s2-02",
+    "character": "expert",
+    "text": "A click on any file shows exactly the text EagleEye read from it, the same text it searches and cites."
+  },
+  {
+    "id": "s2-03",
+    "character": "narrator",
+    "text": "Alongside his notes sit hundreds of company documents, every policy and report, and the operations database itself."
+  },
+  {
+    "id": "s2-04",
+    "character": "expert",
+    "text": "Each document is read the moment it arrives: its text, its tables, even its charts. All of it can be searched, and all of it can be cited."
+  },
+  {
+    "id": "s3-01",
+    "character": "narrator",
+    "text": "One request. EagleEye reads his notes, searches the company's policies, and queries the database, in a single answer."
+  },
+  {
+    "id": "s3-02",
+    "character": "expert",
+    "text": "Every figure comes from the live database, through read-only queries limited to what Vikram is allowed to see. Every policy point carries a citation."
+  },
+  {
+    "id": "s3-03",
+    "character": "narrator",
+    "text": "And every citation opens the exact passage in the original document."
+  },
+  {
+    "id": "s4-01",
+    "character": "expert",
+    "text": "This answer was read from a chart. When the review was added, each chart was described in words, so the search can find it like any passage, and the original picture comes back with the answer."
+  },
+  {
+    "id": "s5-01",
+    "character": "narrator",
+    "text": "Questions about the business become SQL, shown in full, so anyone can check exactly how an answer was reached."
+  },
+  {
+    "id": "s6-01",
+    "character": "narrator",
+    "text": "Emissions will come up too. Vikram uploads a year of voyage data, and EagleEye profiles it at once: columns, gaps, correlations. Then he asks for a full exploratory analysis."
+  },
+  {
+    "id": "s6-02",
+    "character": "expert",
+    "text": "Here is what happens behind the scenes. A safety check reads the request first, then the planner decides this needs a full notebook."
+  },
+  {
+    "id": "s6-03",
+    "character": "expert",
+    "text": "The analysis agent loads the file and writes the notebook: eight cells, from data quality through to comparisons by vessel class."
+  },
+  {
+    "id": "s6-04",
+    "character": "expert",
+    "text": "Now the notebook runs, as real Python, in an isolated sandbox with no network access. Five figures and seven tables come back from his data."
+  },
+  {
+    "id": "s6-05",
+    "character": "expert",
+    "text": "Finally, the findings are written from those results, and every number quoted is checked against the tables before the answer appears."
+  },
+  {
+    "id": "s6-06",
+    "character": "narrator",
+    "text": "An afternoon of analyst work, ready in minutes."
+  },
+  {
+    "id": "s7-01",
+    "character": "narrator",
+    "text": "Not every request is innocent. Sam, an intern, tries his luck."
+  },
+  {
+    "id": "s7-02",
+    "character": "expert",
+    "text": "Every message is screened before it reaches the model, and data access is enforced by role in the data layer itself, not in the prompt. HR data is simply out of Sam's reach."
+  },
+  {
+    "id": "s8-01",
+    "character": "narrator",
+    "text": "EagleEye. Your company's knowledge, data and files, answered with evidence."
+  }
+]

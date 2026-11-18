@@ -39,7 +39,7 @@ export async function openRecordingBrowser() {
       "--kiosk",
       "--start-fullscreen",
       "--window-position=0,0",
-      "--force-device-scale-factor=2",
+      "--force-device-scale-factor=2.4", // app lays out at 1600x900: larger, readable text in the 1080p video
       "--no-first-run",
       "--no-default-browser-check",
       "--disable-infobars",
