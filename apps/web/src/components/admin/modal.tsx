@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { useBackCloses } from "@/hooks/use-back-closes";
+
 /** Native modal <dialog>: focus stays inside, Esc closes (unless `busy`), page behind is inert. */
 export function Modal({ open, title, subtitle, busy = false, onClose, children, wide = false, size }: {
   open: boolean;
@@ -20,6 +22,7 @@ export function Modal({ open, title, subtitle, busy = false, onClose, children, 
         ? "w-[min(40rem,calc(100vw-2rem))]"
         : "w-[min(28rem,calc(100vw-2rem))]";
   const ref = useRef<HTMLDialogElement>(null);
+  const close = useBackCloses(open, onClose); // phones: Back closes the dialog
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
@@ -32,13 +35,13 @@ export function Modal({ open, title, subtitle, busy = false, onClose, children, 
       aria-labelledby="modal-title"
       onCancel={(e) => {
         e.preventDefault();
-        if (!busy) onClose();
+        if (!busy) close();
       }}
       // m-auto: Tailwind's reset removes the margin the browser uses to centre a modal dialog
-      className={`m-auto ${width} rounded-xl border border-black/10 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-black/50 dark:border-white/10 dark:bg-[#1a1a19] dark:text-neutral-100`}
+      className={`max-md:pt-safe max-md:pb-safe m-auto ${width} max-md:m-0 max-md:h-dvh max-md:max-h-none max-md:w-full max-md:max-w-none max-md:rounded-none rounded-xl border border-black/10 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-black/50 dark:border-white/10 dark:bg-[#1a1a19] dark:text-neutral-100`}
     >
       {open && (
-        <div className={`flex flex-col ${size === "xl" ? "max-h-[90vh]" : "max-h-[85vh]"}`}>
+        <div className={`flex flex-col max-md:h-full max-md:max-h-full ${size === "xl" ? "max-h-[90dvh]" : "max-h-[85dvh]"}`}>
           <header className="flex items-start justify-between gap-3 border-b border-black/[0.06] px-5 py-4 dark:border-white/10">
             <div>
               <h2 id="modal-title" className="text-sm font-semibold">{title}</h2>
@@ -46,10 +49,10 @@ export function Modal({ open, title, subtitle, busy = false, onClose, children, 
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={close}
               disabled={busy}
               aria-label="Close"
-              className="rounded px-1.5 text-lg leading-none text-neutral-400 hover:text-neutral-700 disabled:opacity-40 dark:hover:text-neutral-200"
+              className="-m-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded text-lg leading-none text-neutral-400 hover:text-neutral-700 disabled:opacity-40 dark:hover:text-neutral-200"
             >
               ×
             </button>

@@ -37,7 +37,7 @@ export default function StatusPage() {
   }, [poll]);
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-4 py-12">
+    <main className="mx-auto min-h-dvh max-w-3xl px-4 py-12">
       <header className="mb-10">
         <h1 className="text-2xl font-semibold tracking-tight">EagleEye</h1>
         <p className="mt-1 text-sm text-neutral-500">Platform status</p>

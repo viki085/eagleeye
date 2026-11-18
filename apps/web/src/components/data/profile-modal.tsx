@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { ResultTable } from "@/components/data/result-table";
 import type { ApiClient, DatasetDetail, DatasetSummary, ProfileColumn } from "@/lib/api";
+import { useBackCloses } from "@/hooks/use-back-closes";
 
 interface ProfileModalProps {
   api: ApiClient;
@@ -102,16 +103,17 @@ export function ProfileModal({ api, dataset, onClose }: ProfileModalProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const close = useBackCloses(dataset !== null, onClose);
   if (dataset === null) return null;
   const profile = state.kind === "ok" ? state.detail.profile : null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 md:p-4" onClick={close}>
       <section
         role="dialog"
         aria-label={`Profile of ${dataset.title}`}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-5xl flex-col gap-3 overflow-y-auto rounded-xl border border-neutral-200 bg-white p-4 shadow-xl dark:border-neutral-800 dark:bg-neutral-950"
+        className="pt-safe pb-safe flex h-dvh w-full max-w-5xl flex-col gap-3 overflow-y-auto bg-white px-3 py-3 shadow-xl md:h-auto md:max-h-[90dvh] md:rounded-xl md:border md:border-neutral-200 md:p-4 dark:bg-neutral-950 md:dark:border-neutral-800"
       >
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -123,7 +125,7 @@ export function ProfileModal({ api, dataset, onClose }: ProfileModalProps) {
               </p>
             )}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="px-1.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200">
+          <button type="button" onClick={close} aria-label="Close" className="-m-2 flex h-10 w-10 shrink-0 items-center justify-center text-lg text-neutral-400 hover:text-neutral-800 md:m-0 md:h-auto md:w-auto md:px-1.5 md:text-base dark:hover:text-neutral-200">
             ×
           </button>
         </header>

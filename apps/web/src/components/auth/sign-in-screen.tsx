@@ -195,7 +195,7 @@ export function SignInScreen() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f3f3f0] dark:bg-[#0b0b0c]">
+    <div className="flex min-h-dvh bg-[#f3f3f0] dark:bg-[#0b0b0c]">
       <BrandPanel />
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-[400px]">

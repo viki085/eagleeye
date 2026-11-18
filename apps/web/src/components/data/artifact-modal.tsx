@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { ResultTable } from "@/components/data/result-table";
 import type { ApiClient, ArtifactPage, ArtifactView } from "@/lib/api";
+import { useBackCloses } from "@/hooks/use-back-closes";
 
 const PAGE_SIZE = 100;
 
@@ -43,17 +44,18 @@ export function ArtifactModal({ api, artifact, onClose, onDownload }: ArtifactMo
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const close = useBackCloses(artifact !== null, onClose);
   if (artifact === null) return null;
   const total = state.kind === "ok" ? state.page.total : artifact.row_count;
   const end = Math.min(offset + PAGE_SIZE, total);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 md:p-4" onClick={close}>
       <section
         role="dialog"
         aria-label={artifact.title}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-5xl flex-col gap-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-xl dark:border-neutral-800 dark:bg-neutral-950"
+        className="pt-safe pb-safe flex h-dvh w-full max-w-5xl flex-col gap-3 bg-white px-3 py-3 shadow-xl md:h-auto md:max-h-[90dvh] md:rounded-xl md:border md:border-neutral-200 md:p-4 dark:bg-neutral-950 md:dark:border-neutral-800"
       >
         <header className="flex items-center justify-between gap-3">
           <h2 className="truncate text-sm font-semibold">{artifact.title}</h2>
@@ -61,16 +63,16 @@ export function ArtifactModal({ api, artifact, onClose, onDownload }: ArtifactMo
             <button type="button" onClick={() => onDownload(artifact)} className="rounded-md border border-neutral-300 px-2 py-1 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800">
               CSV
             </button>
-            <button type="button" onClick={onClose} aria-label="Close" className="px-1.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200">
+            <button type="button" onClick={close} aria-label="Close" className="flex h-9 w-9 items-center justify-center text-lg text-neutral-400 hover:text-neutral-800 md:h-auto md:w-auto md:px-1.5 md:text-base dark:hover:text-neutral-200">
               ×
             </button>
           </div>
         </header>
-        <div className="min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
           {state.kind === "loading" && <p className="text-sm text-neutral-400">Loading…</p>}
           {state.kind === "error" && <p className="text-sm text-red-600">{state.message}</p>}
           {state.kind === "ok" && (
-            <ResultTable columns={state.page.columns} rows={state.page.rows} maxHeightClass="max-h-[65vh]" />
+            <ResultTable columns={state.page.columns} rows={state.page.rows} maxHeightClass="max-h-full md:max-h-[65dvh]" />
           )}
         </div>
         <footer className="flex items-center justify-between text-xs text-neutral-500">

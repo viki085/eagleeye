@@ -7,15 +7,18 @@ import { NoAccess } from "@/components/auth/no-access";
 import { ServerConnecting, ServerWaking } from "@/components/server-waking";
 import { Composer } from "@/components/chat/composer";
 import { MessageBubble } from "@/components/chat/message-bubble";
-import { Sidebar } from "@/components/chat/sidebar";
+import { MobileTopBar } from "@/components/chat/mobile-top-bar";
+import { ChatsDrawerContent, Sidebar, type SidebarProps } from "@/components/chat/sidebar";
 import { SourceDrawer } from "@/components/chat/source-drawer";
 import { ArtifactModal } from "@/components/data/artifact-modal";
 import { DemoBanner, DemoEnded, DemoQuestions } from "@/components/demo/demo-welcome";
 import { DocumentsPanel, type CurrentUser } from "@/components/documents/documents-panel";
+import { SlideOver } from "@/components/layout/slide-over";
 import { UsagePanel } from "@/components/usage/usage-panel";
 import { useApi } from "@/hooks/use-api";
 import { useDemoVisit } from "@/hooks/use-demo-visit";
 import { useDocuments } from "@/hooks/use-documents";
+import { COMPACT_QUERY, PHONE_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { useUsage } from "@/hooks/use-usage";
 import { accountLoadFailure, displayRole } from "@/lib/account-load";
 import { ApiError, type ArtifactView, type ChatSummary, type Citation } from "@/lib/api";
@@ -65,6 +68,10 @@ export default function ChatPage() {
   const isUp = useCallback(() => api.isUp(), [api]);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<{ text: string; id: number } | null>(null);
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const isCompact = useMediaQuery(COMPACT_QUERY);
+  const [chatsOpen, setChatsOpen] = useState(false); // phone: the chat list slide-over
+  const [docsOpen, setDocsOpen] = useState(false); // phone and tablet: the documents slide-over
   const isDemo = me?.isDemo === true;
   const demoVisit = useDemoVisit(api, isDemo);
   const clerk = useClerk();
@@ -258,6 +265,19 @@ export default function ChatPage() {
   const closeDrawer = useCallback(() => setOpenCitation(null), []);
   const closeArtifact = useCallback(() => setOpenArtifact(null), []);
 
+  const sidebarProps: SidebarProps = {
+    chats,
+    activeChatId,
+    busy,
+    role: displayRole(me),
+    isDemo,
+    onNewChat: handleNewChat,
+    onSelect: (id) => void openChat(id),
+    onDelete: (id) => void handleDelete(id),
+    footer: isDemo ? undefined : <UsagePanel state={usage} />,
+  };
+  const activeTitle = chats.find((c) => c.id === activeChatId)?.title ?? "EagleEye";
+
   if (noAccess) return <NoAccess message={noAccess} />;
   if (asleep) return <ServerWaking isUp={isUp} />;
   if (!serverUp) return <ServerConnecting />;
@@ -265,31 +285,38 @@ export default function ChatPage() {
   return (
     // relative + overflow-hidden: the shell is exactly one screen; nothing inside it (e.g. an
     // absolutely positioned element) can stretch the page and make the whole layout scroll
-    <div className="relative flex h-screen overflow-hidden">
-      <Sidebar
-        chats={chats}
-        activeChatId={activeChatId}
-        busy={busy}
-        role={displayRole(me)}
-        isDemo={isDemo}
-        onNewChat={handleNewChat}
-        onSelect={(id) => void openChat(id)}
-        onDelete={(id) => void handleDelete(id)}
-        footer={isDemo ? undefined : <UsagePanel state={usage} />}
-      />
+    <div className="relative flex h-dvh overflow-hidden">
+      {isPhone ? (
+        <SlideOver open={chatsOpen} side="left" label="Chats" onClose={() => setChatsOpen(false)}>
+          {(close) => <ChatsDrawerContent {...sidebarProps} close={close} />}
+        </SlideOver>
+      ) : (
+        <Sidebar {...sidebarProps} />
+      )}
       <main className="flex min-w-0 flex-1 flex-col">
+        {isPhone && (
+          <MobileTopBar
+            title={activeTitle}
+            busy={busy}
+            selectedDocs={selectedCount}
+            onOpenChats={() => setChatsOpen(true)}
+            onOpenDocuments={() => setDocsOpen(true)}
+            onNewChat={handleNewChat}
+          />
+        )}
         {isDemo && <DemoBanner visit={demoVisit} />}
         {isDemo && demoVisit?.exhausted && <DemoEnded visit={demoVisit} onSignOut={signOutOfDemo} />}
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
-          <div className="mx-auto flex max-w-3xl flex-col gap-4 px-4 py-6">
+          <div className="mx-auto flex max-w-3xl flex-col gap-4 px-3 py-4 md:px-4 md:py-6">
             {messages.length === 0 && stream === null && isDemo && (
               <DemoQuestions onPick={(text) => setDraft((d) => ({ text, id: (d?.id ?? 0) + 1 }))} />
             )}
             {messages.length === 0 && stream === null && !isDemo && (
-              <div className="mt-24 text-center text-neutral-400">
+              <div className="mt-16 px-4 text-center text-neutral-400 md:mt-24">
                 <p className="text-lg font-medium">What can I help you with?</p>
                 <p className="mt-1 text-sm">
-                  Upload documents on the right and ask about them — answers cite their sources.
+                  {isPhone ? "Add documents from the documents button above" : "Upload documents on the right"} and ask
+                  about them — answers cite their sources.
                 </p>
               </div>
             )}
@@ -352,7 +379,14 @@ export default function ChatPage() {
           }
         />
       </main>
-      <DocumentsPanel state={docs} currentUser={me} api={api} />
+      <DocumentsPanel
+        state={docs}
+        currentUser={me}
+        api={api}
+        layout={isPhone ? "phone" : isCompact ? "tablet" : "docked"}
+        overlayOpen={docsOpen}
+        onOverlayChange={setDocsOpen}
+      />
       <SourceDrawer api={api} citation={openCitation} onClose={closeDrawer} />
       <ArtifactModal
         api={api}

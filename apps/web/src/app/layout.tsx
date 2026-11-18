@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -37,6 +37,18 @@ export const metadata: Metadata = {
   title: "EagleEye",
   description: "Enterprise AI assistant — RAG, text-to-SQL, and cross-source analysis",
   icons: { icon: "/brand/eagleeye-icon-64.png", apple: "/brand/eagleeye-icon.png" },
+};
+
+/** Phones: render at the device width (no shrunken desktop page) and draw under the notch, so
+ * the safe-area padding (pt-safe / pb-safe) can keep content clear of it. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({

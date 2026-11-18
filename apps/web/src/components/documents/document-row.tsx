@@ -79,7 +79,7 @@ export function DocumentRow({ doc, canDelete, onOpen, onDelete, selection }: Doc
           <button
             onClick={onDelete}
             aria-label={`Delete ${doc.title}`}
-            className="rounded px-1 text-neutral-400 opacity-0 hover:text-red-500 focus:opacity-100 group-hover:opacity-100"
+            className="rounded px-1 text-neutral-400 opacity-0 hover:text-red-500 focus:opacity-100 group-hover:opacity-100 pointer-coarse:px-2 pointer-coarse:text-base pointer-coarse:opacity-100"
           >
             ×
           </button>

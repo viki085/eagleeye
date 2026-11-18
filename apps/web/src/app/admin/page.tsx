@@ -91,7 +91,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#f3f3f0] text-neutral-900 dark:bg-[#0d0d0d] dark:text-neutral-100">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#f3f3f0] text-neutral-900 dark:bg-[#0d0d0d] dark:text-neutral-100">
       <TopBar />
       {access.kind === "checking" && <p className="p-6 text-sm text-neutral-400">Checking access…</p>}
       {access.kind === "denied" && (

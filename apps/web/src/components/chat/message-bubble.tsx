@@ -91,7 +91,7 @@ export function MessageBubble({
   if (role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl bg-blue-600 px-4 py-2 text-sm text-white">
+        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-blue-600 px-4 py-2 text-sm text-white md:max-w-[80%]">
           {text}
         </div>
       </div>
@@ -100,10 +100,10 @@ export function MessageBubble({
   const refusal = route === "blocked";
   return (
     <div className="flex">
-      <div className="min-w-0 max-w-[85%] flex-1">
+      <div className="min-w-0 max-w-full flex-1 md:max-w-[85%]">
         <StepTree steps={steps} live={streaming} />
         <div
-          className={`prose prose-sm prose-neutral max-w-none dark:prose-invert [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-neutral-100 [&_pre]:p-3 dark:[&_pre]:bg-neutral-900 ${
+          className={`prose prose-sm prose-neutral max-w-none break-words dark:prose-invert [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-neutral-100 [&_pre]:p-3 dark:[&_pre]:bg-neutral-900 ${
             refusal ? "italic text-neutral-500" : ""
           }`}
         >

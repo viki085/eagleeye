@@ -16,14 +16,17 @@ export function DemoBanner({ visit }: { visit: DemoVisit | null }) {
   return (
     <div
       role="note"
-      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-[rgba(197,163,104,0.3)] bg-[#9E8253]/[0.07] px-4 py-2 text-xs text-[#6b5636] dark:text-[#d6bd8f]"
+      className="flex items-center justify-center gap-x-3 gap-y-1 border-b border-[rgba(197,163,104,0.3)] bg-[#9E8253]/[0.07] px-3 py-1.5 text-xs md:flex-wrap md:px-4 md:py-2 text-[#6b5636] dark:text-[#d6bd8f]"
     >
       <span className="font-semibold uppercase tracking-[0.12em] text-[#7d6540] dark:text-[#C5A368]">Demo</span>
-      <span>Your chats and uploads are private to this visit and deleted after 24 hours. Don&apos;t upload confidential files.</span>
+      <span className="hidden md:inline">
+        Your chats and uploads are private to this visit and deleted after 24 hours. Don&apos;t upload confidential files.
+      </span>
+      <span className="min-w-0 truncate md:hidden">Private to your visit · deleted after 24 h</span>
       {visit && (
         <span
           aria-live="polite"
-          className={`rounded-full px-2 py-0.5 font-semibold tabular-nums ${
+          className={`shrink-0 rounded-full px-2 py-0.5 font-semibold tabular-nums ${
             low ? "bg-[#d03b3b]/10 text-[#b42f2f] dark:text-[#e66767]" : "bg-[#9E8253]/[0.12] text-[#7d6540] dark:text-[#C5A368]"
           }`}
         >
@@ -61,7 +64,7 @@ export function DemoEnded({ visit, onSignOut }: { visit: DemoVisit; onSignOut: (
 /** The empty-chat screen for the demo account: what to try, one click to fill the box. */
 export function DemoQuestions({ onPick }: { onPick: (text: string) => void }) {
   return (
-    <section aria-labelledby="demo-try" className="mt-6">
+    <section aria-labelledby="demo-try" className="mt-2 md:mt-6">
       <div className="text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7d6540] dark:text-[#C5A368]">
           Welcome to the EagleEye demo
@@ -71,8 +74,10 @@ export function DemoQuestions({ onPick }: { onPick: (text: string) => void }) {
         </h2>
         <p className="mx-auto mt-1.5 max-w-xl text-sm text-neutral-500">
           Grand Line Shipping is a fictional company. Its policies, reports and operations database are
-          already loaded, and five data files are in <span className="font-medium">My data files</span> on
-          the right. Click a question to put it in the message box, then press Enter.
+          already loaded, and five data files are in <span className="font-medium">My data files</span>
+          <span className="hidden md:inline"> on the right</span>
+          <span className="md:hidden"> (the documents button at the top)</span>. Pick a question to put it in
+          the message box, then send it.
         </p>
       </div>
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -93,7 +98,7 @@ export function DemoQuestions({ onPick }: { onPick: (text: string) => void }) {
                   <button
                     type="button"
                     onClick={() => onPick(q.text)}
-                    className="w-full rounded-lg px-2 py-1.5 text-left outline-none transition hover:bg-[#9E8253]/[0.08] focus-visible:ring-2 focus-visible:ring-[#9E8253]/50 dark:hover:bg-[#C5A368]/[0.07]"
+                    className="w-full rounded-lg px-2 py-1.5 text-left outline-none pointer-coarse:py-2.5 transition hover:bg-[#9E8253]/[0.08] focus-visible:ring-2 focus-visible:ring-[#9E8253]/50 dark:hover:bg-[#C5A368]/[0.07]"
                   >
                     <span className="line-clamp-2 text-[13px] leading-snug text-neutral-800 dark:text-neutral-200">
                       {q.text}

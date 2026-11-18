@@ -77,7 +77,7 @@ export function DatasetList({ datasets, onProfile, onDelete }: DatasetListProps)
               type="button"
               onClick={() => onDelete(d)}
               aria-label={`Delete ${d.title}`}
-              className="rounded px-1 text-neutral-400 opacity-0 hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
+              className="rounded px-1 text-neutral-400 opacity-0 hover:text-red-600 focus:opacity-100 group-hover:opacity-100 pointer-coarse:px-2 pointer-coarse:text-base pointer-coarse:opacity-100"
             >
               ×
             </button>

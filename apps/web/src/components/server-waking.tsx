@@ -15,7 +15,7 @@ interface ServerWakingProps {
 /** Shown while the first liveness check runs: the app opens only once the server answers. */
 export function ServerConnecting() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f3f3f0] px-4 dark:bg-[#0b0b0c]">
+    <main className="grid min-h-dvh place-items-center bg-[#f3f3f0] px-4 dark:bg-[#0b0b0c]">
       <div role="status" aria-live="polite" className="w-full max-w-sm text-center">
         <BrandIcon size={48} className="mx-auto block" />
         <h1 className="mt-5 text-lg font-semibold text-neutral-900 dark:text-neutral-50">Connecting to EagleEye…</h1>
@@ -61,7 +61,7 @@ export function ServerWaking({ isUp }: ServerWakingProps) {
   }, [isUp, attempt]);
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f3f3f0] px-4 dark:bg-[#0b0b0c]">
+    <main className="grid min-h-dvh place-items-center bg-[#f3f3f0] px-4 dark:bg-[#0b0b0c]">
       <div role="status" aria-live="polite" className="w-full max-w-sm text-center">
         <BrandIcon size={48} className="mx-auto block" />
         {state === "starting" ? (

@@ -89,7 +89,7 @@ function ViewerBody({ state }: { state: Loaded }) {
         <iframe
           src={state.url}
           title="Document"
-          className="h-[72vh] w-full rounded-md border border-neutral-200 bg-white dark:border-neutral-800"
+          className="h-[72dvh] w-full rounded-md border border-neutral-200 bg-white dark:border-neutral-800"
         />
       );
     case "markdown":

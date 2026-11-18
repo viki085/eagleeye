@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 export default function SsoCallbackPage() {
   const router = useRouter();
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f3f3f0] text-sm text-neutral-500 dark:bg-[#0d0d0d]">
+    <main className="flex min-h-dvh items-center justify-center bg-[#f3f3f0] text-sm text-neutral-500 dark:bg-[#0d0d0d]">
       Signing you in…
       <HandleSSOCallback
         navigateToApp={({ decorateUrl }) => {

@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { DATASETS_CHANGED } from "@/hooks/use-datasets";
 import type { ApiClient, ChunkDetail, Citation } from "@/lib/api";
 import { isSourceGone } from "@/lib/citation";
+import { useBackCloses } from "@/hooks/use-back-closes";
 
 interface SourceDrawerProps {
   api: ApiClient;
@@ -147,16 +148,17 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const close = useBackCloses(citation !== null, onClose);
   if (citation === null) return null;
   const path = [citation.title, ...citation.heading_path].join(" › ");
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/20" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/20" onClick={close}>
       <section
         role="dialog"
         aria-label={`Source ${citation.n}`}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-lg flex-col border-l border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-950"
+        className="pt-safe pb-safe flex h-full w-full max-w-lg flex-col border-l border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-950"
       >
         <header className="flex items-start justify-between gap-3 border-b border-neutral-200 p-4 dark:border-neutral-800">
           <div className="min-w-0">
@@ -166,7 +168,7 @@ export function SourceDrawer({ api, citation, onClose }: SourceDrawerProps) {
             </p>
             <h2 className="mt-1 text-sm font-medium">{path}</h2>
           </div>
-          <button onClick={onClose} aria-label="Close source" className="text-neutral-400 hover:text-neutral-700">
+          <button onClick={close} aria-label="Close source" className="-m-2 flex h-10 w-10 shrink-0 items-center justify-center text-lg text-neutral-400 hover:text-neutral-700">
             ×
           </button>
         </header>

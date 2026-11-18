@@ -13,6 +13,7 @@ import { SearchBox } from "@/components/documents/search-box";
 import { UploadButton } from "@/components/documents/upload-button";
 import { useDatasets } from "@/hooks/use-datasets";
 import type { DocumentsState } from "@/hooks/use-documents";
+import { SlideOver } from "@/components/layout/slide-over";
 import { usePanelOpen } from "@/hooks/use-panel-open";
 import { filterDocuments } from "@/lib/doc-search";
 import {
@@ -31,10 +32,18 @@ export interface CurrentUser {
   isDemo?: boolean;
 }
 
+/** docked: beside the chat (desktop). tablet: a strip that opens the panel over the chat.
+ * phone: nothing on screen until the top bar's Documents button opens it full width. */
+export type DocumentsLayout = "docked" | "tablet" | "phone";
+
 interface DocumentsPanelProps {
   state: DocumentsState;
   currentUser: CurrentUser | null;
   api: ApiClient;
+  layout?: DocumentsLayout;
+  /** Tablet and phone: whether the slide-over is open (the page owns it). */
+  overlayOpen?: boolean;
+  onOverlayChange?: (open: boolean) => void;
 }
 
 function useSources(api: ApiClient): DataSource[] | null {
@@ -121,8 +130,18 @@ function DocumentList({
  * split by a draggable divider. Enterprise upload/delete only for knowledge admins (the API
  * enforces the same rule).
  */
-export function DocumentsPanel({ state, currentUser, api }: DocumentsPanelProps) {
-  const [open, setOpen] = usePanelOpen("documents");
+export function DocumentsPanel({
+  state,
+  currentUser,
+  api,
+  layout = "docked",
+  overlayOpen = false,
+  onOverlayChange,
+}: DocumentsPanelProps) {
+  const [dockedOpen, setDockedOpen] = usePanelOpen("documents");
+  const docked = layout === "docked";
+  const open = docked ? dockedOpen : overlayOpen;
+  const setOpen = (next: boolean) => (docked ? setDockedOpen(next) : onOverlayChange?.(next));
   const [scope, setScope] = useState<DocumentScope>("personal");
   const [profiled, setProfiled] = useState<DatasetSummary | null>(null);
   const [viewing, setViewing] = useState<DocumentSummary | null>(null);
@@ -151,7 +170,7 @@ export function DocumentsPanel({ state, currentUser, api }: DocumentsPanelProps)
       ? `Answering from ${personalSelected} selected`
       : "Tick documents to restrict answers to them";
 
-  if (!open) {
+  if (!open && docked) {
     return (
       <button
         onClick={() => setOpen(true)}
@@ -162,17 +181,27 @@ export function DocumentsPanel({ state, currentUser, api }: DocumentsPanelProps)
     );
   }
 
-  return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-l border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
+  const body = (close: () => void) => (
+    <>
       <div className="flex items-center justify-between p-3">
         <span className="text-sm font-semibold tracking-tight">Documents & data</span>
-        <button
-          onClick={() => setOpen(false)}
-          aria-label="Collapse documents panel"
-          className="rounded px-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-        >
-          ›
-        </button>
+        {docked ? (
+          <button
+            onClick={close}
+            aria-label="Collapse documents panel"
+            className="rounded px-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+          >
+            ›
+          </button>
+        ) : (
+          <button
+            onClick={close}
+            aria-label="Close documents"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-lg text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-800"
+          >
+            ×
+          </button>
+        )}
       </div>
       <div className="flex flex-col gap-2 px-3 pb-2">
         <ScopeTabs scope={scope} onChange={setScope} />
@@ -268,6 +297,35 @@ export function DocumentsPanel({ state, currentUser, api }: DocumentsPanelProps)
       </div>
       <DocumentViewer api={api} doc={viewing} onClose={() => setViewing(null)} />
       <ProfileModal api={api} dataset={profiled} onClose={() => setProfiled(null)} />
+    </>
+  );
+
+  if (!docked) {
+    return (
+      <>
+        {!open && layout === "tablet" && (
+          <button
+            onClick={() => setOpen(true)}
+            className="h-full w-10 shrink-0 border-l border-neutral-200 text-xs text-neutral-500 [writing-mode:vertical-rl] hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900"
+          >
+            Documents & data ({documents.length + data.datasets.length})
+          </button>
+        )}
+      <SlideOver
+        open={open}
+        side="right"
+        label="Documents and data"
+        onClose={() => setOpen(false)}
+        widthClass={layout === "phone" ? "w-full" : "w-96 max-w-[90vw]"}
+      >
+        {(close) => <div className="pt-safe pb-safe flex h-full flex-col">{body(close)}</div>}
+      </SlideOver>
+      </>
+    );
+  }
+  return (
+    <aside className="flex h-full w-72 shrink-0 flex-col border-l border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
+      {body(() => setOpen(false))}
     </aside>
   );
 }
