@@ -109,487 +109,681 @@
   {
    "kind": "docs",
    "text": "Under the Emissions and EU ETS Compliance Policy, what reduction in CO2 per TEU-km must the fleet achieve by 2030 compared with 2024?",
-   "doc": "emissions-policy"
+   "doc": "emissions-policy",
+   "span": "20 percent",
+   "title": "Emissions and EU ETS Compliance Policy"
   },
   {
    "kind": "docs",
    "text": "Under the Customer Credit and Collections Policy, after how long can a receivable be removed from the books if the Finance Director agrees?",
-   "doc": "credit-policy"
+   "doc": "credit-policy",
+   "span": "more than 180 days",
+   "title": "Customer Credit and Collections Policy"
   },
   {
    "kind": "docs",
    "text": "Under the Health, Safety and Environment Policy, what is the deadline for notifying the company about an injury incident?",
-   "doc": "hse-policy"
+   "doc": "hse-policy",
+   "span": "within 24 hours",
+   "title": "Health, Safety and Environment Policy"
   },
   {
    "kind": "docs",
    "text": "Under the Hybrid and Remote Work Policy, what is the minimum number of weekly office visits required for employees assigned to the workplace?",
-   "doc": "remote-work-policy"
+   "doc": "remote-work-policy",
+   "span": "3 days a week",
+   "title": "Hybrid and Remote Work Policy"
   },
   {
    "kind": "docs",
    "text": "Who leads the team responsible for managing a booking-platform crisis?",
-   "doc": "business-continuity-plan"
+   "doc": "business-continuity-plan",
+   "span": "Chief Operating Officer",
+   "title": "Business Continuity Plan: Booking Platform"
   },
   {
    "kind": "docs",
    "text": "Under the Cargo Claims Handling Procedure, what proportion of filed claims should reach a decision no later than four months afterward?",
-   "doc": "claims-handling-procedure"
+   "doc": "claims-handling-procedure",
+   "span": "80 percent",
+   "title": "Cargo Claims Handling Procedure"
   },
   {
    "kind": "docs",
    "text": "Under the Procurement Policy, what rating threshold and duration trigger a subcontractor review?",
-   "doc": "procurement-policy"
+   "doc": "procurement-policy",
+   "span": "below 2.5 for two quarters",
+   "title": "Procurement Policy"
   },
   {
    "kind": "docs",
    "text": "What is Grand Line’s rule on offering bribes or unofficial payments to speed up business?",
-   "doc": "code-of-conduct"
+   "doc": "code-of-conduct",
+   "span": "zero tolerance",
+   "title": "Code of Conduct"
   },
   {
    "kind": "docs",
    "text": "Under the Container Repair and Maintenance Policy, at what age are containers considered for sale?",
-   "doc": "equipment-repair-policy"
+   "doc": "equipment-repair-policy",
+   "span": "15 years",
+   "title": "Container Repair and Maintenance Policy"
   },
   {
    "kind": "docs",
    "text": "How many additional ships did AEX and AMX hire to preserve weekly sailings?",
-   "doc": "red-sea-contingency-plan"
+   "doc": "red-sea-contingency-plan",
+   "span": "Two extra vessels",
+   "title": "Red Sea Contingency Plan"
   },
   {
    "kind": "docs",
    "text": "Under the travel and expense policy, how long after incurring a cost do I have to file for reimbursement?",
-   "doc": "travel-expense-policy"
+   "doc": "travel-expense-policy",
+   "span": "within 30 days",
+   "title": "Travel and Expense Policy"
   },
   {
    "kind": "docs",
    "text": "Under the pricing governance policy, when do Transpacific and Asia–US East Coast agreements renew?",
-   "doc": "pricing-governance"
+   "doc": "pricing-governance",
+   "span": "1 May to 30 April",
+   "title": "Pricing Governance and Rate Approval Procedure"
   },
   {
    "kind": "docs",
    "text": "Under the customs clearance procedure, what cause is assigned when customs delays a shipment?",
-   "doc": "customs-clearance-procedure"
+   "doc": "customs-clearance-procedure",
+   "span": "Customs inspection hold",
+   "title": "Customs Clearance and Import Security Filing Procedure"
   },
   {
    "kind": "docs",
    "text": "Under the reefer monitoring policy, how soon must the monitoring centre confirm receipt of a temperature alert?",
-   "doc": "reefer-sop"
+   "doc": "reefer-sop",
+   "span": "within 30 minutes",
+   "title": "Reefer Cargo Handling Standard Operating Procedure"
   },
   {
    "kind": "docs",
    "text": "Under the Peak Season Surcharge and Allocation Policy, what is the PSS rate range for shipments without a contract?",
-   "doc": "peak-season-policy"
+   "doc": "peak-season-policy",
+   "span": "USD 300 to 700 per FEU",
+   "title": "Peak Season Surcharge and Allocation Policy"
   },
   {
    "kind": "docs",
    "text": "When must staff enter the container seal IDs in the booking, and how often are omissions flagged?",
-   "doc": "seal-integrity-procedure"
+   "doc": "seal-integrity-procedure",
+   "span": "before gate-in",
+   "title": "Container Seal Integrity Procedure"
   },
   {
    "kind": "docs",
    "text": "Under the Information Security Policy, how soon after discovering a security incident must I notify the Security Operations Centre?",
-   "doc": "information-security-policy"
+   "doc": "information-security-policy",
+   "span": "within 1 hour",
+   "title": "Information Security Policy"
   },
   {
    "kind": "docs",
    "text": "Under the Annual Leave and Holiday Policy, how many paid leave days are provided each year, excluding public holidays?",
-   "doc": "leave-policy"
+   "doc": "leave-policy",
+   "span": "25 days",
+   "title": "Annual Leave and Holiday Policy"
   },
   {
    "kind": "docs",
    "text": "Under the Sanctions and Export Controls Policy, what happens to matches before compliance review is complete?",
-   "doc": "sanctions-policy"
+   "doc": "sanctions-policy",
+   "span": "held until cleared",
+   "title": "Sanctions and Export Controls Policy"
   },
   {
    "kind": "docs",
    "text": "Under the Vessel Schedule Recovery Procedure, what delay triggers the requirement to send a recovery plan to network operations?",
-   "doc": "vessel-schedule-recovery"
+   "doc": "vessel-schedule-recovery",
+   "span": "more than 24 hours",
+   "title": "Vessel Schedule Recovery Procedure"
   },
   {
    "kind": "docs",
    "text": "Under the data retention policy, how long must billing documentation be kept?",
-   "doc": "data-retention-policy"
+   "doc": "data-retention-policy",
+   "span": "10 years",
+   "title": "Data Retention Policy"
   },
   {
    "kind": "docs",
    "text": "Under the Verified Gross Mass procedure, what is the heaviest container allowed before rejection?",
-   "doc": "vgm-procedure"
+   "doc": "vgm-procedure",
+   "span": "30,480 kg",
+   "title": "Verified Gross Mass (VGM) Procedure"
   },
   {
    "kind": "docs",
    "text": "At which locations does the company generally purchase bunker fuel because costs are most favorable?",
-   "doc": "bunker-procurement-procedure"
+   "doc": "bunker-procurement-procedure",
+   "span": "Singapore, Rotterdam and Jebel Ali",
+   "title": "Bunker Fuel Procurement Procedure"
   },
   {
    "kind": "docs",
    "text": "On which days are stock counts conducted and their results shared with clients?",
-   "doc": "warehouse-operations"
+   "doc": "warehouse-operations",
+   "span": "every Sunday and reported to customers on Monday",
+   "title": "Logistics Centre Operations Manual"
   },
   {
    "kind": "docs",
    "text": "Under the Dangerous Goods Acceptance and Handling Policy, what is the charge for each container containing dangerous goods that were not properly declared?",
-   "doc": "dangerous-goods-policy"
+   "doc": "dangerous-goods-policy",
+   "span": "USD 15,000 per container",
+   "title": "Dangerous Goods Acceptance and Handling Policy"
   },
   {
    "kind": "docs",
    "text": "According to the Demurrage and Detention Policy, what invoice code identifies these charges?",
-   "doc": "demurrage-detention-policy"
+   "doc": "demurrage-detention-policy",
+   "span": "DND",
+   "title": "Demurrage and Detention Policy"
   },
   {
    "kind": "docs",
    "text": "Under the subcontractor performance policy, when does a late pickup affect a subcontractor’s rating?",
-   "doc": "subcontractor-management"
+   "doc": "subcontractor-management",
+   "span": "more than 4 hours late",
+   "title": "Trucking Subcontractor Management Procedure"
   },
   {
    "kind": "docs",
    "text": "At what stage in the customer onboarding process must sanctions screening occur?",
-   "doc": "customer-onboarding"
+   "doc": "customer-onboarding",
+   "span": "before the first booking",
+   "title": "Customer Onboarding and KYC Procedure"
   },
   {
    "kind": "docs",
    "text": "Under the Speak Up (Whistleblowing) Policy, what reporting options are available at any time?",
-   "doc": "whistleblowing-policy"
+   "doc": "whistleblowing-policy",
+   "span": "phone or web",
+   "title": "Speak Up (Whistleblowing) Policy"
   },
   {
    "kind": "docs",
    "text": "What led to the major disruption in Singapore?",
-   "doc": "incident-inc-2024-00070"
+   "doc": "incident-inc-2024-00070",
+   "span": "Port congestion",
+   "title": "Incident Investigation Report INC-2024-00070: Port congestion at Singapore"
   },
   {
    "kind": "docs",
    "text": "How many hours late was the ship arriving at Rotterdam?",
-   "doc": "incident-inc-2024-00009"
+   "doc": "incident-inc-2024-00009",
+   "span": "303.5 hours",
+   "title": "Incident Investigation Report INC-2024-00009: Red Sea diversion via Cape of Good Hope at Rotterdam"
   },
   {
    "kind": "docs",
    "text": "At which port did the congestion incident begin in June 2024?",
-   "doc": "incident-inc-2024-00352"
+   "doc": "incident-inc-2024-00352",
+   "span": "Singapore (SGSIN)",
+   "title": "Incident Investigation Report INC-2024-00352: Port congestion at Singapore"
   },
   {
    "kind": "docs",
    "text": "Which ship and voyage were involved in the mechanical breakdown at Piraeus?",
-   "doc": "incident-inc-2025-00426"
+   "doc": "incident-inc-2025-00426",
+   "span": "GL Nautilus",
+   "title": "Incident Investigation Report INC-2025-00426: Mechanical failure at Piraeus"
   },
   {
    "kind": "docs",
    "text": "Why did the voyage involving Singapore take the southern route around Africa?",
-   "doc": "incident-inc-2024-00027"
+   "doc": "incident-inc-2024-00027",
+   "span": "because of the Red Sea crisis",
+   "title": "Incident Investigation Report INC-2024-00027: Red Sea diversion via Cape of Good Hope at Singapore"
   },
   {
    "kind": "docs",
    "text": "What issue was identified in incident INC-2024-00102?",
-   "doc": "incident-inc-2024-00102"
+   "doc": "incident-inc-2024-00102",
+   "span": "Port congestion",
+   "title": "Incident Investigation Report INC-2024-00102: Port congestion at Singapore"
   },
   {
    "kind": "docs",
    "text": "Why was the voyage to Piraeus rerouted?",
-   "doc": "incident-inc-2024-00290"
+   "doc": "incident-inc-2024-00290",
+   "span": "because of the Red Sea crisis",
+   "title": "Incident Investigation Report INC-2024-00290: Red Sea diversion via Cape of Good Hope at Piraeus"
   },
   {
    "kind": "docs",
    "text": "How far behind schedule was the vessel at Rotterdam?",
-   "doc": "incident-inc-2024-00031"
+   "doc": "incident-inc-2024-00031",
+   "span": "150.2 hours",
+   "title": "Incident Investigation Report INC-2024-00031: Mechanical failure at Rotterdam"
   },
   {
    "kind": "docs",
    "text": "At which port did the congestion incident begin in May 2024?",
-   "doc": "incident-inc-2024-00344"
+   "doc": "incident-inc-2024-00344",
+   "span": "Singapore",
+   "title": "Incident Investigation Report INC-2024-00344: Port congestion at Singapore"
   },
   {
    "kind": "docs",
    "text": "How many bookings, measured in TEU, were aboard during the Rotterdam Red Sea diversion incident?",
-   "doc": "incident-inc-2024-00024"
+   "doc": "incident-inc-2024-00024",
+   "span": "5,881 TEU",
+   "title": "Incident Investigation Report INC-2024-00024: Red Sea diversion via Cape of Good Hope at Rotterdam"
   },
   {
    "kind": "docs",
    "text": "What led to the Singapore port incident, and how serious was it?",
-   "doc": "incident-inc-2024-00357"
+   "doc": "incident-inc-2024-00357",
+   "span": "Port congestion",
+   "title": "Incident Investigation Report INC-2024-00357: Port congestion at Singapore"
   },
   {
    "kind": "docs",
    "text": "At which port did the congestion incident begin in August 2024?",
-   "doc": "incident-inc-2024-00109"
+   "doc": "incident-inc-2024-00109",
+   "span": "Rotterdam (NLRTM)",
+   "title": "Incident Investigation Report INC-2024-00109: Port congestion at Rotterdam"
   },
   {
    "kind": "docs",
    "text": "How many bookings were aboard during the Yantian mechanical failure in 2025?",
-   "doc": "incident-inc-2025-00174"
+   "doc": "incident-inc-2025-00174",
+   "span": "717 bookings",
+   "title": "Incident Investigation Report INC-2025-00174: Mechanical failure at Yantian (Shenzhen)"
   },
   {
    "kind": "docs",
    "text": "Which ship was involved in the Rotterdam port-congestion incident?",
-   "doc": "incident-inc-2024-00049"
+   "doc": "incident-inc-2024-00049",
+   "span": "GL Dauntless",
+   "title": "Incident Investigation Report INC-2024-00049: Port congestion at Rotterdam"
   },
   {
    "kind": "docs",
    "text": "Which ship and westbound voyage were involved in the June 2024 Cape diversion incident at Rotterdam?",
-   "doc": "incident-inc-2024-00022"
+   "doc": "incident-inc-2024-00022",
+   "span": "GL Halcyon",
+   "title": "Incident Investigation Report INC-2024-00022: Red Sea diversion via Cape of Good Hope at Rotterdam"
   },
   {
    "kind": "docs",
    "text": "What incident identifier is assigned to the Singapore port congestion investigation?",
-   "doc": "incident-inc-2024-00364"
+   "doc": "incident-inc-2024-00364",
+   "span": "INC-2024-00364",
+   "title": "Incident Investigation Report INC-2024-00364: Port congestion at Singapore"
   },
   {
    "kind": "docs",
    "text": "Which ship and trip were affected by the Charleston labour stoppage?",
-   "doc": "incident-inc-2024-00649"
+   "doc": "incident-inc-2024-00649",
+   "span": "GL Intrepid",
+   "title": "Incident Investigation Report INC-2024-00649: Labour strike at Charleston"
   },
   {
    "kind": "docs",
    "text": "Which ship and westbound voyage were involved in the Rotterdam congestion incident?",
-   "doc": "incident-inc-2024-00052"
+   "doc": "incident-inc-2024-00052",
+   "span": "GL Equinox",
+   "title": "Incident Investigation Report INC-2024-00052: Port congestion at Rotterdam"
   },
   {
    "kind": "docs",
    "text": "What was the mean ocean shipping income per TEU in December 2025?",
-   "doc": "monthly-ops-2025-12"
+   "doc": "monthly-ops-2025-12",
+   "span": "USD 1,216 per TEU",
+   "title": "Monthly Operations Report - December 2025"
   },
   {
    "kind": "docs",
    "text": "How many cargo claims were submitted in July 2024?",
-   "doc": "monthly-ops-2024-07"
+   "doc": "monthly-ops-2024-07",
+   "span": "275 cargo claims",
+   "title": "Monthly Operations Report - July 2024"
   },
   {
    "kind": "docs",
    "text": "What was the mean ocean-shipping income per TEU in May 2024?",
-   "doc": "monthly-ops-2024-05"
+   "doc": "monthly-ops-2024-05",
+   "span": "USD 2,177 per TEU",
+   "title": "Monthly Operations Report - May 2024"
   },
   {
    "kind": "docs",
    "text": "How many TEU were handled in July 2025?",
-   "doc": "monthly-ops-2025-07"
+   "doc": "monthly-ops-2025-07",
+   "span": "208,863 TEU",
+   "title": "Monthly Operations Report - July 2025"
   },
   {
    "kind": "docs",
    "text": "How many February 2024 delay cases were classified as severe?",
-   "doc": "monthly-ops-2024-02"
+   "doc": "monthly-ops-2024-02",
+   "span": "21",
+   "title": "Monthly Operations Report - February 2024"
   },
   {
    "kind": "docs",
    "text": "How many reservations were deferred to a subsequent sailing in August 2025?",
-   "doc": "monthly-ops-2025-08"
+   "doc": "monthly-ops-2025-08",
+   "span": "1,076 bookings",
+   "title": "Monthly Operations Report - August 2025"
   },
   {
    "kind": "docs",
    "text": "What was the mean cost per tonne of bunker fuel in September 2026?",
-   "doc": "monthly-ops-2026-09"
+   "doc": "monthly-ops-2026-09",
+   "span": "USD 814.09 per tonne",
+   "title": "Monthly Operations Report - September 2026"
   },
   {
    "kind": "docs",
    "text": "What was the mean ocean-freight amount earned per TEU in April 2025?",
-   "doc": "monthly-ops-2025-04"
+   "doc": "monthly-ops-2025-04",
+   "span": "USD 1,492 per TEU",
+   "title": "Monthly Operations Report - April 2025"
   },
   {
    "kind": "docs",
    "text": "What percentage of arrivals met the timetable target in October 2025?",
-   "doc": "monthly-ops-2025-10"
+   "doc": "monthly-ops-2025-10",
+   "span": "72.4%",
+   "title": "Monthly Operations Report - October 2025"
   },
   {
    "kind": "docs",
    "text": "What percentage of scheduled arrivals met the timing standard in June 2025?",
-   "doc": "monthly-ops-2025-06"
+   "doc": "monthly-ops-2025-06",
+   "span": "70.4%",
+   "title": "Monthly Operations Report - June 2025"
   },
   {
    "kind": "docs",
    "text": "How many TEUs were handled in February 2025?",
-   "doc": "monthly-ops-2025-02"
+   "doc": "monthly-ops-2025-02",
+   "span": "162,437 TEU",
+   "title": "Monthly Operations Report - February 2025"
   },
   {
    "kind": "docs",
    "text": "What was the average amount earned for each TEU in November 2024?",
-   "doc": "monthly-ops-2024-11"
+   "doc": "monthly-ops-2024-11",
+   "span": "USD 2,089 per TEU",
+   "title": "Monthly Operations Report - November 2024"
   },
   {
    "kind": "docs",
    "text": "How many March 2025 schedule disruptions were classified as major or critical?",
-   "doc": "monthly-ops-2025-03"
+   "doc": "monthly-ops-2025-03",
+   "span": "1",
+   "title": "Monthly Operations Report - March 2025"
   },
   {
    "kind": "docs",
    "text": "What was the average cost per tonne of bunker fuel in July 2026?",
-   "doc": "monthly-ops-2026-07"
+   "doc": "monthly-ops-2026-07",
+   "span": "USD 590.66 per tonne",
+   "title": "Monthly Operations Report - July 2026"
   },
   {
    "kind": "docs",
    "text": "How many calls has Charleston (USCHS) had from January 2024 onward?",
-   "doc": "port-profile-uschs"
+   "doc": "port-profile-uschs",
+   "span": "143",
+   "title": "Port Profile: Charleston (USCHS)"
   },
   {
    "kind": "docs",
    "text": "At Rotterdam, what percentage of scheduled vessel visits arrive no more than a day late?",
-   "doc": "port-profile-nlrtm"
+   "doc": "port-profile-nlrtm",
+   "span": "81.6%",
+   "title": "Port Profile: Rotterdam (NLRTM)"
   },
   {
    "kind": "docs",
    "text": "At Genoa (ITGOA), what percentage of vessel calls arrive no more than a day behind schedule?",
-   "doc": "port-profile-itgoa"
+   "doc": "port-profile-itgoa",
+   "span": "48.6%",
+   "title": "Port Profile: Genoa (ITGOA)"
   },
   {
    "kind": "docs",
    "text": "How many vessel visits to Felixstowe have been logged from January 2024 onward?",
-   "doc": "port-profile-gbfxt"
+   "doc": "port-profile-gbfxt",
+   "span": "286",
+   "title": "Port Profile: Felixstowe (GBFXT)"
   },
   {
    "kind": "docs",
    "text": "Which service calls at Hamburg (DEHAM)?",
-   "doc": "port-profile-deham"
+   "doc": "port-profile-deham",
+   "span": "AEX",
+   "title": "Port Profile: Hamburg (DEHAM)"
   },
   {
    "kind": "docs",
    "text": "How long does a ship typically remain at Oakland (USOAK) during a port call?",
-   "doc": "port-profile-usoak"
+   "doc": "port-profile-usoak",
+   "span": "22.8 hours",
+   "title": "Port Profile: Oakland (USOAK)"
   },
   {
    "kind": "docs",
    "text": "At Antwerp-Bruges, what percentage of scheduled vessel visits reach the port no more than a day early or late?",
-   "doc": "port-profile-beanr"
+   "doc": "port-profile-beanr",
+   "span": "25.9%",
+   "title": "Port Profile: Antwerp-Bruges (BEANR)"
   },
   {
    "kind": "docs",
    "text": "At Nhava Sheva, what proportion of ship visits occur no more than a day behind their planned time?",
-   "doc": "port-profile-innsa"
+   "doc": "port-profile-innsa",
+   "span": "57.9%",
+   "title": "Port Profile: Nhava Sheva (INNSA)"
   },
   {
    "kind": "docs",
    "text": "How long does a ship typically spend at Yantian (Shenzhen) during a port visit?",
-   "doc": "port-profile-cnytn"
+   "doc": "port-profile-cnytn",
+   "span": "22.9 hours",
+   "title": "Port Profile: Yantian (Shenzhen) (CNYTN)"
   },
   {
    "kind": "docs",
    "text": "How long does a ship typically remain at Piraeus on each visit?",
-   "doc": "port-profile-grpir"
+   "doc": "port-profile-grpir",
+   "span": "23.2 hours",
+   "title": "Port Profile: Piraeus (GRPIR)"
   },
   {
    "kind": "docs",
    "text": "What was the fleet’s total carbon dioxide output in the fourth quarter of 2025?",
-   "doc": "qbr-2025-q4"
+   "doc": "qbr-2025-q4",
+   "span": "737,345 tonnes",
+   "title": "Quarterly Business Review - Q4 2025"
   },
   {
    "kind": "docs",
    "text": "What was the total container throughput during the third quarter of 2024?",
-   "doc": "qbr-2024-q3"
+   "doc": "qbr-2024-q3",
+   "span": "656,818 TEU",
+   "title": "Quarterly Business Review - Q3 2024"
   },
   {
    "kind": "docs",
    "text": "What was the total bunker fuel expenditure during the third quarter of 2025?",
-   "doc": "qbr-2025-q3"
+   "doc": "qbr-2025-q3",
+   "span": "USD 124,335,380",
+   "title": "Quarterly Business Review - Q3 2025"
   },
   {
    "kind": "docs",
    "text": "What was the fleet’s total carbon dioxide output during the second quarter of 2024?",
-   "doc": "qbr-2024-q2"
+   "doc": "qbr-2024-q2",
+   "span": "778,914 tonnes",
+   "title": "Quarterly Business Review - Q2 2024"
   },
   {
    "kind": "docs",
    "text": "How many TEUs did Cherian-Zacharia (India) ship in 2025?",
-   "doc": "customer-concentration-review"
+   "doc": "customer-concentration-review",
+   "span": "23,973 TEU",
+   "title": "Customer Concentration Review"
   },
   {
    "kind": "docs",
    "text": "During which dates in June 2025 could customers not use the booking platform?",
-   "doc": "cyber-board-briefing"
+   "doc": "cyber-board-briefing",
+   "span": "10 June 2025 to 14 June 2025",
+   "title": "Board Briefing: Cyber Incident June 2025"
   },
   {
    "kind": "docs",
    "text": "How much did bunker fuel cost during the first quarter of 2024?",
-   "doc": "qbr-2024-q1"
+   "doc": "qbr-2024-q1",
+   "span": "USD 113,977,309",
+   "title": "Quarterly Business Review - Q1 2024"
   },
   {
    "kind": "docs",
    "text": "In which years did LNG- and methanol-capable vessels become part of the fleet?",
-   "doc": "fleet-renewal-2026"
+   "doc": "fleet-renewal-2026",
+   "span": "2024 and 2025",
+   "title": "Fleet Renewal Programme 2026"
   },
   {
    "kind": "docs",
    "text": "What was the total bunker fuel expense during the first quarter of 2026?",
-   "doc": "qbr-2026-q1"
+   "doc": "qbr-2026-q1",
+   "span": "USD 131,460,239",
+   "title": "Quarterly Business Review - Q1 2026"
   },
   {
    "kind": "docs",
    "text": "During which dates in June 2025 was the booking system unavailable?",
-   "doc": "digital-strategy"
+   "doc": "digital-strategy",
+   "span": "10 to 14 June 2025",
+   "title": "Digital and Data Strategy"
   },
   {
    "kind": "docs",
    "text": "What percentage of services ran according to schedule in April 2024?",
-   "doc": "minutes-network-ops-2024-04"
+   "doc": "minutes-network-ops-2024-04",
+   "span": "60.3%",
+   "title": "Minutes: Network Operations Review, April 2024"
   },
   {
    "kind": "docs",
    "text": "What percentage of scheduled operations ran on time in July 2025?",
-   "doc": "minutes-network-ops-2025-07"
+   "doc": "minutes-network-ops-2025-07",
+   "span": "71.3%",
+   "title": "Minutes: Network Operations Review, July 2025"
   },
   {
    "kind": "docs",
    "text": "How many TEU were handled during April 2025?",
-   "doc": "minutes-network-ops-2025-04"
+   "doc": "minutes-network-ops-2025-04",
+   "span": "199,108 TEU",
+   "title": "Minutes: Network Operations Review, April 2025"
   },
   {
    "kind": "docs",
    "text": "On what date did the reservation system stop working?",
-   "doc": "minutes-crisis-team-2025-06"
+   "doc": "minutes-crisis-team-2025-06",
+   "span": "10 June 2025",
+   "title": "Minutes: Crisis Team, 11 June 2025"
   },
   {
    "kind": "docs",
    "text": "How many TEU were handled in April 2026?",
-   "doc": "minutes-network-ops-2026-04"
+   "doc": "minutes-network-ops-2026-04",
+   "span": "189,710 TEU",
+   "title": "Minutes: Network Operations Review, April 2026"
   },
   {
    "kind": "docs",
    "text": "How many TEU were handled in January 2024?",
-   "doc": "minutes-network-ops-2024-01"
+   "doc": "minutes-network-ops-2024-01",
+   "span": "140,736 TEU",
+   "title": "Minutes: Network Operations Review, January 2024"
   },
   {
    "kind": "docs",
    "text": "What volume is covered by Hanoi Rising Packaging Manufacturing Co., Ltd.’s GLC-2025-01239 agreement?",
-   "doc": "contract-glc-2025-01239"
+   "doc": "contract-glc-2025-01239",
+   "span": "5,569 TEU",
+   "title": "Service Agreement GLC-2025-01239: Hanoi Rising Packaging Manufacturing Co., Ltd. (Asia - Mediterranean)"
   },
   {
    "kind": "docs",
    "text": "What container capacity is specified for Scholl Neureuther AG under agreement GLC-2025-01241?",
-   "doc": "contract-glc-2025-01241"
+   "doc": "contract-glc-2025-01241",
+   "span": "2,604 TEU",
+   "title": "Service Agreement GLC-2025-01241: Scholl Neureuther AG (Asia - East Coast South America)"
   },
   {
    "kind": "docs",
    "text": "How much capacity is Suzhou Ocean Plastics Corporation obligated to book under agreement GLC-2025-01208?",
-   "doc": "contract-glc-2025-01208"
+   "doc": "contract-glc-2025-01208",
+   "span": "7,229 TEU",
+   "title": "Service Agreement GLC-2025-01208: Suzhou Ocean Plastics Corporation (Transpacific (Asia - US West Coast))"
   },
   {
    "kind": "docs",
    "text": "How much capacity does Gnatz Benthin OHG mbH have under agreement GLC-2025-01211?",
-   "doc": "contract-glc-2025-01211"
+   "doc": "contract-glc-2025-01211",
+   "span": "5,479 TEU",
+   "title": "Service Agreement GLC-2025-01211: Gnatz Benthin OHG mbH (Asia - US East Coast)"
   },
   {
    "kind": "docs",
    "text": "How much capacity is pledged under agreement GLC-2025-01212?",
-   "doc": "contract-glc-2025-01212"
+   "doc": "contract-glc-2025-01212",
+   "span": "10,463 TEU",
+   "title": "Service Agreement GLC-2025-01212: Gnatz Benthin OHG mbH (Transpacific (Asia - US West Coast))"
   },
   {
    "kind": "docs",
    "text": "What volume is specified for Ammaniti s.r.l. under GLC-2025-01231?",
-   "doc": "contract-glc-2025-01231"
+   "doc": "contract-glc-2025-01231",
+   "span": "10,886 TEU",
+   "title": "Service Agreement GLC-2025-01231: Ammaniti s.r.l. (Intra-Asia)"
   },
   {
    "kind": "docs",
    "text": "What volume is pledged under contract GLC-2025-01226?",
-   "doc": "contract-glc-2025-01226"
+   "doc": "contract-glc-2025-01226",
+   "span": "3,463 TEU",
+   "title": "Service Agreement GLC-2025-01226: Xiamen Jade Auto Parts Trading Co., Ltd. (Asia - Middle East and India)"
   },
   {
    "kind": "docs",
    "text": "What capacity is specified for Ward, Brown and James under agreement GLC-2025-01176?",
-   "doc": "contract-glc-2025-01176"
+   "doc": "contract-glc-2025-01176",
+   "span": "4,511 TEU",
+   "title": "Service Agreement GLC-2025-01176: Ward, Brown and James (Asia - Mediterranean)"
   },
   {
    "kind": "docs",
    "text": "How many TEU does contract GLC-2025-01179 allocate to Tianjin Bright Furniture Trading Co., Ltd.?",
-   "doc": "contract-glc-2025-01179"
+   "doc": "contract-glc-2025-01179",
+   "span": "3,924 TEU",
+   "title": "Service Agreement GLC-2025-01179: Tianjin Bright Furniture Trading Co., Ltd. (Transpacific (Asia - US West Coast))"
   },
   {
    "kind": "docs",
    "text": "How many TEU does contract GLC-2025-01202 allocate to Staude Wesack AG?",
-   "doc": "contract-glc-2025-01202"
+   "doc": "contract-glc-2025-01202",
+   "span": "2,063 TEU",
+   "title": "Service Agreement GLC-2025-01202: Staude Wesack AG (Asia - East Coast South America)"
   },
   {
    "kind": "sql",

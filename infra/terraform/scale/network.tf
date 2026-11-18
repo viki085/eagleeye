@@ -4,7 +4,7 @@
 
 resource "aws_subnet" "public_b" {
   vpc_id                  = data.aws_vpc.main.id
-  cidr_block              = "10.40.10.0/24"
+  cidr_block              = "10.40.20.0/24" # .0 public, .10 sandbox (base stack)
   availability_zone       = data.aws_availability_zones.available.names[1]
   map_public_ip_on_launch = false
   tags                    = { Name = "${local.name}-public-b" }

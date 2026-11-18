@@ -124,3 +124,46 @@ async def test_notebook_writer_returns_runnable_cells() -> None:
     )
     draft = json.loads(raw)
     assert len(draft["cells"]) == 3 and 'datasets["ds_1"]' in draft["cells"][0]["code"]
+
+
+async def answer_after(messages: list[ChatMessage], tools: list[ToolSpec] = TOOLS) -> str:
+    text = ""
+    async for chunk in StubLLM(FAST).stream("capable", messages, tools=tools):
+        text += chunk.text or ""
+    return text.strip()
+
+
+async def test_document_answers_quote_the_passage_with_the_fact() -> None:
+    q = first("docs", doc="emissions-policy")
+    passage = (
+        "[1] Emissions policy, section 3\n# Targets\nThe fleet must cut CO2 per TEU-km by "
+        f"{q['span']} by 2030 against the 2024 baseline. Progress is reported each quarter."
+    )
+    answer = await answer_after(
+        [ChatMessage("system", "sup"), ChatMessage("user", q["text"]), ChatMessage("tool", passage)]
+    )
+    assert answer.startswith(f"According to the {q['title']}")
+    assert f"by {q['span']} by 2030" in answer and answer.count("[1]") == 1
+    assert "Here is a summary" not in answer and "#" not in answer
+
+
+async def test_document_answers_fall_back_to_the_fact_when_no_passage_has_it() -> None:
+    q = first("docs", doc="emissions-policy")
+    answer = await answer_after(
+        [ChatMessage("system", "sup"), ChatMessage("user", q["text"]), ChatMessage("tool", "[1] x")]
+    )
+    assert q["span"] in answer and q["title"] in answer and "[1]" in answer
+
+
+async def test_database_and_notebook_answers_point_to_their_results() -> None:
+    sql = await answer_after(
+        [ChatMessage("system", "s"), ChatMessage("user", first("sql")["text"])], []
+    )
+    chart = await answer_after(
+        [ChatMessage("system", "s"), ChatMessage("user", first("chart")["text"])], []
+    )
+    book = await answer_after(
+        [ChatMessage("system", "s"), ChatMessage("user", first("notebook")["text"])], []
+    )
+    assert "operations database" in sql and "chart" in chart and "sandbox" in book
+    assert not any(ch.isdigit() for ch in sql + chart)  # no figures the checks could not verify

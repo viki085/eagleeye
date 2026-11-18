@@ -212,7 +212,9 @@ class StubLLM:
             )
             return
         words = _answer_words(messages, self._t.answer_words)
-        delay = 1.0 / self._t.words_per_s if self._t.words_per_s > 0 else 0.0
+        # a short pool answer streams over the same time as a full-length one: same load
+        per_word = max(self._t.answer_words, len(words)) / max(len(words), 1)
+        delay = per_word / self._t.words_per_s if self._t.words_per_s > 0 else 0.0
         for word in words:
             yield StreamChunk(text=word + " ", model_id=STUB_MODEL)
             await asyncio.sleep(delay)
@@ -267,7 +269,51 @@ def _next_tool_call(messages: list[ChatMessage], tools: set[str]) -> ToolCall | 
     return None
 
 
+_SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
+_MARKUP = re.compile(r"[#*_|`>]+")
+SQL_ANSWER = (
+    "Here is what the Grand Line operations database shows for this question. The results "
+    "of the query are in the table above, straight from the data, with nothing added."
+)
+CHART_ANSWER = (
+    "Here is what the Grand Line operations database shows for this question. The query "
+    "results are in the table above, and the chart is drawn from the same rows."
+)
+NOTEBOOK_ANSWER = (
+    "The analysis ran in the isolated sandbox on your data file. The notebook above "
+    "profiles each column, checks for gaps and summarises the main measures."
+)
+
+
+def _quote(passages: str, span: str) -> str | None:
+    """The sentence of a retrieved passage that states the fact, cleaned of Markdown."""
+    for raw in _SENTENCE.split(passages):
+        sentence = _MARKUP.sub(" ", raw).strip()
+        sentence = re.sub(r"^\[\d+\]\s*", "", " ".join(sentence.split()))
+        if span.lower() in sentence.lower() and len(sentence) <= 320:
+            return sentence.rstrip(".") + "."
+    return None
+
+
+def _pool_answer(messages: list[ChatMessage]) -> str | None:
+    """A believable answer for a pool question (shown in the recorded windows)."""
+    question, after = _since_question(messages)
+    q = pool_question(question)
+    if not q:
+        return None
+    if q["kind"] == "docs" and q.get("span"):
+        passages = "\n".join(m.content for m in messages if m.role in ("system", "tool", "user"))
+        quoted = _quote(passages, q["span"])
+        if quoted:
+            return f"According to the {q['title']}: {quoted} [1]"
+        return f"According to the {q['title']}, the answer is {q['span']}. [1]"
+    return {"sql": SQL_ANSWER, "chart": CHART_ANSWER, "notebook": NOTEBOOK_ANSWER}.get(q["kind"])
+
+
 def _answer_words(messages: list[ChatMessage], count: int) -> list[str]:
+    pooled = _pool_answer(messages)
+    if pooled:
+        return pooled.split()
     grounded = any("[1]" in m.content for m in messages if m.role in ("system", "tool", "user"))
     text = ANSWER_TEXT * (count // len(ANSWER_TEXT.split()) + 1)
     words = text.split()[:count]

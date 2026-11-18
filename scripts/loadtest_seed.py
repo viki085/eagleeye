@@ -26,6 +26,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 ISSUER = "eagleeye-loadtest"
 SUBJECT_PREFIX = "loadtest:"
@@ -201,6 +202,16 @@ MIME = {
 }
 
 
+def _post_politely(http: Any, url: str, **kwargs: Any) -> Any:
+    """POST, waiting out the per-user upload limit (429) instead of failing."""
+    for _ in range(8):
+        resp = http.post(url, **kwargs)
+        if resp.status_code != 429:
+            return resp
+        time.sleep(int(resp.headers.get("Retry-After", "10")))
+    return resp
+
+
 def upload(api_url: str, keys: Path) -> None:
     import httpx
 
@@ -209,7 +220,8 @@ def upload(api_url: str, keys: Path) -> None:
         admin = {"Authorization": f"Bearer {tokens['admin']}"}
         files = corpus_files()
         for path in files:
-            resp = http.post(
+            resp = _post_politely(
+                http,
                 "/v1/documents",
                 headers=admin,
                 data={"scope": "enterprise"},
@@ -227,7 +239,8 @@ def upload(api_url: str, keys: Path) -> None:
         analysts = [u for u in tokens["users"] if u["analysis"]]
         voyage = VOYAGE_DATA.read_bytes()
         for u in analysts:
-            resp = http.post(
+            resp = _post_politely(
+                http,
                 "/v1/datasets",
                 headers={"Authorization": f"Bearer {u['token']}"},
                 files={"file": ("vessel_fuel_and_emissions.csv", voyage, "text/csv")},

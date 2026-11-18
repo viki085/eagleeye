@@ -81,7 +81,11 @@ def main() -> None:
     golden = {r["id"]: r for r in map(json.loads, (REPO / "evals/sql_golden.jsonl").read_text(encoding="utf-8").splitlines()) if r.get("sql")}
     docs = [json.loads(line) for line in (REPO / "evals/retrieval_golden.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     questions = []
-    questions += [{"kind": "docs", "text": d["question"], "doc": d["doc"]} for d in docs]
+    # span + title let the stand-in model write a believable answer (it quotes the passage)
+    questions += [
+        {"kind": "docs", "text": d["question"], "doc": d["doc"], "span": d["span"], "title": d["title"]}
+        for d in docs
+    ]
     questions += [{"kind": "sql", "text": golden[i]["question"], "sql": " ".join(golden[i]["sql"].split()), "title": golden[i]["question"].rstrip("?")[:70]} for i in SQL_IDS]
     questions += [{"kind": "chart", "text": t, "sql": s, "chart": {"type": ty, "x": x, "y": y, "title": ti}, "title": ti} for t, s, ty, x, y, ti in CHARTS]
     for text, attack, verdict in ATTACKS:
