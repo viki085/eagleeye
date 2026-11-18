@@ -50,6 +50,12 @@ export async function openRecordingBrowser() {
     ],
   });
   await context.addInitScript({ path: CURSOR });
+  // dark mode from the first frame (the app reads this key before it paints)
+  await context.addInitScript(() => {
+    try {
+      localStorage.setItem("eagleeye-theme", "dark");
+    } catch {}
+  });
   // keep a fixed window title so the capture finds this window and nothing else
   await context.addInitScript((title) => {
     const pin = () => {
