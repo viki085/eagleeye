@@ -180,6 +180,9 @@ const CHECKPOINTS = {
     ["Overview", "Avg response time"], ["Overview", "Success rate"], ["Overview", "Slowest pipeline steps"],
     ["Overview", "Caching: Hit rate"],
   ],
+  // after the run: the simulated calls priced at the real model's rates (load-test DB only),
+  // shown over 24 hours; the edit labels it an estimate
+  cost: [["Overview", "LLM cost"], ["Overview", "November spend"], ["Overview", "LLM cost by model"]],
   2000: [
     ["Quality & safety", "Safety events by category"], ["Quality & safety", "SQL refused or failed"],
     ["Quality & safety", "Sandbox runs"], ["Overview", "Request routing distribution"], ["Overview", "LLM cost"],
@@ -191,7 +194,8 @@ async function adminCheckpoint(users) {
   try {
     await signInWithTicket(page, ADMIN);
     await page.goto(`${args.site}/admin`, { waitUntil: "load" });
-    await page.getByRole("radio", { name: "Last hour, by the minute" }).click({ timeout: 60_000 });
+    const period = users === "cost" ? "Last 24 hours" : "Last hour, by the minute";
+    await page.getByRole("radio", { name: period }).click({ timeout: 60_000 });
     await page.getByRole("button", { name: "Live" }).click();
     await sleep(4000); // first live refresh lands
     const stop = await startCapture(page, { out: `${OUT}/admin-${users}.mp4` });
@@ -238,7 +242,8 @@ async function adminCheckpoint(users) {
 const W = (at, until) => ({ type: "wall", at, until });
 const A = (at, until, users) => ({ type: "admin", at, until, users });
 const SCHEDULES = {
-  smoke: [W(0, 9999), A(0, 9999, 500)], // with --no-k6: one clip of each kind, to check the setup
+  smoke: [W(0, 9999), A(0, 9999, 500)],
+  cost: [A(0, 9999, "cost")], // with --no-k6, after the run // with --no-k6: one clip of each kind, to check the setup
   rehearsal: [W(25, 60), W(130, 200), A(250, 330, 500), W(400, 480)],
   run: [
     W(5, 40), W(60, 95), // 1 user
@@ -254,7 +259,7 @@ const SCHEDULES = {
 
 async function main() {
   const questions = wallQuestions();
-  await clearAccounts();
+  if (args.profile !== "cost") await clearAccounts();
   const { t0, arn } = args["no-k6"] ? { t0: Date.now(), arn: null } : await startK6(args.profile);
   writeFileSync(`${OUT}/k6.json`, JSON.stringify({ profile: args.profile, t0, arn }, null, 2));
   console.log(`k6 running (${args.profile}); schedule starts`);
