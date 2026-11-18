@@ -7,12 +7,12 @@
   {
     "id": "s1-01",
     "character": "narrator",
-    "text": "Vikram is a key account manager. His company runs EagleEye, and only invited employees can sign in."
+    "text": "Vikram is a key account manager. His company runs EagleEye to find answers to business questions."
   },
   {
     "id": "s2-01",
     "character": "narrator",
-    "text": "On Thursday he meets one of the company's largest customers, so he adds his own meeting notes. They stay private to him."
+    "text": "On Thursday he meets one of the company's largest customers, so he adds his own meeting notes."
   },
   {
     "id": "s2-02",
@@ -32,7 +32,7 @@
   {
     "id": "s3-01",
     "character": "narrator",
-    "text": "One request. EagleEye reads his notes, searches the company's policies, and queries the database, in a single answer."
+    "text": "On request, EagleEye reads his notes, searches the company's policies, and queries the database, to generate an answer."
   },
   {
     "id": "s3-02",

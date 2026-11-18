@@ -4,7 +4,7 @@
 // included; the real mouse pointer is not.
 //
 // Chrome sends a frame whenever the page changes. A steady clock feeds the latest frame to ffmpeg
-// 30 times a second, giving a constant-rate 1920x1080 H.264 file.
+// 30 times a second, giving a constant-rate 3840x2160 (4K) H.264 file.
 //
 //   const stop = await startCapture(page, { out: "raw/scene2.mp4" });
 //   ... drive the page ...
@@ -23,8 +23,9 @@ export async function startCapture(page, { out }) {
     [
       "-y", "-hide_banner", "-loglevel", "error",
       "-f", "image2pipe", "-framerate", String(FPS), "-c:v", "mjpeg", "-i", "-",
-      "-vf", "scale=1920:1080:flags=lanczos,format=yuv420p",
-      "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-r", String(FPS),
+      // 4K: the page renders at 3840x2160 device pixels; the GPU encoder (NVENC) keeps up in real time
+      "-vf", "scale=3840:2160:flags=lanczos,format=yuv420p",
+      "-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "17", "-b:v", "0", "-r", String(FPS),
       out,
     ],
     { stdio: ["pipe", "inherit", "inherit"] },
