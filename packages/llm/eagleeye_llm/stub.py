@@ -4,10 +4,16 @@ Accepted only when APP_ENV=loadtest (Settings refuses LLM_PROVIDER=stub anywhere
 cost nothing, answer every call the agent makes with something it can use, and stream at a
 realistic speed so the load on the API, workers, Redis and database is close to real traffic.
 
-What a simulated user's message does is chosen by a tag in it:
-  #docs      a document question: search, then an answer citing [1]
-  #analysis  a data-file analysis: list_datasets → analyze_data (real code in the sandbox)
-  otherwise  small talk: a plain streamed answer
+What a simulated user's message does is chosen by the load-test question pool
+(loadtest_questions.json, built by evals/load/build_pool.py and shared with the k6 script); the
+stand-in recognises a pool question by its text, so nothing extra appears in the chat:
+  docs      a document question: search, then an answer citing [1]
+  sql       a database question: query_database with the pool's SQL (the gateway really runs it)
+  chart     as sql, then make_chart with the pool's chart
+  attack    the guard verdict the pool gives (injection, exfiltration, harmful); attacks marked
+            for the data layer pass the guard so the real gateway refuses them
+  notebook  list_datasets, then explore_data with a small notebook that runs in the sandbox
+Messages outside the pool fall back to tags: #docs, #analysis, otherwise small talk.
 """
 
 import asyncio
@@ -17,6 +23,8 @@ import math
 import re
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
+from functools import cache
+from pathlib import Path
 
 from eagleeye_llm.gateway import ChatMessage, StreamChunk, Tier, ToolCall, ToolSpec, Usage
 
@@ -26,6 +34,41 @@ ANALYSIS_TAG = "#analysis"
 
 _LATEST = re.compile(r"<latest_message>\s*(.*?)\s*</latest_message>", re.DOTALL)
 _DATASET_ID = re.compile(r"- id ([0-9a-fA-F-]{36})")
+_RESULT_ID = re.compile(r"Result id: (\S+)")
+_SQL_QUESTION = re.compile(r"\n\nQuestion: (.*?)(?:\n\nPrevious attempts|$)", re.DOTALL)
+_NOTEBOOK_GOAL = re.compile(r"\n\nGoal: (.*?)(?:\n\nPrevious attempt|$)", re.DOTALL)
+POOL_FILE = Path(__file__).with_name("loadtest_questions.json")
+
+# a small notebook that runs on any data file (shape and types, a summary table, a histogram)
+NOTEBOOK = {
+    "title": "Data file overview",
+    "cells": [
+        {
+            "purpose": "Shape and column types",
+            "code": (
+                'df = datasets["ds_1"]\n'
+                'print("Shape:", df.shape)\n'
+                'display(df.dtypes.astype(str).to_frame("type").head(15))'
+            ),
+        },
+        {
+            "purpose": "Summary of the numeric columns",
+            "code": (
+                'numeric = df.select_dtypes("number")\n'
+                'save_table("numeric_summary", numeric.describe().T.round(2))'
+            ),
+        },
+        {
+            "purpose": "Distribution of the first numeric column",
+            "code": (
+                "import matplotlib.pyplot as plt\n"
+                "col = numeric.columns[0]\n"
+                'numeric[col].plot(kind="hist", bins=30, title=f"Distribution of {col}")\n'
+                "plt.tight_layout()"
+            ),
+        },
+    ],
+}
 _WORD = re.compile(r"[a-z0-9]+")
 
 ANSWER_TEXT = (
@@ -51,7 +94,29 @@ class StubTiming:
     complete_s: float = 0.3  # a short non-streamed call (guard, rewrite, title)
 
 
+def _norm(text: str) -> str:
+    return " ".join(text.split()).strip().lower()
+
+
+@cache
+def _pool() -> dict[str, dict]:
+    """Pool questions by their normalised text (empty when the file is absent)."""
+    if not POOL_FILE.exists():
+        return {}
+    data = json.loads(POOL_FILE.read_text(encoding="utf-8"))
+    return {_norm(q["text"]): q for q in data["questions"]}
+
+
+def pool_question(text: str) -> dict | None:
+    return _pool().get(_norm(text))
+
+
 def _mode(text: str) -> str:
+    q = pool_question(text)
+    if q is not None:
+        if q["kind"] == "attack":
+            return "sql" if q.get("verdict") is None else "attack"
+        return q["kind"]
     lowered = text.lower()
     if ANALYSIS_TAG in lowered:
         return "analysis"
@@ -90,11 +155,18 @@ class StubLLM:
         system = next((m.content for m in messages if m.role == "system"), "")
         user = next((m.content for m in reversed(messages) if m.role == "user"), "")
         latest = _LATEST.search(user)
-        if latest:  # the guard: safe, with the intent the tag asks for
-            mode = _mode(latest.group(1))
+        if latest:  # the guard: the verdict and intent the question calls for
+            question = latest.group(1)
+            mode = _mode(question)
+            if mode == "attack":
+                verdict = pool_question(question)["verdict"]  # type: ignore[index]
+                return json.dumps({"safe": verdict, "intent": "other", "complexity": "simple"})
             intent, complexity = {
                 "docs": ("docs", "simple"),
+                "sql": ("sql", "simple"),
+                "chart": ("sql", "simple"),
                 "analysis": ("analysis", "complex"),
+                "notebook": ("analysis", "complex"),
             }.get(mode, ("chitchat", "simple"))
             return json.dumps({"safe": "allowed", "intent": intent, "complexity": complexity})
         if "rewrite a user's question for document search" in system:
@@ -104,6 +176,18 @@ class StubLLM:
             )
         if user.startswith("Today's date:") and "Task:" in user and json_mode:
             return json.dumps(ANALYSIS_DRAFT)  # the analysis agent's code
+        sql_question = _SQL_QUESTION.search(user) if json_mode else None
+        if sql_question and user.startswith("Today's date:"):  # the SQL writer
+            q = pool_question(sql_question.group(1))
+            if q and q.get("sql"):
+                return json.dumps(
+                    {"sql": q["sql"], "title": q.get("title", "Query result"), "assumptions": ""}
+                )
+            return json.dumps({"unavailable": "Not a load-test question."})
+        if json_mode and _NOTEBOOK_GOAL.search(user) and user.startswith("Today's date:"):
+            return json.dumps(NOTEBOOK)  # the notebook writer
+        if json_mode and "to fix" in user and "Problem:" in user:
+            return json.dumps({"code": NOTEBOOK["cells"][0]["code"]})  # a notebook repair
         if json_mode:
             return "{}"
         if len(messages) == 1:  # chat titles are a single user message
@@ -149,13 +233,33 @@ def _since_question(messages: list[ChatMessage]) -> tuple[str, list[ChatMessage]
 
 def _next_tool_call(messages: list[ChatMessage], tools: set[str]) -> ToolCall | None:
     question, after = _since_question(messages)
-    if _mode(question) != "analysis":
-        return None
+    mode = _mode(question)
     called = [c.name for m in after for c in m.tool_calls]
+    results = "\n".join(m.content for m in after if m.role == "tool")
+    if mode in ("sql", "chart"):
+        q = pool_question(question)
+        if "query_database" in tools and "query_database" not in called:
+            asked = q["text"] if q else question
+            return ToolCall("stub_query", "query_database", json.dumps({"question": asked}))
+        found = _RESULT_ID.search(results)
+        if mode == "chart" and q and found and "make_chart" in tools and "make_chart" not in called:
+            return ToolCall(
+                "stub_chart", "make_chart", json.dumps({**q["chart"], "source_id": found.group(1)})
+            )
+        return None
+    if mode == "notebook":
+        if "list_datasets" in tools and "list_datasets" not in called:
+            return ToolCall("stub_list", "list_datasets", "{}")
+        found = _DATASET_ID.search(results)
+        if found and "explore_data" in tools and "explore_data" not in called:
+            args = {"goal": "Explore this data file", "inputs": [found.group(1)]}
+            return ToolCall("stub_explore", "explore_data", json.dumps(args))
+        return None
+    if mode != "analysis":
+        return None
     if "list_datasets" in tools and "list_datasets" not in called:
         return ToolCall("stub_list", "list_datasets", "{}")
     if "analyze_data" in tools and "analyze_data" not in called:
-        results = "\n".join(m.content for m in after if m.role == "tool")
         found = _DATASET_ID.search(results)
         if found:
             args = {"question": "Count the rows in this data file", "inputs": [found.group(1)]}
