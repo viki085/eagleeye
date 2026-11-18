@@ -5,21 +5,26 @@
 // Waits are sped up (typing, uploads, the model working) with a visible badge; everything the
 // viewer should read plays in real time. Voice lines are placed at anchors in their scene and
 // never overlap; if a scene ends before its last line, its final frame is held.
+import { execFileSync } from "node:child_process";
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import ffmpeg from "ffmpeg-static";
 
 const FPS = 30;
 const PUBLIC = "public";
 const durations = JSON.parse(readFileSync("audio/durations.json", "utf8"));
 const lines = JSON.parse(readFileSync("demo/lines.json", "utf8"));
 const GAP_MS = 350; // silence between consecutive lines
+const TEMPO = 1.25; // narration played 25% faster (pitch kept: ffmpeg atempo)
 
 mkdirSync(`${PUBLIC}/scenes`, { recursive: true });
 mkdirSync(`${PUBLIC}/lines`, { recursive: true });
 cpSync("../apps/web/public/brand", `${PUBLIC}/brand`, { recursive: true });
-for (const l of lines) copyFileSync(`audio/lines/${l.id}.wav`, `${PUBLIC}/lines/${l.id}.wav`);
+for (const l of lines) {
+  execFileSync(ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", "-i", `audio/lines/${l.id}.wav`, "-filter:a", `atempo=${TEMPO}`, `${PUBLIC}/lines/${l.id}.wav`]);
+}
 
 const f = (ms) => Math.round((ms / 1000) * FPS);
-const lineMs = (id) => durations[id].seconds * 1000;
+const lineMs = (id) => (durations[id].seconds * 1000) / TEMPO;
 
 // speed-up zones per scene: [fromMarker, toMarker, target seconds on screen]
 const ZONES = [
@@ -56,7 +61,7 @@ const ANCHORS = [
 ];
 
 // freeze frames: [marker, ms after it, how long to hold] — keeps a view on screen while its line plays
-const HOLDS = { 2: [["preview", 2600, 9000]], 3: [["answer_end", 1500, 4800]] };
+const HOLDS = { 2: [["preview", 2600, 7600]], 3: [["answer_end", 1500, 3900]] };
 
 // per-scene zones, checked before the general ones: the EDA wait plays near real time so the
 // step-by-step narration fits

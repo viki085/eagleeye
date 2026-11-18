@@ -117,7 +117,9 @@ def lines(client, characters: dict, path: Path) -> None:
         if not c["voice"]:
             sys.exit(f"pick a voice for {line['character']} in characters.json first")
         out = AUDIO / "lines" / f"{line['id']}.wav"
-        if out.exists() and durations.get(line["id"], {}).get("text") == line["text"]:
+        prev = durations.get(line["id"], {})
+        same = prev.get("text") == line["text"] and prev.get("character") == line["character"]
+        if out.exists() and same:
             continue  # unchanged line: no new call
         seconds = speak(
             client, c["voice"], line.get("instructions", c["instructions"]), line["text"], out

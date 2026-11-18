@@ -74,7 +74,6 @@ export const Demo: React.FC<{ timeline: Timeline }> = ({ timeline }) => (
     {timeline.lines.map((line) => (
       <Sequence key={line.id} from={line.from} durationInFrames={line.frames}>
         <Audio src={staticFile(line.src)} />
-        <Subtitle line={line} />
       </Sequence>
     ))}
   </AbsoluteFill>

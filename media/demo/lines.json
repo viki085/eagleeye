@@ -16,7 +16,7 @@
   },
   {
     "id": "s2-02",
-    "character": "expert",
+    "character": "narrator",
     "text": "A click on any file shows exactly the text EagleEye read from it, the same text it searches and cites."
   },
   {
@@ -26,7 +26,7 @@
   },
   {
     "id": "s2-04",
-    "character": "expert",
+    "character": "narrator",
     "text": "Each document is read the moment it arrives: its text, its tables, even its charts. All of it can be searched, and all of it can be cited."
   },
   {
@@ -36,22 +36,22 @@
   },
   {
     "id": "s3-02",
-    "character": "expert",
+    "character": "narrator",
     "text": "The brief is built around the topics in his own uploaded notes."
   },
   {
     "id": "s3-03",
-    "character": "expert",
+    "character": "narrator",
     "text": "These claim counts come straight from a query on the operations database."
   },
   {
     "id": "s3-04",
-    "character": "expert",
+    "character": "narrator",
     "text": "The alarm rules are quoted from the company's Reefer SOP, an enterprise document, with citations."
   },
   {
     "id": "s3-05",
-    "character": "expert",
+    "character": "narrator",
     "text": "And the reliability comparison is a second database query, with context from a network review report."
   },
   {
@@ -61,7 +61,7 @@
   },
   {
     "id": "s4-01",
-    "character": "expert",
+    "character": "narrator",
     "text": "This answer was read from a chart. When the review was added, each chart was described in words, so the search can find it like any passage, and the original picture comes back with the answer."
   },
   {
@@ -76,22 +76,22 @@
   },
   {
     "id": "s6-02",
-    "character": "expert",
+    "character": "narrator",
     "text": "Here is what happens behind the scenes. A safety check reads the request first, then the planner decides this needs a full notebook."
   },
   {
     "id": "s6-03",
-    "character": "expert",
+    "character": "narrator",
     "text": "The analysis agent loads the file and writes the notebook: eight cells, from data quality through to comparisons by vessel class."
   },
   {
     "id": "s6-04",
-    "character": "expert",
+    "character": "narrator",
     "text": "Now the notebook runs, as real Python, in an isolated sandbox with no network access. Five figures and seven tables come back from his data."
   },
   {
     "id": "s6-05",
-    "character": "expert",
+    "character": "narrator",
     "text": "Finally, the findings are written from those results, and every number quoted is checked against the tables before the answer appears."
   },
   {
@@ -106,7 +106,7 @@
   },
   {
     "id": "s7-02",
-    "character": "expert",
+    "character": "narrator",
     "text": "Every message is screened before it reaches the model, and data access is enforced by role in the data layer itself, not in the prompt. HR data is simply out of Sam's reach."
   },
   {
