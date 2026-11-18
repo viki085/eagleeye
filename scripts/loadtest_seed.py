@@ -32,24 +32,10 @@ ADMIN_ROLE = "knowledge_admin"  # may add enterprise documents, nothing more
 MAX_HOURS = 6.0
 ANALYSIS_EVERY = 20  # user n runs analyses when n % 20 == 0 (5% of users)
 DEFAULT_DIR = Path(".loadtest")
-
-SAMPLE_DOCS = {
-    "travel-policy.md": (
-        "# Travel policy\n\nEmployees book travel through the company portal. Economy class is "
-        "the default for flights under six hours. Hotel stays are reimbursed up to the city "
-        "rate. Receipts are submitted within thirty days of return.\n"
-    ),
-    "leave-policy.md": (
-        "# Leave policy\n\nAnnual leave is requested in the HR system at least two weeks ahead. "
-        "Sick leave longer than three days needs a doctor's note. Unused leave carries over "
-        "up to five days into the next year.\n"
-    ),
-    "security-handbook.md": (
-        "# Security handbook\n\nLaptops are encrypted and locked when unattended. Passwords are "
-        "never shared, and multi-factor sign-in is required for all company systems. Report "
-        "lost devices to the service desk immediately.\n"
-    ),
-}
+REPO = Path(__file__).resolve().parents[1]
+POOL_FILE = REPO / "packages" / "llm" / "eagleeye_llm" / "loadtest_questions.json"
+CORPUS = REPO / "data" / "grandline" / "out"  # the Grand Line documents the pool asks about
+VOYAGE_DATA = REPO / "Trial" / "data" / "data-files" / "vessel_fuel_and_emissions.csv"
 
 
 def _refuse_unless_loadtest() -> None:
@@ -143,6 +129,29 @@ async def create_users(database_url: str, count: int) -> None:
     print(f"{count} users ready (+ the knowledge admin)")
 
 
+async def video_accounts(database_url: str, admin_clerk_id: str, member_clerk_id: str) -> None:
+    """The two real sign-in accounts used for the screen recordings (the window wall and the
+    admin console), mapped into the load-test database: one admin, one member."""
+    import asyncpg
+
+    conn = await asyncpg.connect(database_url)
+    try:
+        await conn.executemany(
+            """
+            INSERT INTO users (clerk_user_id, email, display_name, role)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (clerk_user_id) DO UPDATE SET role = EXCLUDED.role, status = 'active'
+            """,
+            [
+                (admin_clerk_id, "vikram.k@grandlineshipping.com", "Vikram K", "admin"),
+                (member_clerk_id, "sam.rivera@grandlineshipping.com", "Sam Rivera", "member"),
+            ],
+        )
+    finally:
+        await conn.close()
+    print("video accounts ready (admin + member)")
+
+
 async def remove_users(database_url: str) -> None:
     """Teardown: delete every synthetic account (and, by cascade, its chats and files)."""
     import asyncpg
@@ -170,36 +179,56 @@ def write_tokens(keys: Path, count: int, hours: float) -> None:
     print(f"wrote {keys / 'tokens.json'} ({count} tokens, valid {hours} h)")
 
 
-def sample_csv(n: int) -> bytes:
-    lines = ["month,region,orders,revenue"]
-    regions = ("north", "south", "east", "west")
-    for m in range(1, 13):
-        for i, region in enumerate(regions):
-            orders = 100 + (n * 7 + m * 13 + i * 29) % 400
-            lines.append(f"2026-{m:02d},{region},{orders},{orders * 42}")
-    return ("\n".join(lines) + "\n").encode()
+def corpus_files() -> list[Path]:
+    """The documents the question pool asks about: Markdown where it exists, else the PDF/Word file."""
+    slugs = json.loads(POOL_FILE.read_text(encoding="utf-8"))["documents"]
+    found = []
+    for slug in slugs:
+        md = CORPUS / "md" / f"{slug}.md"
+        matches = [md] if md.exists() else sorted((CORPUS / "docs").rglob(f"{slug}.*"))
+        if not matches:
+            sys.exit(f"document for {slug!r} not found under {CORPUS}")
+        found.append(matches[0])
+    return found
+
+
+MIME = {
+    ".md": "text/markdown",
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 
 def upload(api_url: str, keys: Path) -> None:
     import httpx
 
     tokens = json.loads((keys / "tokens.json").read_text())
-    with httpx.Client(base_url=api_url.rstrip("/"), timeout=60) as http:
+    with httpx.Client(base_url=api_url.rstrip("/"), timeout=120) as http:
         admin = {"Authorization": f"Bearer {tokens['admin']}"}
-        for name, text in SAMPLE_DOCS.items():
+        files = corpus_files()
+        for path in files:
             resp = http.post(
                 "/v1/documents",
                 headers=admin,
                 data={"scope": "enterprise"},
-                files={"file": (name, text.encode(), "text/markdown")},
+                files={
+                    "file": (
+                        path.name,
+                        path.read_bytes(),
+                        MIME.get(path.suffix, "application/octet-stream"),
+                    )
+                },
             )
-            print(f"document {name}: {resp.status_code}")  # 409 = already uploaded
+            if resp.status_code not in (200, 201, 202, 409):  # 409 = already uploaded
+                print(f"document {path.name}: {resp.status_code} {resp.text[:200]}")
+        print(f"{len(files)} enterprise documents submitted for indexing")
         analysts = [u for u in tokens["users"] if u["analysis"]]
+        voyage = VOYAGE_DATA.read_bytes()
         for u in analysts:
             resp = http.post(
                 "/v1/datasets",
                 headers={"Authorization": f"Bearer {u['token']}"},
-                files={"file": ("sales.csv", sample_csv(u["n"]), "text/csv")},
+                files={"file": ("vessel_fuel_and_emissions.csv", voyage, "text/csv")},
             )
             if resp.status_code not in (201, 409):
                 print(f"user {u['n']} data file: {resp.status_code} {resp.text[:200]}")
@@ -215,7 +244,10 @@ def main() -> None:
     users.add_argument("--count", type=int, default=500)
     users.add_argument("--hours", type=float, default=4.0)
     remove = sub.add_parser("remove-users")
-    for p in (users, remove):
+    video = sub.add_parser("video-accounts")
+    video.add_argument("--admin-clerk-id", required=True)
+    video.add_argument("--member-clerk-id", required=True)
+    for p in (users, remove, video):
         p.add_argument("--confirm-db-host", required=True, help="the load-test database host")
     uploads = sub.add_parser("uploads")
     uploads.add_argument("--api-url", required=True)
@@ -231,6 +263,9 @@ def main() -> None:
         _refuse_unless_confirmed(database_url, args.confirm_db_host)
         asyncio.run(create_users(database_url, args.count))
         write_tokens(args.dir, args.count, args.hours)
+    elif args.cmd == "video-accounts":
+        _refuse_unless_confirmed(database_url, args.confirm_db_host)
+        asyncio.run(video_accounts(database_url, args.admin_clerk_id, args.member_clerk_id))
     elif args.cmd == "remove-users":
         _refuse_unless_confirmed(database_url, args.confirm_db_host)
         asyncio.run(remove_users(database_url))

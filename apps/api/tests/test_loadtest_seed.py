@@ -44,9 +44,15 @@ def test_refuses_outside_loadtest(monkeypatch: pytest.MonkeyPatch) -> None:
         get_settings.cache_clear()
 
 
-def test_sample_csv_has_a_header_and_48_rows() -> None:
-    lines = seed.sample_csv(20).decode().splitlines()
-    assert lines[0] == "month,region,orders,revenue" and len(lines) == 49
+def test_every_document_the_pool_asks_about_is_found() -> None:
+    files = seed.corpus_files()
+    assert len(files) == 97 and all(f.exists() for f in files)
+    assert {f.suffix for f in files} <= set(seed.MIME)
+
+
+def test_notebook_users_get_the_voyage_data_file() -> None:
+    header = seed.VOYAGE_DATA.read_text(encoding="utf-8").splitlines()[0]
+    assert "co2_grams_per_teu_km" in header
 
 
 def test_writing_users_needs_the_database_host_confirmed() -> None:

@@ -71,3 +71,7 @@ media/raw/
 media/out/
 media/.secrets/
 media/public/
+
+# Load test: synthetic users' tokens (secret, short-lived) and the copied pool
+evals/load/tokens.json
+evals/load/loadtest_questions.json
