@@ -3,6 +3,7 @@ import { Composition } from "remotion";
 import { Demo } from "./Demo";
 import { BuiltWith } from "./BuiltWith";
 import { Thumbnail } from "./Thumbnail";
+import { Thumbnail2 } from "./Thumbnail2";
 import { Architecture, type ArchTimeline } from "./arch/Architecture";
 import archTimeline from "../../public/arch-timeline.json";
 import timeline from "../../public/timeline.json";
@@ -20,6 +21,7 @@ export const Root: React.FC = () => (
     <Composition id="LoadTest" component={LoadTest} durationInFrames={LOAD.durationInFrames} fps={30} width={1920} height={1080} />
     <Composition id="Video2" component={Video2} durationInFrames={ARCH.durationInFrames + LOAD.durationInFrames} fps={30} width={1920} height={1080} />
     <Composition id="Thumbnail" component={Thumbnail} durationInFrames={1} fps={t.fps} width={1280} height={720} />
+    <Composition id="Thumbnail2" component={Thumbnail2} durationInFrames={1} fps={30} width={1280} height={720} />
     <Composition id="BuiltWith" component={BuiltWith} durationInFrames={t.fps * 12} fps={t.fps} width={1920} height={1080} />
   </>
 );
