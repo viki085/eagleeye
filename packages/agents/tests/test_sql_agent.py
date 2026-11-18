@@ -46,6 +46,31 @@ async def test_validation_rejection_feeds_back_and_regenerates() -> None:
     assert errors and "COLUMN_RESTRICTED" in errors[0]["output_summary"]
 
 
+async def test_refused_sql_is_recorded_once_with_a_security_event() -> None:
+    restricted = draft("SELECT email FROM sales.customers")
+    llm = FakeLLM([SQL_GUARD, restricted, restricted, draft()], [Turn("Web 20.")])
+    ctx, _, _ = make_ctx(llm)
+    enable_sql(ctx)
+    await run_graph(ctx, _state())
+    # refused twice, recorded once: the console counts refused questions, not retries
+    assert [r[2] for r in ctx.store.sql_refusals] == ["COLUMN_RESTRICTED"]
+    assert ctx.store.sql_refusals[0][1] == "SELECT email FROM sales.customers"
+    assert [(k, c) for k, c, _ in ctx.store.security_events] == [
+        ("input_blocked", "restricted_data")
+    ]
+
+
+async def test_a_model_mistake_is_logged_but_is_not_a_security_event() -> None:
+    llm = FakeLLM(
+        [SQL_GUARD, draft("SELECT no_such_column FROM sales.customers"), draft()], [Turn("Web 20.")]
+    )
+    ctx, _, _ = make_ctx(llm)
+    enable_sql(ctx)
+    await run_graph(ctx, _state())
+    assert [r[2] for r in ctx.store.sql_refusals] == ["UNKNOWN_COLUMN"]
+    assert ctx.store.security_events == []
+
+
 async def test_database_error_feeds_back_and_self_corrects() -> None:
     # a query that passes local validation but fails in the database (e.g. a type error)
     llm = FakeLLM([SQL_GUARD, draft(), draft()], [Turn("Web 20.")])

@@ -41,6 +41,10 @@ class RunStore(Protocol):
         self, user_id: str, run_id: str, kind: str, category: str, detail: dict[str, Any]
     ) -> None: ...
 
+    async def record_sql_refusal(
+        self, user_id: str, run_id: str, data_source_id: str | None, sql: str, reason: str
+    ) -> None: ...
+
 
 @dataclass(frozen=True)
 class AgentSettings:

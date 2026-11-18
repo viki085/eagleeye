@@ -72,7 +72,7 @@ variable "agent_max" {
 }
 
 variable "answers_per_worker" {
-  description = "Target answers in progress per agent worker (each runs 8 at once)"
+  description = "Answers in progress per agent worker above which workers are added (each runs 40)"
   type        = number
-  default     = 5
+  default     = 20
 }

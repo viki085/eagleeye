@@ -1,5 +1,6 @@
 """Worker-side run persistence (parameterised SQL only)."""
 
+import hashlib
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
@@ -252,6 +253,24 @@ class PgRunStore:
             [n.lower() for n in names],
         )
         return [{"id": str(r["id"]), "title": r["title"], "scope": r["scope"]} for r in rows]
+
+    async def record_sql_refusal(
+        self, user_id: str, run_id: str, data_source_id: str | None, sql: str, reason: str
+    ) -> None:
+        """A query the worker's own validator refused (it never reached the data gateway)."""
+        await self._pool.execute(
+            """
+            INSERT INTO sql_query_log (run_id, user_id, data_source_id, sql_hash, sql_text,
+                                       validated, rejected_reason, origin)
+            VALUES ($1, $2, $3, $4, $5, false, $6, 'worker')
+            """,
+            run_id,
+            user_id,
+            data_source_id,
+            hashlib.sha256(sql.encode()).hexdigest(),
+            sql[:4000],
+            reason,
+        )
 
     async def record_security_event(
         self, user_id: str, run_id: str, kind: str, category: str, detail: dict[str, Any]

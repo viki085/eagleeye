@@ -50,6 +50,9 @@ class NullStore:
     async def record_security_event(self, *args: Any) -> None:
         return None
 
+    async def record_sql_refusal(self, *args: Any) -> None:
+        return None
+
 
 def norm(value: Any) -> Any:
     if isinstance(value, bool) or value is None:

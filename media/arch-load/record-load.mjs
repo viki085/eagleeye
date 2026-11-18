@@ -94,6 +94,7 @@ async function clearAccounts() {
       await signInWithTicket(page, email);
       await page.goto(args.site, { waitUntil: "load" });
       await page.getByLabel("Message").waitFor({ timeout: 60_000 });
+      await page.waitForFunction(() => window.Clerk?.session, null, { timeout: 30_000 });
       const chats = (await api(page, "/v1/chats")).data ?? [];
       for (const c of chats) await api(page, `/v1/chats/${c.id}`, { method: "DELETE" });
       console.log(`${email}: ${chats.length} chats cleared`);
@@ -237,7 +238,7 @@ async function adminCheckpoint(users) {
 const W = (at, until) => ({ type: "wall", at, until });
 const A = (at, until, users) => ({ type: "admin", at, until, users });
 const SCHEDULES = {
-  smoke: [W(0, 9999), A(0, 9999, 500)], // with --no-k6: one clip of each kind, to check the setup // with --no-k6: one clip of each kind, to check the setup
+  smoke: [W(0, 9999), A(0, 9999, 500)], // with --no-k6: one clip of each kind, to check the setup
   rehearsal: [W(25, 60), W(130, 200), A(250, 330, 500), W(400, 480)],
   run: [
     W(5, 40), W(60, 95), // 1 user

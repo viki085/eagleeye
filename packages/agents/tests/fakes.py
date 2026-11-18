@@ -106,12 +106,16 @@ class FakeRetriever:
 class FakeStore:
     docs: list[DocInfo] = field(default_factory=lambda: [DocInfo("d1", "Policy", "personal", 3, 3)])
     security_events: list[tuple[str, str, dict]] = field(default_factory=list)
+    sql_refusals: list[tuple[str | None, str, str]] = field(default_factory=list)
 
     async def visible_ready_documents(self, user_id: str) -> list[DocInfo]:
         return self.docs
 
     async def record_security_event(self, user_id, run_id, kind, category, detail) -> None:  # noqa: ANN001
         self.security_events.append((kind, category, detail))
+
+    async def record_sql_refusal(self, user_id, run_id, data_source_id, sql, reason) -> None:  # noqa: ANN001
+        self.sql_refusals.append((data_source_id, sql, reason))
 
 
 def make_ctx(

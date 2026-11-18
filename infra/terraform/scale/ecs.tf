@@ -84,13 +84,13 @@ locals {
     FIGURES_ENABLED         = "false" # no vision model in the load test
     # our own database (not Supabase's small pooler): larger pools per process
     DB_POOL_MAX_API     = "20"
-    DB_POOL_MAX_WORKER  = "10"
+    DB_POOL_MAX_WORKER  = "20"
     DB_POOL_MAX_GATEWAY = "8"
     # every simulated user arrives from the k6 task's one address: the per-user limits stay,
     # the per-address limit is lifted for the test
     RATE_LIMIT_IP_PER_MIN = "1000000"
     FORWARDED_ALLOW_IPS   = "*"
-    AGENT_CONCURRENCY     = "8"
+    AGENT_CONCURRENCY     = "40" # answers mostly wait on the model and databases: CPU stays low
   }
   app_secrets = ["DATABASE_URL", "GATEWAY_HMAC_SECRET", "ORIGIN_VERIFY_SECRET", "LOADTEST_TOKEN_PUBLIC_KEY"]
   clerk_secrets = {
@@ -206,7 +206,11 @@ resource "aws_ecs_task_definition" "svc" {
       [for k in local.app_secrets : { name = k, valueFrom = aws_ssm_parameter.secret[k].arn }],
       [for k, n in local.clerk_secrets : { name = k, valueFrom = "arn:aws:ssm:${var.region}:${local.account}:parameter${n}" }],
     ) : (contains(["appdb", "warehouse"], each.key) ? [{ name = "POSTGRES_PASSWORD", valueFrom = aws_ssm_parameter.secret["POSTGRES_PASSWORD"].arn }] : [])
-    command = each.key == "redis" ? ["redis-server", "--save", "", "--appendonly", "no"] : null
+    command = lookup({
+      redis = ["redis-server", "--save", "", "--appendonly", "no"]
+      # up to ~400 connections at peak (12 workers x 20, 6 API tasks x 20, gateways)
+      appdb = ["postgres", "-D", "/etc/postgresql", "-c", "max_connections=500", "-c", "shared_buffers=1GB"]
+    }, each.key, null)
     logConfiguration = {
       logDriver = "awslogs"
       options = {

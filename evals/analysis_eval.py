@@ -55,6 +55,9 @@ class NullStore:
     async def record_security_event(self, *args: Any) -> None:
         return None
 
+    async def record_sql_refusal(self, *args: Any) -> None:
+        return None
+
 
 def loaded(name: str, parquet: bytes, column_map: dict[str, str] | None = None) -> LoadedInput:
     profile = profile_parquet(parquet, column_map)

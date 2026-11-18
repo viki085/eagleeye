@@ -86,16 +86,43 @@ async def _generate(
     return draft
 
 
-async def _check(ctx: RunContext, acc: SourceAccess, sql: str, parent: str | None) -> str | None:
-    """Local validation (fast feedback). Returns a problem description, or None if valid."""
+# refusals that point at an attempt on data or the database, not a model slip: recorded as
+# security events too (the others, e.g. PARSE_ERROR, only go to the SQL log)
+SECURITY_CODES = {
+    "TABLE_NOT_ALLOWED": "restricted_data",
+    "COLUMN_RESTRICTED": "restricted_data",
+    "NOT_SINGLE_SELECT": "unsafe_sql",
+    "FORBIDDEN_STATEMENT": "unsafe_sql",
+    "FUNCTION_NOT_ALLOWED": "unsafe_sql",
+}
+
+
+async def _check(
+    ctx: RunContext, acc: SourceAccess, sql: str, parent: str | None
+) -> tuple[str, str] | None:
+    """Local validation (fast feedback). Returns (problem description, code), or None."""
     async with ctx.steps.step("check", "validate SQL", "", parent) as step:
         try:
             validate(sql, acc.policy)
         except SqlRejected as exc:
             step.status, step.output_summary = "error", f"{exc.code}: {exc.user_message}"
-            return f"Validation rejected the query ({exc.code}): {exc.user_message}"
+            return f"Validation rejected the query ({exc.code}): {exc.user_message}", exc.code
         step.output_summary = "read-only, granted tables only"
     return None
+
+
+async def _record_refusal(ctx: RunContext, acc: SourceAccess, sql: str, code: str) -> None:
+    """Make a worker-side refusal visible to administrators (SQL log, and security events for
+    attempts on restricted data or unsafe SQL). Best effort: never fails the answer."""
+    try:
+        await ctx.store.record_sql_refusal(ctx.user_id, ctx.run_id, acc.source.id, sql, code)
+        if code in SECURITY_CODES:
+            detail = {"code": code, "source": acc.source.name}
+            await ctx.store.record_security_event(
+                ctx.user_id, ctx.run_id, "input_blocked", SECURITY_CODES[code], detail
+            )
+    except Exception:
+        logger.warning("could not record the SQL refusal for run %s", ctx.run_id, exc_info=True)
 
 
 async def _execute(
@@ -154,6 +181,7 @@ async def _loop(
 ) -> SqlOutcome:
     feedback: list[str] = []
     executions, zero_retry_used, last_problem = 0, False, ""
+    recorded: set[str] = set()
     for attempt in range(1, MAX_GENERATIONS + 1):
         if ctx.budget.breach(ctx.usage.cost_usd):
             break
@@ -168,8 +196,12 @@ async def _loop(
             return SqlOutcome("unanswerable", draft.unavailable, attempts=attempt)
         if draft.clarification and not draft.sql:
             return SqlOutcome("clarify", draft.clarification, attempts=attempt)
-        problem = await _check(ctx, acc, draft.sql, parent)
-        if problem:
+        checked = await _check(ctx, acc, draft.sql, parent)
+        if checked:
+            problem, code = checked
+            if code not in recorded:  # once per question and reason, not once per retry
+                recorded.add(code)
+                await _record_refusal(ctx, acc, draft.sql, code)
             feedback.append(f"SQL: {draft.sql}\n  Problem: {problem}")
             last_problem = problem
             continue
