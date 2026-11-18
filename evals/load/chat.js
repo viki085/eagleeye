@@ -115,7 +115,11 @@ export default function () {
   const body = stream.body || "";
   const ok = check(stream, { "answer completed": (r) => r.status === 200 && body.includes("event: run.done") && !body.includes("event: run.error") });
   errors.add(!ok);
-  answerSeconds.add((Date.now() - started) / 1000, { kind });
+  const seconds = (Date.now() - started) / 1000;
+  answerSeconds.add(seconds, { kind });
+  // one line per answer (finish time, kind, seconds, ok): export.py turns these into response
+  // time per minute for the before/after-scaling graph
+  console.log(`ANS ${Date.now()} ${kind} ${seconds.toFixed(2)} ${ok ? 1 : 0}`);
 
   sleep(60 + Math.random() * 30); // read the answer, think, ask again
 }
