@@ -1,0 +1,67 @@
+[
+  {
+    "id": "a0-01",
+    "character": "narrator",
+    "text": "In the first video you saw what EagleEye can do. Here is how it works, and how it holds up when the whole company logs in at once."
+  },
+  {
+    "id": "a1-01",
+    "character": "narrator",
+    "text": "EagleEye is a web app in front, a set of services on AWS in the middle, and the company's data underneath. Every request you are about to see travels this map."
+  },
+  {
+    "id": "a1-02",
+    "character": "narrator",
+    "text": "The web app runs on Vercel. Sign-in is handled by Clerk. Everything else, the API, the queue, the workers and the data, lives on AWS."
+  },
+  {
+    "id": "a2-01",
+    "character": "narrator",
+    "text": "When someone signs in, Clerk checks who they are and issues a short-lived token. Every request to the API carries it, and the API checks it, and the person's role, every time."
+  },
+  {
+    "id": "a3-01",
+    "character": "narrator",
+    "text": "When a document is uploaded, the file goes to secure storage and a job joins the queue, so the upload returns at once."
+  },
+  {
+    "id": "a3-02",
+    "character": "narrator",
+    "text": "An ingest worker reads it: the text, the tables, even the charts, which a vision model describes in words. Every passage is turned into a vector and indexed for search."
+  },
+  {
+    "id": "a4-01",
+    "character": "narrator",
+    "text": "A question takes the same road. The API places it on the queue and an agent worker picks it up."
+  },
+  {
+    "id": "a4-02",
+    "character": "narrator",
+    "text": "First a safety check reads it. Then a planner decides what it needs: a document search, a database query, a notebook analysis, or all of them at once."
+  },
+  {
+    "id": "a4-03",
+    "character": "narrator",
+    "text": "Database questions go through a gateway that only allows read-only queries, limited to what the person may see. Analysis code runs in an isolated sandbox with no internet access."
+  },
+  {
+    "id": "a4-04",
+    "character": "narrator",
+    "text": "Finally the answer is written from the results, every figure is checked against them, and the answer streams back with its citations."
+  },
+  {
+    "id": "a5-01",
+    "character": "narrator",
+    "text": "A malicious request stops at the safety check. A request for data someone isn't allowed to see stops at the gateway. Both are recorded for the administrators."
+  },
+  {
+    "id": "a6-01",
+    "character": "narrator",
+    "text": "For a handful of users, one small server is enough. When the whole company arrives, the same services run on a cluster that grows on its own: the more questions waiting in the queue, the more workers it starts."
+  },
+  {
+    "id": "a6-02",
+    "character": "narrator",
+    "text": "Let's put that to the test."
+  }
+]
