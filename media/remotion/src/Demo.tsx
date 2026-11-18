@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Audio, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { BuiltWith } from "./BuiltWith";
-import { CosmicZoom } from "./CosmicZoom";
+import { LogoOutro } from "./LogoOutro";
 import { TitleCard, TypedCard } from "./TitleCard";
 import type { Item, Line, Segment, Timeline } from "./types";
 
@@ -70,7 +70,7 @@ export const Demo: React.FC<{ timeline: Timeline }> = ({ timeline }) => (
         {item.kind === "typed" && <TypedCard line1={item.line1} line2={item.line2} />}
         {item.kind === "clip" && <Clip item={item} fps={timeline.fps} />}
         {item.kind === "card" && <BuiltWith />}
-        {item.kind === "finale" && <CosmicZoom />}
+        {item.kind === "outro" && <LogoOutro />}
         {item.kind === "caption" && <Caption text={item.text} frames={item.frames} />}
       </Sequence>
     ))}

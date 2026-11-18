@@ -183,9 +183,9 @@ items.push({ kind: "card", card: "builtwith", from: f(cursorMs), frames: f(cardM
 placeLine("s8-01", cursorMs + 1000);
 cursorMs += cardMs;
 
-// 9 · cosmic zoom finale (no voice)
-items.push({ kind: "finale", from: f(cursorMs), frames: f(10000) });
-cursorMs += 10000;
+// 9 · closing frame: cross-fades in over the last second of the card, holds, fades to black
+items.push({ kind: "outro", from: f(cursorMs - 1000), frames: f(4000) });
+cursorMs += 3000;
 
 const timeline = { fps: FPS, durationInFrames: f(cursorMs), items, lines: placed };
 writeFileSync(`${PUBLIC}/timeline.json`, JSON.stringify(timeline, null, 2));

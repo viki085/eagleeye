@@ -11,7 +11,7 @@ export type Item =
   | { kind: "typed"; from: number; frames: number; line1: string; line2: string }
   | { kind: "clip"; scene: number; src: string; from: number; frames: number; segments: Segment[] }
   | { kind: "card"; card: "builtwith"; from: number; frames: number }
-  | { kind: "finale"; from: number; frames: number }
+  | { kind: "outro"; from: number; frames: number }
   | { kind: "caption"; from: number; frames: number; text: string };
 
 export interface Line {

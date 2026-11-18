@@ -125,9 +125,9 @@ Logos come from the open Simple Icons set (each shown in its brand colour on a d
 
 - **Narrator:** "EagleEye. Your company's knowledge, data and files, answered with evidence."
 
-## 9 · Cosmic zoom finale (4:27–4:37) · last priority
+## 9 · Closing frame (about 3 s)
 
-One continuous zoom out: ancient ruins → the pyramids → a modern skyline → the Earth → the solar system → the galaxy → the whole universe. Pulling back further, the universe is revealed to be **contained inside the pupil of an eye**; the eye pulls back and **becomes the EagleEye logo**, with the name beneath. No voice.
+The "Built with" card cross-fades into the EagleEye logo with the name beneath, on the dark title background; it holds, then fades to black. No voice. (The cosmic-zoom finale was dropped: it didn't look professional.)
 
 ---
 
