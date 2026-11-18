@@ -4,6 +4,8 @@
                 -> set LOADTEST_TOKEN_PUBLIC_KEY on the API to the contents of public.pem
     2. users    create N synthetic users in the load-test database and sign one token each
                 (tokens.json, read by the k6 script; valid for --hours, at most 6)
+       tokens   sign fresh tokens for existing users without touching the database (the
+                users are baked into the load-test database image; sign just before the run)
     3. uploads  through the running API: a few enterprise documents (as the synthetic
                 knowledge admin) and one small CSV for every user who runs analyses
 
@@ -243,6 +245,9 @@ def main() -> None:
     users = sub.add_parser("users")
     users.add_argument("--count", type=int, default=500)
     users.add_argument("--hours", type=float, default=4.0)
+    tokens = sub.add_parser("tokens")
+    tokens.add_argument("--count", type=int, default=2000)
+    tokens.add_argument("--hours", type=float, default=4.0)
     remove = sub.add_parser("remove-users")
     video = sub.add_parser("video-accounts")
     video.add_argument("--admin-clerk-id", required=True)
@@ -259,6 +264,8 @@ def main() -> None:
     database_url = get_settings().database_url
     if args.cmd == "keys":
         make_keys(args.dir)
+    elif args.cmd == "tokens":
+        write_tokens(args.dir, args.count, args.hours)
     elif args.cmd == "users":
         _refuse_unless_confirmed(database_url, args.confirm_db_host)
         asyncio.run(create_users(database_url, args.count))

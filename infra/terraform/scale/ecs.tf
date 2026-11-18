@@ -29,9 +29,10 @@ resource "aws_s3_bucket_public_access_block" "files" {
   restrict_public_buckets = true
 }
 
-resource "random_password" "db" {
-  length  = 32
-  special = false
+# fixed when the database image was built (infra/loadtest/build-images.sh): read from the
+# git-ignored .loadtest folder, never output
+locals {
+  db_password = trimspace(file(var.db_password_file))
 }
 
 resource "random_password" "gateway_hmac" {
@@ -46,8 +47,8 @@ resource "random_password" "origin_verify" {
 
 resource "aws_ssm_parameter" "secret" {
   for_each = {
-    DATABASE_URL              = "postgresql://postgres:${random_password.db.result}@appdb.${local.ns}:5432/postgres"
-    POSTGRES_PASSWORD         = random_password.db.result
+    DATABASE_URL              = "postgresql://postgres:${local.db_password}@appdb.${local.ns}:5432/postgres"
+    POSTGRES_PASSWORD         = local.db_password
     GATEWAY_HMAC_SECRET       = random_password.gateway_hmac.result
     ORIGIN_VERIFY_SECRET      = random_password.origin_verify.result
     LOADTEST_TOKEN_PUBLIC_KEY = file(var.loadtest_public_key_file)

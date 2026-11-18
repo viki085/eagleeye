@@ -44,6 +44,9 @@ def test_refuses_outside_loadtest(monkeypatch: pytest.MonkeyPatch) -> None:
         get_settings.cache_clear()
 
 
+@pytest.mark.skipif(
+    not (seed.CORPUS / "md").is_dir(), reason="the generated Grand Line corpus is not in git"
+)
 def test_every_document_the_pool_asks_about_is_found() -> None:
     files = seed.corpus_files()
     assert len(files) == 97 and all(f.exists() for f in files)

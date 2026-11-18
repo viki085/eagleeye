@@ -43,8 +43,14 @@ variable "loadtest_public_key_file" {
   default     = "../../../.loadtest/public.pem"
 }
 
+variable "db_password_file" {
+  description = "Password the load-test database images were built with (build-images.sh)"
+  type        = string
+  default     = "../../../.loadtest/db_password"
+}
+
 variable "web_origin" {
-  description = "The Vercel preview address the recordings use (CORS)"
+  description = "The web app address the recordings use (CORS): a local production build"
   type        = string
 }
 
