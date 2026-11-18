@@ -182,26 +182,64 @@ def run_python(task: dict) -> dict:
     return {"tables": env.written_tables(), "stats": env.stats}
 
 
-def _arrow_safe(frame):  # noqa: ANN001, ANN202
-    """Text columns holding more than one kind of value (e.g. ints and strings after a melt or
-    concat) can't be stored as Parquet; they become text throughout, blanks kept as blanks.
-    Otherwise a valid analysis would fail at the very last step."""
+def _as_text(values):  # noqa: ANN001, ANN202
+    """Every value as text; blanks stay blank."""
     import pandas as pd
 
+    return [
+        None if v is None or (not isinstance(v, str) and pd.isna(v)) else str(v) for v in values
+    ]
+
+
+def _arrow_safe(frame):  # noqa: ANN001, ANN202
+    """Make a result table storable as Parquet, so a valid analysis never fails at the very
+    last step:
+    - group labels held in the index (groupby(...).mean()) become ordinary columns;
+    - binned ranges (pd.cut/qcut intervals), periods, complex numbers and categories of them
+      become text, e.g. "(8, 12]";
+    - text columns holding more than one kind of value (ints and strings after a melt or
+      concat) become text throughout.
+    Blanks are kept as blanks."""
+    import pandas as pd
+    from pandas.api.types import is_object_dtype
+
     frame = frame.copy()
+    index = frame.index
+    # meaningful labels only: a named or multi-level index, or non-numeric labels (describe());
+    # a filtered table's leftover row numbers are dropped as before
+    labelled = (
+        isinstance(index, pd.MultiIndex)
+        or any(n is not None for n in index.names)
+        or not pd.api.types.is_integer_dtype(index.dtype)
+    )
+    if labelled:
+        try:
+            frame = frame.reset_index()
+        except ValueError:  # an index label repeats a column name: keep the columns as they are
+            frame = frame.reset_index(drop=True)
+    if isinstance(frame.columns, pd.MultiIndex):
+        frame.columns = [" ".join(str(p) for p in col if str(p)) for col in frame.columns]
+    frame.columns = [str(c) for c in frame.columns]
+
     for col in frame.columns:
-        if frame[col].dtype != object:
+        dtype = frame[col].dtype
+        if isinstance(dtype, pd.CategoricalDtype):
+            inner = dtype.categories.dtype
+            if isinstance(inner, (pd.IntervalDtype, pd.PeriodDtype)) or is_object_dtype(inner):
+                frame[col] = _as_text(frame[col].astype(object))
+            continue
+        if isinstance(dtype, (pd.IntervalDtype, pd.PeriodDtype)) or dtype.kind == "c":
+            frame[col] = _as_text(frame[col].astype(object))
+            continue
+        if not is_object_dtype(dtype):
             continue
         kinds = {
             type(v)
             for v in frame[col]
             if v is not None and not (isinstance(v, float) and pd.isna(v))
         }
-        if len(kinds) > 1:
-            frame[col] = [
-                None if v is None or (isinstance(v, float) and pd.isna(v)) else str(v)
-                for v in frame[col]
-            ]
+        if len(kinds) > 1 or any(issubclass(k, (pd.Interval, pd.Period)) for k in kinds):
+            frame[col] = _as_text(frame[col])
     return frame
 
 

@@ -197,3 +197,45 @@ async def test_a_mixed_type_text_column_is_saved_as_text() -> None:
     assert result.status == "ok", result.error
     table = pq.read_table(io.BytesIO(result.tables[0].parquet))
     assert table.column("level").to_pylist() == ["1", "high", None]
+
+
+async def test_binned_ranges_from_pd_cut_are_saved_as_text() -> None:
+    # analysts bin a measure (pd.cut) and save the bins: Parquet can't store interval values
+    code = "\n".join(
+        [
+            "import pandas as pd",
+            "df = pd.DataFrame({'speed': [10.0, 14.0, 18.0], 'co2': [1.0, 2.0, 3.0]})",
+            "df['band'] = pd.cut(df['speed'], bins=[8, 12, 16, 20])",
+            "save_table('banded', df)",
+        ]
+    )
+    result = await run(code)
+    assert result.status == "ok", result.error
+    table = pq.read_table(io.BytesIO(result.tables[0].parquet))
+    assert table.column("band").to_pylist() == ["(8, 12]", "(12, 16]", "(16, 20]"]
+
+
+async def test_group_labels_in_the_index_are_kept() -> None:
+    # groupby(...).mean() puts the group labels in the index; they must not be dropped
+    code = "\n".join(
+        [
+            "import pandas as pd",
+            "df = pd.DataFrame({'speed': [10.0, 14.0, 18.0, 19.0], 'co2': [1.0, 2.0, 3.0, 5.0]})",
+            "bands = pd.cut(df['speed'], bins=[8, 12, 16, 20])",
+            "save_table('by_band', df.groupby(bands, observed=True)['co2'].mean().to_frame())",
+        ]
+    )
+    result = await run(code)
+    assert result.status == "ok", result.error
+    table = pq.read_table(io.BytesIO(result.tables[0].parquet))
+    assert table.column_names == ["speed", "co2"]
+    assert table.column("speed").to_pylist() == ["(8, 12]", "(12, 16]", "(16, 20]"]
+    assert table.column("co2").to_pylist() == [1.0, 2.0, 4.0]
+
+
+async def test_a_filtered_table_gains_no_row_number_column() -> None:
+    code = "df = datasets['ds_1']\nsave_table('big', df[df['v'] > 1.5])"
+    result = await run(code)
+    assert result.status == "ok", result.error
+    table = pq.read_table(io.BytesIO(result.tables[0].parquet))
+    assert table.column_names == ["g", "v"] and table.num_rows == 2
