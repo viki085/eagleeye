@@ -13,6 +13,8 @@ import { SystemTab } from "@/components/admin/system-tab";
 import { UsageTab } from "@/components/admin/usage-tab";
 import { UsersTab } from "@/components/admin/users-tab";
 import { ThemeToggle } from "@/components/theme-toggle";
+
+const LIVE_REFRESH_MS = 5000;
 import { useApi } from "@/hooks/use-api";
 import { ApiError, type AdminRange } from "@/lib/api";
 import { AccountMenu } from "@/components/account/account-menu";
@@ -85,6 +87,17 @@ export default function AdminPage() {
   const [refreshedAt, setRefreshedAt] = useState(() => new Date());
   const meta = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
 
+  // "Live": refresh every 5 seconds (watching a load test, an incident); off by default
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    if (!live) return;
+    const timer = setInterval(() => {
+      setRefreshKey((n) => n + 1);
+      setRefreshedAt(new Date());
+    }, LIVE_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [live]);
+
   function refresh(): void {
     setRefreshKey((n) => n + 1);
     setRefreshedAt(new Date());
@@ -129,6 +142,8 @@ export default function AdminPage() {
                 onRange={setRange}
                 onRefresh={refresh}
                 refreshedAt={refreshedAt}
+                live={live}
+                onLive={setLive}
               />
               {section === "overview" && <OverviewTab api={api} range={range} refreshKey={refreshKey} />}
               {section === "users" && <UsersTab api={api} range={range} refreshKey={refreshKey} meId={access.meId} />}

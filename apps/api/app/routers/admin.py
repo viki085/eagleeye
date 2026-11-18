@@ -30,8 +30,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 OVERVIEW_CACHE_S = 60
+LIVE_CACHE_S = 10  # the 1-hour view refreshes every few seconds when "Live" is on
 
-RangeParam = Annotated[Literal["24h", "7d", "14d", "30d"], Query()]
+RangeParam = Annotated[Literal["1h", "24h", "7d", "14d", "30d"], Query()]
 SortParam = Annotated[Literal["last_seen", "cost", "runs", "email"], Query()]
 
 
@@ -65,7 +66,8 @@ async def _cached_overview(request: Request, range_: str) -> dict[str, Any]:
     }
     await _add_caching(redis, data, window)
     try:
-        await redis.set(key, json.dumps(data), ex=OVERVIEW_CACHE_S)
+        ttl = LIVE_CACHE_S if range_ == "1h" else OVERVIEW_CACHE_S
+        await redis.set(key, json.dumps(data), ex=ttl)
     except Exception:
         logger.warning("overview cache write failed", exc_info=True)
     return data

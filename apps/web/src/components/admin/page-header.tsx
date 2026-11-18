@@ -4,20 +4,24 @@ import { Icon } from "@/components/admin/icons";
 import type { AdminRange } from "@/lib/api";
 
 const RANGES: { value: AdminRange; label: string; long: string }[] = [
+  { value: "1h", label: "1h", long: "Last hour, by the minute" },
   { value: "24h", label: "24h", long: "Last 24 hours" },
   { value: "7d", label: "7d", long: "Last 7 days" },
   { value: "14d", label: "14d", long: "Last 14 days" },
   { value: "30d", label: "30d", long: "Last 30 days" },
 ];
 
-/** Report title, the period filter (segmented, as in BI tools) and a manual refresh. */
-export function PageHeader({ title, description, range, onRange, onRefresh, refreshedAt }: {
+/** Report title, the period filter (segmented, as in BI tools), a manual refresh and "Live"
+ * (refresh every 5 seconds, e.g. to watch a load test). */
+export function PageHeader({ title, description, range, onRange, onRefresh, refreshedAt, live = false, onLive }: {
   title: string;
   description: string;
   range: AdminRange | null; // null: this report has no period
   onRange: (r: AdminRange) => void;
   onRefresh: () => void;
   refreshedAt: Date;
+  live?: boolean;
+  onLive?: (on: boolean) => void;
 }) {
   const time = refreshedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   return (
@@ -51,6 +55,22 @@ export function PageHeader({ title, description, range, onRange, onRefresh, refr
               );
             })}
           </div>
+        )}
+        {onLive && (
+          <button
+            type="button"
+            aria-pressed={live}
+            title={live ? "Live: refreshing every 5 seconds" : "Refresh every 5 seconds"}
+            onClick={() => onLive(!live)}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${
+              live
+                ? "border-[#0ca30c]/40 bg-[#0ca30c]/10 text-[#006300] dark:text-[#3ddc84]"
+                : "border-black/10 bg-white text-neutral-700 hover:bg-black/[0.03] dark:border-white/10 dark:bg-[#1a1a19] dark:text-neutral-300"
+            }`}
+          >
+            <span aria-hidden className={`h-2 w-2 rounded-full ${live ? "animate-pulse bg-[#0ca30c]" : "bg-neutral-400"}`} />
+            Live
+          </button>
         )}
         <button
           type="button"

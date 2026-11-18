@@ -117,6 +117,15 @@ def test_overview_aggregates_are_cached_per_range(env: dict) -> None:
     assert "admin:overview:7d" in env["app"].state.redis.data
 
 
+def test_the_one_hour_live_view_uses_minutes_and_a_short_cache(env: dict) -> None:
+    from app.repos.admin_metrics import WINDOWS
+    from app.routers.admin import LIVE_CACHE_S
+
+    resp = _as(env, ADMIN).get("/v1/admin/overview?range=1h")
+    assert resp.status_code == 200 and resp.json()["data"]["range"] == "1h"
+    assert WINDOWS["1h"].bucket == "minute" and LIVE_CACHE_S < 60
+
+
 def test_demoted_admin_loses_access_immediately(env: dict) -> None:
     client = _as(env, ADMIN)  # the cached identity still says "admin"
     assert client.get("/v1/admin/overview").status_code == 200

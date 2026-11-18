@@ -34,6 +34,7 @@ class Window:
 
 
 WINDOWS: dict[str, Window] = {
+    "1h": Window(timedelta(hours=1), "minute", timedelta(minutes=1)),  # live view, e.g. a load test
     "24h": Window(timedelta(hours=24), "hour", timedelta(hours=1)),
     "7d": Window(timedelta(days=7), "day", timedelta(days=1)),
     "14d": Window(timedelta(days=14), "day", timedelta(days=1)),

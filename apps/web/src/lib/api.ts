@@ -309,7 +309,7 @@ export class ApiError extends Error {
 
 // --- admin console -----------------------------------------------------------------------
 
-export type AdminRange = "24h" | "7d" | "14d" | "30d";
+export type AdminRange = "1h" | "24h" | "7d" | "14d" | "30d";
 
 export interface AdminSeriesPoint {
   bucket: string;

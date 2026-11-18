@@ -10,6 +10,7 @@ import { count, money, ratePct, seconds, when } from "@/lib/admin-format";
 import type { AdminOverview, AdminRange, ApiClient } from "@/lib/api";
 
 const VERSUS: Record<AdminRange, string> = {
+  "1h": "vs prev. hour",
   "24h": "vs prev. 24 h",
   "7d": "vs prev. 7 days",
   "14d": "vs prev. 14 days",
@@ -152,10 +153,10 @@ export function OverviewTab({ api, range, refreshKey }: { api: ApiClient; range:
     <SectionState state={state}>
       {(d) => (
         <div className="flex flex-col gap-4">
-          <UsageGlance d={d} hourly={range === "24h"} api={api} onBudgetChanged={reload} />
+          <UsageGlance d={d} hourly={range === "24h" || range === "1h"} api={api} onBudgetChanged={reload} />
           <KpiRow d={d} range={range} />
           <StatusRow d={d} range={range} />
-          <OverviewCharts d={d} hourly={range === "24h"} />
+          <OverviewCharts d={d} hourly={range === "24h" || range === "1h"} />
           <p className="text-[11px] text-neutral-500">
             Figures as of {when(d.generated_at)} · refreshed at most once a minute · times in UTC ·
             cost from the billing ledger · first-token time recorded since this release
