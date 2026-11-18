@@ -75,6 +75,34 @@ async function startK6(profile) {
 
 // --- helpers ---------------------------------------------------------------------------------
 
+async function api(page, path, init = {}) {
+  return page.evaluate(
+    async ({ base, path, init }) => {
+      const token = await window.Clerk.session.getToken();
+      const res = await fetch(base + path, { ...init, headers: { Authorization: `Bearer ${token}` } });
+      return res.status === 204 ? null : res.json();
+    },
+    { base: args.api, path, init },
+  );
+}
+
+/** Before a recording: both video accounts start with no chats (off camera). */
+async function clearAccounts() {
+  for (const email of [MEMBER, ADMIN]) {
+    const { browser, page } = await openSignedIn(email);
+    try {
+      await signInWithTicket(page, email);
+      await page.goto(args.site, { waitUntil: "load" });
+      await page.getByLabel("Message").waitFor({ timeout: 60_000 });
+      const chats = (await api(page, "/v1/chats")).data ?? [];
+      for (const c of chats) await api(page, `/v1/chats/${c.id}`, { method: "DELETE" });
+      console.log(`${email}: ${chats.length} chats cleared`);
+    } finally {
+      await browser.close();
+    }
+  }
+}
+
 async function openSignedIn(email) {
   const { browser, page } = await openRecordingBrowser();
   page.setDefaultTimeout(15_000); // no step may hang a recording
@@ -101,12 +129,28 @@ async function wallClip(n, question, email) {
     await page.goto(args.site, { waitUntil: "load" });
     await page.getByLabel("Message").waitFor({ timeout: 120_000 });
     mark("ready");
+    // continue the account's latest chat: a first question can be replayed from the answer
+    // cache in 0 s, a follow-up is always worked out, so its time shows the real load
+    const latest = page.locator("aside button[title]:not([aria-label])").first(); // chat entries
+    // the list loads after the page (showing "No chats yet" meanwhile): wait for an entry
+    await latest.waitFor({ timeout: 6_000 }).catch(() => {});
+    if (await latest.count()) {
+      await clickOn(page, latest);
+      await sleep(1800);
+      mark("continued");
+    }
     await clickOn(page, page.getByLabel("Message"));
     await typeLikeAPerson(page, question.text);
+    // an answer is done when its "Worked for ..." summary appears (also for a cache replay)
+    const done = page.locator("main button[aria-expanded]").filter({ hasText: /Worked for/ });
+    const before = await done.count();
     await page.keyboard.press("Enter");
     mark("asked");
-    await page.getByLabel("Stop answering").waitFor({ timeout: 30_000 }).catch(() => {});
-    await page.getByLabel("Stop answering").waitFor({ state: "detached", timeout: 240_000 });
+    await page.waitForFunction(
+      (n) => [...document.querySelectorAll("main button[aria-expanded]")].filter((b) => /Worked for/.test(b.textContent)).length > n,
+      before,
+      { timeout: 240_000, polling: 200 },
+    );
     mark("answered");
     await sleep(2500);
     const result = await stop();
@@ -193,7 +237,7 @@ async function adminCheckpoint(users) {
 const W = (at, until) => ({ type: "wall", at, until });
 const A = (at, until, users) => ({ type: "admin", at, until, users });
 const SCHEDULES = {
-  smoke: [A(0, 9999, 500)], // with --no-k6: one clip of each kind, to check the setup
+  smoke: [W(0, 9999), A(0, 9999, 500)], // with --no-k6: one clip of each kind, to check the setup // with --no-k6: one clip of each kind, to check the setup
   rehearsal: [W(25, 60), W(130, 200), A(250, 330, 500), W(400, 480)],
   run: [
     W(5, 40), W(60, 95), // 1 user
@@ -209,6 +253,7 @@ const SCHEDULES = {
 
 async function main() {
   const questions = wallQuestions();
+  await clearAccounts();
   const { t0, arn } = args["no-k6"] ? { t0: Date.now(), arn: null } : await startK6(args.profile);
   writeFileSync(`${OUT}/k6.json`, JSON.stringify({ profile: args.profile, t0, arn }, null, 2));
   console.log(`k6 running (${args.profile}); schedule starts`);
