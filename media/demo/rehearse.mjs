@@ -92,7 +92,17 @@ try {
     await page.waitForTimeout(800);
     if (q.upload) {
       await page.locator('input[type="file"]').first().setInputFiles(resolve("..", q.upload));
-      await page.getByText(/Ready/).first().waitFor({ timeout: 3 * 60 * 1000 });
+      // wait for THIS file's row to say Ready (other files may already be ready)
+      const stem = q.upload.split("/").pop().replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").toLowerCase();
+      await page.waitForFunction(
+        (s) =>
+          [...document.querySelectorAll("li, [role=listitem], div")].some((el) => {
+            const t = el.textContent.toLowerCase().replace(/[-_]+/g, " ");
+            return el.children.length < 12 && t.includes(s.slice(0, 18)) && /ready/.test(t);
+          }),
+        stem,
+        { timeout: 4 * 60 * 1000, polling: 1000 },
+      );
       await page.waitForTimeout(3000);
     }
     const before = await usage(page);

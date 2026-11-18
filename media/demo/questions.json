@@ -21,6 +21,21 @@
     "want": "Names the lane; formatted SQL; table; a monthly line chart"
   },
   {
+    "id": "brief",
+    "scene": 5,
+    "who": "vikram.k@grandlineshipping.com",
+    "upload": "Trial/data/documents/account-review-notes-hunt-williams-francis.docx",
+    "text": "Using my account review notes, prepare me for Thursday's meeting with Hunt, Williams and Francis: their 2025 TEU by trade lane and their 2025 claims by type, what our Reefer SOP and Demurrage and Detention Policy say in plain words, and Asia - North Europe schedule reliability in 2024 compared with 2026.",
+    "want": "One answer from three sources: the uploaded notes, enterprise policies (cited) and the database (tables/chart)"
+  },
+  {
+    "id": "db_aeu",
+    "scene": 4,
+    "who": "vikram.k@grandlineshipping.com",
+    "text": "How did schedule reliability on Asia - North Europe change from 2024 to 2026? Chart it month by month.",
+    "want": "Formatted SQL, table and a monthly line chart across the three years"
+  },
+  {
     "id": "combined_a",
     "scene": 5,
     "who": "vikram.k@grandlineshipping.com",

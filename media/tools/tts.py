@@ -56,7 +56,12 @@ def spent(kind: str) -> float:
 
 def log_cost(kind: str, usd: float, detail: str) -> None:
     with LEDGER.open("a", encoding="utf-8") as f:
-        row = {"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "kind": kind, "usd": round(usd, 5), "detail": detail}
+        row = {
+            "t": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "kind": kind,
+            "usd": round(usd, 5),
+            "detail": detail,
+        }
         f.write(json.dumps(row) + "\n")
 
 
@@ -77,7 +82,9 @@ def speak(client, voice: str, instructions: str, text: str, out: Path) -> float:
     """One clip; returns its length in seconds. Refuses if it could pass the budget."""
     so_far = spent("tts")
     if so_far + estimate_usd(text) > BUDGET_USD:
-        sys.exit(f"stopping: voice budget ${BUDGET_USD:.2f} would be exceeded (spent ${so_far:.3f})")
+        sys.exit(
+            f"stopping: voice budget ${BUDGET_USD:.2f} would be exceeded (spent ${so_far:.3f})"
+        )
     out.parent.mkdir(parents=True, exist_ok=True)
     with client.audio.speech.with_streaming_response.create(
         model=MODEL, voice=voice, input=text, instructions=instructions, response_format="wav"
@@ -102,7 +109,9 @@ def audition(client, characters: dict) -> None:
 
 def lines(client, characters: dict, path: Path) -> None:
     durations_file = AUDIO / "durations.json"
-    durations = json.loads(durations_file.read_text(encoding="utf-8")) if durations_file.exists() else {}
+    durations = (
+        json.loads(durations_file.read_text(encoding="utf-8")) if durations_file.exists() else {}
+    )
     for line in json.loads(path.read_text(encoding="utf-8")):
         c = characters[line["character"]]
         if not c["voice"]:
@@ -110,14 +119,22 @@ def lines(client, characters: dict, path: Path) -> None:
         out = AUDIO / "lines" / f"{line['id']}.wav"
         if out.exists() and durations.get(line["id"], {}).get("text") == line["text"]:
             continue  # unchanged line: no new call
-        seconds = speak(client, c["voice"], line.get("instructions", c["instructions"]), line["text"], out)
-        durations[line["id"]] = {"seconds": round(seconds, 2), "character": line["character"], "text": line["text"]}
+        seconds = speak(
+            client, c["voice"], line.get("instructions", c["instructions"]), line["text"], out
+        )
+        durations[line["id"]] = {
+            "seconds": round(seconds, 2),
+            "character": line["character"],
+            "text": line["text"],
+        }
         print(f"{line['id']}: {seconds:.1f}s")
     durations_file.write_text(json.dumps(durations, indent=2), encoding="utf-8")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("audition")
     p_lines = sub.add_parser("lines")

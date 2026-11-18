@@ -30,13 +30,14 @@ def mask(email: str) -> str:
 
 async def main(patterns: list[str]) -> None:
     import asyncpg
-
     from app.repos import admin_metrics
     from app.repos import users as users_repo
     from app.services.clerk_admin import ClerkAdmin
 
     async def _init(conn: asyncpg.Connection) -> None:
-        await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
+        await conn.set_type_codec(
+            "jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog"
+        )
 
     clerk = ClerkAdmin(cloud_setting("CLERK_SECRET_KEY"))
     pool = await asyncpg.create_pool(
@@ -44,11 +45,13 @@ async def main(patterns: list[str]) -> None:
     )
     try:
         admin_id = await pool.fetchval(
-            "SELECT id FROM users WHERE role = 'admin' AND status = 'active' ORDER BY created_at LIMIT 1"
+            "SELECT id FROM users WHERE role = 'admin' AND status = 'active' "
+            "ORDER BY created_at LIMIT 1"
         )
         for pattern in patterns:
             rows = await pool.fetch(
-                "SELECT id, email, clerk_user_id, role FROM users WHERE email LIKE $1 AND status != 'deleted'",
+                "SELECT id, email, clerk_user_id, role FROM users "
+                "WHERE email LIKE $1 AND status != 'deleted'",
                 pattern,
             )
             if len(rows) != 1:
@@ -59,7 +62,10 @@ async def main(patterns: list[str]) -> None:
                 print(f"{mask(target['email'])}: is the main admin, skipped")
                 continue
             await admin_metrics.record_admin_action(
-                pool, str(admin_id), "user_deleted", {"email": target["email"], "via": "video setup"}
+                pool,
+                str(admin_id),
+                "user_deleted",
+                {"email": target["email"], "via": "video setup"},
             )
             await clerk.delete_user(target["clerk_user_id"])
             await users_repo.mark_deleted(pool, str(target["id"]))
