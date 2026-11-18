@@ -1,4 +1,4 @@
-﻿# C4 — RAG (Enterprise + Personal Documents)
+# C4 — RAG (Enterprise + Personal Documents)
 
 ## 1. Why RAG (not fine-tuning / long-context)
 Enterprise documents change often; RAG updates instantly, supports per-document ACLs and citations. Long context cannot hold 5M chunks, and cannot enforce per-user access. Fine-tuning leaks access boundaries and needs retraining.
@@ -28,7 +28,7 @@ flowchart LR
 ```
 1. **Scan**: allow-list MIME (pdf, docx, pptx, txt, md, html, xlsx, csv); size limits; basic MIME + magic-byte check (Phase 1). Phase 2 adds GuardDuty Malware Protection for S3 and Macie/Comprehend PII tagging for enterprise docs.
 2. **Parse**: `unstructured` (hi-res for PDF) or `docling`; `unstructured` OCR mode for scanned pages/forms (text density check). Phase 2 can swap to Amazon Textract for higher accuracy on complex forms. Output elements: title, narrative, list, table (as HTML), image (saved to SeaweedFS/S3), with page and bounding boxes.
-3. **Chunk**: structure-aware `chunk_by_title`: max ~800 tokens (≈3,000 chars), soft limit 600 tokens, merge tiny sections (<150 tokens), 10–15% overlap only inside long sections; every chunk carries `heading_path` ("Policy › Returns › Electronics") — fixes the playbook's failure case of return and shipping policy sharing a chunk. Tables and images are standalone chunks.
+3. **Chunk**: structure-aware `chunk_by_title`: max ~800 tokens (≈3,000 chars), soft limit 600 tokens, merge tiny sections (<150 tokens), 10–15% overlap only inside long sections; every chunk carries `heading_path` ("Policy › Returns › Electronics") — fixes the classic failure case of return and shipping policy sharing a chunk. Tables and images are standalone chunks.
 4. **Enrich**: tables and images summarised by a vision-capable capable-class/fast-class LLM call into `content_processed` (searchable text) while `content_original` (HTML/image ref) is kept immutable for faithful answering. Batch and cache by content hash.
 5. **Embed**: provider embedding model (`EMBED_MODEL` env var — e.g. `text-embedding-3-small` via OpenAI/LiteLLM or `nomic-embed-text` via Ollama; batched, normalised); content prefixed with title + heading_path for context ("contextual chunk headers").
 6. **Upsert**: idempotent by `chunk_hash`; set `acl_group_ids`; **dual-store routing**: scope=`enterprise` → Qdrant collection; scope=`personal` → Supabase pgvector. Mark `READY`. Stage progress to `documents.stage_detail` and Redis → UI progress.
@@ -53,7 +53,7 @@ question + chat context
   → return chunks + citation metadata
 ```
 - **Hybrid** because users mix semantic questions with exact terms (policy IDs, product names, error codes).
-- **Rerank** is optional: adds ~150–300 ms; enable if eval shows recall@5 gain justifies it (playbook trade-off).
+- **Rerank** is optional: adds ~150–300 ms; enable if eval shows recall@5 gain justifies it (a latency trade-off).
 - **Threshold**: if best score below floor → return `low_relevance=true`; agent must say so rather than answer from priors.
 - **Dual-store retrieval**: enterprise scope → Qdrant (filtered-ANN, unlimited scale); personal scope → Supabase pgvector (HNSW with iterative scan for selective filters; exact scan via partial index on `(owner_id)` for small personal sets). Mixed queries fan out to both and merge via RRF before rerank.
 - Token budget: ≤ 1,500–2,500 tokens of context injected; chunks truncated with markers.

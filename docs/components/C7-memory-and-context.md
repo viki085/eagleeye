@@ -18,7 +18,7 @@ Budget manager enforces per-section caps and logs the section sizes per run (vis
 - Background job (Celery task on the `maintenance` queue, or in-worker async after run) writes `chat_summaries(version+1)` covering messages up to `N − 2`; the newest 2 messages stay verbatim. **No messages are deleted** (UI shows full history).
 - Summariser (fast-class LLM) preserves: user goals, decisions, entities (dataset/source names), constraints, open questions, key numbers *with the artifact id they came from*.
 - Lock: Redis `lock:compact:{chat}` (120 s TTL) + `chats.summary_version` optimistic check; failure → retry later, never block the turn (fall back to trimming).
-- Manual "Compact now" button optional (DocLens-style).
+- Manual "Compact now" button optional.
 
 ## 4. Long-term facts
 - Extraction job: after a chat is idle 24 h (Celery beat sweeper every 5 min claims due chats with a single `UPDATE … RETURNING`; EventBridge in Phase 2) and after compaction; reads only messages beyond `facts_read_to_msg_no`.

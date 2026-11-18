@@ -1,75 +1,78 @@
-# EagleEye — Enterprise Agentic AI Platform: Design Pack
+# EagleEye Documentation
 
-**Status:** v0.2 — reviewed and accepted (see [Decision Log](99-decision-log.md)).
-**Deployment:** Phase 1 = fully local (Docker Compose, near-zero cost); Phase 2 = AWS. **Auth:** Clerk. **Scale target:** 10,000 users (see assumption A1).
+Design, decisions and reports for EagleEye, an enterprise AI assistant that answers from company
+documents, databases and data files with verifiable evidence. For an overview, setup and the demo
+videos, see the [project README](../README.md).
 
-## How to read this pack
+## Core documents
 
-| # | Doc | Purpose |
-|---|-----|---------|
-| 00 | [Requirements & Scope](00-requirements-and-scope.md) | What we build, what we don't, NFRs, assumptions |
-| 01 | [High-Level Design (HLD)](01-HLD.md) | Architecture, layers, key flows, tech choices with trade-offs |
-| 02 | [Low-Level Design (LLD)](02-LLD.md) | Service internals, API contract, sequence flows, state machines, config |
-| 03 | [Data Model](components/03-data-model.md) | Postgres schema, S3 layout, Redis keys |
-| C1 | [Frontend](components/C1-frontend.md) | Chat UI, right sidebar, streaming, charts |
-| C2 | [Auth, Identity & Access Control](components/C2-auth-and-access-control.md) | Clerk, roles, document ACLs, data-source permissions |
-| C3 | [Agent Orchestration](components/C3-agent-orchestration.md) | Guard, router, supervisor, sub-agents, budgets |
-| C4 | [RAG](components/C4-rag.md) | Ingestion, hybrid retrieval, enterprise vs personal scope |
-| C5 | [Text-to-SQL / Data Gateway](components/C5-text-to-sql-data-gateway.md) | NL → validated SQL → results |
-| C6 | [EDA, Cross-Source Analysis & Charts](components/C6-eda-analysis-charts.md) | CSV EDA, DuckDB federation, chart specs, insights |
-| C7 | [Memory & Context](components/C7-memory-and-context.md) | Short-term, summaries, long-term facts, token budgets |
-| C8 | [Guardrails & Security](components/C8-guardrails-security.md) | Defence in depth, threat model |
-| C9 | [Observability & Evaluation](components/C9-observability-evaluation.md) | Tracing, metrics, eval harness |
-| C10 | [Infrastructure, Scaling & Cost](components/C10-aws-infra-scaling-cost.md) | Phase 1 Docker Compose map; Phase 2 network, compute, capacity, cost model |
-| 99 | [Decision Log (ADRs)](99-decision-log.md) | Every major decision: options, choice, why, when to revisit |
+| # | Document | Contents |
+|---|---|---|
+| 00 | [Requirements and scope](00-requirements-and-scope.md) | Goals, functional and non-functional requirements, assumptions |
+| 01 | [High-level design](01-HLD.md) | Architecture, layers, key flows, technology choices and trade-offs |
+| 02 | [Low-level design](02-LLD.md) | Service internals, API contract, sequence flows, state machines, configuration |
+| 99 | [Decision log](99-decision-log.md) | Architecture decision records: options, choice, rationale, when to revisit |
 
-Source principles come from *Section 12: Complete Agent Design and Interview Playbook* (seven-layer architecture, supervisor-worker, hybrid RAG, loop budgets, HITL, graceful degradation, model routing, tracing). Product reference is DocLens (streamed step tree, citations to chunk, memory panel, tool caps, fail-closed safety gate).
+## Components
 
-## Key decisions (confirmed — full rationale in the [Decision Log](99-decision-log.md))
+| # | Document | Contents |
+|---|---|---|
+| 03 | [Data model](components/03-data-model.md) | Postgres schema, object storage layout, Redis keys |
+| C1 | [Front end](components/C1-frontend.md) | Chat interface, documents panel, streaming, charts, admin console |
+| C2 | [Authentication and access control](components/C2-auth-and-access-control.md) | Clerk, roles, document access, data-source permissions |
+| C3 | [Agent orchestration](components/C3-agent-orchestration.md) | Guard, router, supervisor, tools, budgets |
+| C4 | [Retrieval-augmented generation](components/C4-rag.md) | Ingestion, hybrid retrieval, enterprise and personal scope |
+| C5 | [Text-to-SQL and data gateway](components/C5-text-to-sql-data-gateway.md) | Natural language to validated, read-only SQL |
+| C6 | [Analysis, notebooks and charts](components/C6-eda-analysis-charts.md) | Data-file profiling, cross-source analysis, sandbox, chart specifications |
+| C7 | [Memory and context](components/C7-memory-and-context.md) | Conversation context, summaries, token budgets |
+| C8 | [Guardrails and security](components/C8-guardrails-security.md) | Defence in depth and threat model |
+| C9 | [Observability and evaluation](components/C9-observability-evaluation.md) | Logging, metrics, evaluation harnesses |
+| C10 | [Infrastructure, scaling and cost](components/C10-aws-infra-scaling-cost.md) | Local stack, AWS deployment, capacity and cost model |
 
-| ID | Question | Decision |
-|----|----------|----------|
-| D1 | Scale | 10,000 registered, ~15% daily active, **~1,000 concurrent chats peak, 2,000 burst** (Phase 1 local: single-user dev/demo) |
-| D2 | LLM provider | **LiteLLM proxy** — provider via `LLM_PROVIDER` env var (Anthropic API, OpenAI, or Ollama local/free); fast-class + capable-class model tiers (ADR-02/03) |
-| D3 | Queryable enterprise DBs | Postgres/MySQL/SQL Server/Redshift via SQLAlchemy drivers; Snowflake/Oracle later |
-| D4 | Enterprise doc sources | Admin upload + object-store sync in v1; SharePoint/Confluence connectors in v2 |
-| D5 | Compliance | SOC2-style controls; single region; DR deferred (not required for portfolio v1) |
-| D6 | Tenancy | **Single enterprise tenant**, schema ready for `org_id` (multi-tenant later) |
-| D7 | Agent framework | **LangGraph** (checkpointing, streaming) behind our own thin ports (ADR-17) |
-| D8 | Vector store | **Dual store**: Qdrant for enterprise chunks; Supabase pgvector for personal docs (ADR-04) |
-| D9 | Web search tool | **No** (enterprise data only) |
-| D10 | IaC / CI-CD | **docker-compose.yml** (Phase 1) + Terraform + GitHub Actions (Phase 2) |
-| D11 | Backend language | **Python 3.12 + FastAPI** |
-| D12 | Human-in-the-loop | No write actions in v1 (read-only platform); HITL reserved for v2 |
+## Reports
 
-## Phased roadmap (proposed)
-
-All milestones below run on the local Docker Compose stack; AWS (Phase 2 of ADR-16/25) comes after.
-
-| Milestone | Scope | Exit criteria |
-|-----------|-------|---------------|
-| 0 | Sign-off on this pack, Clerk tenant, docker-compose skeleton, `.env.example` | Decisions D1–D12 closed; `docker compose up` boots the stack |
-| 1 | Auth, chat UI, streaming, single LLM path (LiteLLM), chat history | Authenticated chat with streamed answers |
-| 2 | RAG: personal upload + enterprise docs, dual-store retrieval, citations | Golden-set retrieval recall@5 ≥ target |
-| 3 | Text-to-SQL via Data Gateway + schema catalog | Execution accuracy ≥ target on golden SQL set |
-| 4 | CSV EDA, DuckDB cross-source analysis, charts, insights | End-to-end "combine CSV + DB + docs" demo |
-| 5 | Hardening: guardrails, load test to 2k concurrent, security review | Load-test + security sign-off |
-| 6 (Phase 2) | AWS lift: Terraform, ECS Fargate, Supabase Cloud, managed Redis/Qdrant | Cloud deploy green; parity with local demo |
-
-**Build status (2026-11-15):**
-
-| Milestone | Status |
+| Document | Contents |
 |---|---|
-| 0 Scaffold | ✅ Done |
-| 1 Auth, chat, streaming | ✅ Done |
-| 2 RAG | ✅ Done — retrieval eval (150 questions): budget recall 0.86, recall@5 0.87 with the chosen chunking (C4 §9.1, ADR-32) |
-| 3 Text-to-SQL | ✅ Done — SQL golden set (`evals/sql_eval.py`, 2026-11-15, gpt-6-luna): execution accuracy 50/52 (96%; 49–50 of 52 across two runs, scored with the corrected q24), refusals 5/5, p50 2.4 s, $0.02 per run. Remaining misses: the agent adds an end date the question didn't ask for (forward bookings run into 2027). Reference q24 fixed: it counted 2027 bookings as "made in 2026" |
-| 4 CSV EDA, cross-source analysis, charts | ✅ Done — document + database + data-file demo passed (C6 "As built") |
-| 5 Hardening | 🟡 Guardrails, rate limits, kill switches, admin console, admin-provisioned accounts and the security review are done (C8 §7, [security-review-phase6.md](security-review-phase6.md)); the 2,000-concurrent load test moves to cloud pre-production |
-| 6 AWS lift (Phase 2) | 🟡 Demo live (Phase 7B, 2026-11-15): Vercel web app + CloudFront + EC2 demo machine (stopped when idle) + Lambda sandbox, Terraform in `infra/terraform/`, deploys from CI ([ADR-33](99-decision-log.md), README "Cloud demo"). Next: Phase 7C scale mode (Fargate + load balancer), the 2,000-user load test and its report |
+| [Load test report](load-test-report.md) | 2,000 concurrent users on ECS Fargate: method, results, findings |
+| [Security review](security-review-phase6.md) | Threat review, controls and scan results |
 
-Build phases map onto milestones as: phase 2 → M2, phase 4 → M3, phase 5 → M4, phases 3 and 6 → M5 (agent orchestration C3 §8 is the enabler for M3–M4).
+## Plans
 
-## Notes on the reference site
+Working plans kept as a record of how each stage was delivered.
 
-I could read DocLens' engineering write-up (architecture, memory, streaming, RAG, safety gate) but **not** its interactive product-tour content or the demo UI, because those are client-rendered. UI decisions in C1 follow your description (chat centre, right sidebar for documents) plus DocLens patterns. If you want pixel-level parity, I can walk through the live demo in a browser and capture screenshots.
+| Document | Contents |
+|---|---|
+| [Cloud deployment](phase7-cloud-plan.md) | Demo mode on AWS and Vercel, scale mode on ECS Fargate |
+| [Enterprise demo data](phase7-enterprise-data-plan.md) | The Grand Line Shipping Company warehouse, documents and data files |
+| [Notebook analysis](notebook-eda-plan.md) | Step-by-step exploratory notebooks |
+| [Product video](video-production-plan.md) | Production plan for the product demo video |
+| [Architecture and load-test video](architecture-loadtest-video-plan.md) | Production plan for the architecture and scaling video |
+
+## Key decisions
+
+Full rationale for each is in the [decision log](99-decision-log.md).
+
+| Area | Decision |
+|---|---|
+| Scale | Designed for 10,000 registered users; 1,000 concurrent chats at peak, 2,000 in bursts (verified by the [load test](load-test-report.md)) |
+| Models | OpenAI models through LiteLLM, with fast and capable tiers and automatic fallbacks; provider set by configuration |
+| Agent framework | LangGraph behind thin internal interfaces |
+| Vector storage | Qdrant for enterprise documents, pgvector for personal documents |
+| Enterprise data | SQL databases through a read-only data gateway with a semantic catalog |
+| Document sources | Administrator uploads and object-storage sync |
+| Tenancy | Single enterprise tenant; schema ready for multiple organisations |
+| Web search | Not offered: answers come from enterprise data only |
+| Write actions | None: the platform is read-only, so no human approval step is needed |
+| Backend | Python 3.12 and FastAPI |
+| Infrastructure | Docker Compose locally; Terraform, AWS and GitHub Actions in the cloud |
+
+## Delivery status
+
+| Milestone | Scope | Status |
+|---|---|---|
+| 1 | Authentication, chat, streaming, chat history | Complete |
+| 2 | Document retrieval with citations | Complete: recall@5 of 0.87 on 150 questions |
+| 3 | Text-to-SQL through the data gateway | Complete: 96% execution accuracy on a 52-question golden set |
+| 4 | Data files, cross-source analysis, notebooks and charts | Complete |
+| 5 | Guardrails, rate limits, admin console, security review | Complete |
+| 6 | AWS deployment: demo mode, scale mode, load test to 2,000 users | Complete: 15,417 answers, 99.99% success |

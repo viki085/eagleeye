@@ -1,7 +1,7 @@
 # C3 — Agent Orchestration
 
 ## 1. Pattern
-**Guard → Router → Supervisor-worker**, per the playbook: cheap model classifies/guards; a stronger model plans and calls specialised sub-agents; deterministic code does retrieval, validation, and verification. Sub-agents are used instead of one mega-prompt because tools, prompts, and failure modes differ (docs vs SQL vs analysis) and each prompt stays small (< 1.5k tokens).
+**Guard → Router → Supervisor-worker**: cheap model classifies/guards; a stronger model plans and calls specialised sub-agents; deterministic code does retrieval, validation, and verification. Sub-agents are used instead of one mega-prompt because tools, prompts, and failure modes differ (docs vs SQL vs analysis) and each prompt stays small (< 1.5k tokens).
 
 ```mermaid
 flowchart TB
@@ -63,7 +63,7 @@ PII/secret scan (regex + optional fast-class LLM scan), system-prompt leakage ch
 | Embeddings | Provider embed model (`EMBED_MODEL`, e.g. `text-embedding-3-small` or `nomic-embed-text`) | Alternate embed model for query-side only if index compatible (else fail soft to keyword-only search) |
 `LLMGateway` (LiteLLM adapter) handles retries (429/5xx, backoff 1/2/4 s), circuit breaker (open after 5 failures/30 s → half-open probes), per-model concurrency semaphores, token-bucket vs provider rate limits, and records usage/cost.
 
-## 4. Failure scenarios (from playbook, adapted)
+## 4. Failure scenarios
 | Scenario | Handling |
 |----------|----------|
 | Tool timeout (SQL gateway) | Retry once (2 s); then say what failed, offer to retry or narrow the question; never fabricate data |

@@ -1,7 +1,9 @@
-﻿# 01 — High-Level Design (HLD)
+# 01 — High-Level Design (HLD)
 
-> **Phase 1 (current):** Full stack runs locally via Docker Compose — zero cloud cost, complete portfolio demo.
-> **Phase 2 (later):** AWS deployment provisioned by Terraform. Architecture is designed so Phase 2 is a configuration change, not a rewrite.
+> **Deployment status:** the full stack runs locally with Docker Compose (Phase 1) and on AWS,
+> provisioned by Terraform (Phase 2): an on-demand demo mode and an autoscaling scale mode on ECS
+> Fargate, load-tested to 2,000 concurrent users ([report](load-test-report.md)). Moving between them
+> is a configuration change, not a rewrite.
 
 ## 1. Architectural principles
 
@@ -250,7 +252,7 @@ Cloud-phase changes from Phase 1:
 - **Model fallback chain**: capable-class primary → alternate capable-class provider → fast-class (flag `degraded`) → semantic cache → "connect me to support". Never a silent failure.
 - Graceful degradation ladder: full (docs+SQL+analysis) → docs only → plain chat → maintenance banner.
 - Backpressure: per-user concurrent-run cap (2), per-org LLM API token bucket, Celery task queue depth shedding with clear "busy" message.
-- **DR deferred** — not required for portfolio v1; single-region only. Add cross-region Supabase/Postgres replication + S3 CRR when a production SLA demands it.
+- **DR deferred** — beyond the first release; single-region only. Add cross-region Supabase/Postgres replication + S3 CRR when a production SLA demands it.
 
 ## 8. Security summary
 
@@ -271,3 +273,18 @@ Cloud-phase changes from Phase 1:
 | Security | ACL below LLM, gateway, network-isolated sandbox, guardrail rules, audit log | C2, C8 |
 | Quality | Golden sets, LLM-as-judge via Langfuse evals, SQL execution accuracy, feedback loop | C9 |
 | Portability | docker-compose ↔ ECS Fargate; SeaweedFS ↔ S3; Celery Redis broker ↔ SQS broker; Supabase CLI ↔ Supabase Cloud | ADR-16, ADR-25 |
+
+## 10. As built
+
+The delivered system follows this design, with these differences, each recorded in the
+[decision log](99-decision-log.md):
+
+| Area | Original design | As built |
+|---|---|---|
+| Monitoring | Langfuse traces and Prometheus metrics | An in-app admin console (usage, cost, latency, quality, safety, live by the minute) and CloudWatch logs and metrics (ADR-32) |
+| Accounts | Clerk sign-up restricted to the company | Administrator-provisioned accounts only; the API refuses any account it did not create (ADR-32) |
+| Analysis sandbox | Docker container per execution | Docker locally; an AWS Lambda function with no network access in the cloud (ADR-31, ADR-33) |
+| PDF parsing | Structure-aware parsing | Docling layout analysis with table extraction and vision-model figure descriptions (ADR-35) |
+| Cloud compute | ECS Fargate, always on | Demo mode: one EC2 instance that starts on demand and stops when idle (ADR-33). Scale mode: ECS Fargate with step autoscaling, used for the 2,000-user load test (ADR-36) |
+| Load testing | Load test to 2,000 concurrent users | Done on the scale stack with a built-in stand-in model and real everything else ([report](load-test-report.md), ADR-34, ADR-36) |
+

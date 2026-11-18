@@ -24,7 +24,7 @@ Availability SLO 99.9% on chat path; error budget policy (freeze risky releases 
 Structured JSON (request_id, trace_id, user_id hash, route, latency); no raw prompts/PII in app logs; security events on a dedicated stream; log retention 90 d hot, 1 yr cold (Phase 2: S3 Object Lock for immutable audit log; Phase 1: local Docker log files, dev/demo data only).
 
 ## 4. Evaluation framework (eval-driven development)
-Pyramid per the playbook (properties → golden sets → human review), run in CI and nightly.
+An evaluation pyramid (properties → golden sets → human review), run in CI and nightly.
 
 | Suite | What | Metric | Gate |
 |-------|------|--------|------|

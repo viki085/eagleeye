@@ -16,7 +16,7 @@ Phases 0–6 are done and committed (latest `83b2351`). Everything runs only on 
 
 The original infrastructure design (`docs/components/C10-aws-infra-scaling-cost.md`) targets 10,000 users at roughly $22–30k per month. Your constraints are very different:
 
-- This is a portfolio project. The whole AWS spend must stay within the **$100 free-plan credit**.
+- The whole AWS spend must stay within the **$100 free-plan credit**.
 - The web app should use the **Vercel free tier**. No paid domain.
 - A handful of recruiters should be able to **start the app themselves** and try it.
 - Once or twice, a **500–2,000 user load test** is run and recorded on video to show the system scales automatically.
@@ -183,7 +183,7 @@ Things I do:
 1. Install the AWS CLI and Terraform locally (neither is installed).
 2. Check, read-only, what the Free plan allows: ECS/Fargate, Lambda container images, CloudFront private origins, EC2 instance types, and the Fargate, EC2 and Lambda quotas. Request Fargate and Lambda increases if needed.
 3. Re-check every price in the tables above and update the estimate.
-4. Create the GitHub repo and push. The playbook PDF at the repo root stays untracked and is never pushed.
+4. Create the GitHub repo and push.
 
 **Gate:** if Fargate is not available on the Free plan, scale mode falls back to ECS on small EC2 machines in an auto-scaling group (same task definitions, similar cost). I report before going further.
 
@@ -285,7 +285,7 @@ Commit `feat: phase 7c autoscaling stack and load test`. **Stop.**
 | Load-test sign-in or stub model enabled outside a test | Startup refuses them unless `APP_ENV=loadtest`; tests; security review; separate database |
 | Anyone with the link can wake the demo and use the model | Per-IP allowance ($1, 30 minutes per 24 hours) checked before sign-in and before waking the machine; $3 per day for all visitors; machine running time capped at 12 hours per day and stopped when idle; OpenAI monthly hard limit as a backstop |
 | Visitors see each other's chats and uploads in the shared demo account | Chats, documents and data files are tagged with the visitor's allowance and filtered by it; visitors' data is deleted when their window ends; banner. Separate Clerk accounts per visitor were ruled out because Clerk development mode caps users at 500 |
-| IP is a weak identity (shared office networks, VPNs, rotating IPv6) | Accepted for a portfolio demo; IPv6 grouped by /64; the $2 daily total and the OpenAI hard limit bound the cost |
+| IP is a weak identity (shared office networks, VPNs, rotating IPv6) | Accepted for a public demo; IPv6 grouped by /64; the $2 daily total and the OpenAI hard limit bound the cost |
 | The demo sign-in is left on in a real deployment | Off by default; a separate setting on web and API; covered by a test and the security review |
 | Analysis code escapes or leaks data from the Lambda sandbox | No internet route; function role has no permissions; S3 reachable only for our bucket through expiring single-use links; existing code checks still run first; escape tests run in the cloud |
 | CloudFront cuts long answer streams | Read timeout raised; the stream already sends heartbeats and resumes with `Last-Event-ID`; tested in 7B |

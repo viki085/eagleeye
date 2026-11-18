@@ -23,7 +23,7 @@ Next.js (App Router) + TypeScript (strict), Tailwind + shadcn/ui, TanStack Query
 ```
 - **Right sidebar** (collapsible): *Documents* tab (personal uploads with ingestion status badges UPLOADING→READY, delete, include/exclude toggle for this chat; enterprise docs browse/search, read-only) and *Data* tab (datasets/CSVs with profile preview; permitted DB sources list).
 - **Message actions**: copy, regenerate, thumbs up/down, "view steps", "view SQL", download table/chart.
-- **Insight panel** (drawer): step tree, per-step tokens/cost/latency, memory/context view (DocLens-style transparency) — admin/dev toggle in prod.
+- **Insight panel** (drawer): step tree, per-step tokens/cost/latency, memory/context view (full transparency) — admin/dev toggle in prod.
 - Responsive: sidebar becomes a sheet on <1024 px; left nav becomes a drawer.
 
 ## 3. Key client modules

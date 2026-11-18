@@ -5,7 +5,7 @@
 
 ## Context
 
-EagleEye is finished and live: the web app is on Vercel, the API runs on AWS, and the phone layout went in today. Two videos are wanted for the portfolio:
+EagleEye is finished and live: the web app is on Vercel, the API runs on AWS, and the phone layout went in today. Two videos are planned:
 
 1. **Product demo.** A real recording of the app being used the way employees at a company would use it: signing in, asking impressive questions, uploading files, guardrails stopping misuse, and the admin console. It is paced so viewers can follow what is on screen, and the agent's steps are expanded on a few answers so the process is visible. A voice-over cast of three characters explains it with showmanship.
 2. **Load test.** The Phase 7C 2,000-user test, cut like a scene from a hacker movie: windows opening, users signing in and asking questions, counters climbing, AWS adding servers, and the admin console showing up to 2,000 people online at once.

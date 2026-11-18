@@ -1,4 +1,4 @@
-﻿# C10 — Infrastructure, Scaling & Cost
+# C10 — Infrastructure, Scaling & Cost
 
 ## Phase 1 — Local / Docker Compose
 
@@ -97,7 +97,7 @@ Provider-agnostic via `LLM_PROVIDER` env var (Anthropic, OpenAI, or Ollama). No 
 | LLM provider outage | Slow/failed LLM calls | Backoff, circuit breaker, fallback model/provider chain, degraded mode, status banner |
 | Enterprise DB down | SQL unavailable | Per-source circuit breaker; other tools continue |
 | Poison ingest doc | Celery queue stuck | Dead-letter after 3 tries, per-doc isolation |
-| Region loss | Full outage | DR deferred (not required for portfolio v1); Supabase PG backup restore; S3 CRR |
+| Region loss | Full outage | DR deferred beyond the first release; Supabase PG backup restore; S3 CRR |
 
 ### 2.9 CI/CD
 GitHub Actions: lint/type/test (80% coverage gate), SAST/SCA, build images (SBOM, Trivy), push to ECR (immutable tags = commit SHA), Terraform plan on PR, deploy via ECS rolling/blue-green (CodeDeploy) with automatic rollback on alarms; DB migrations as a pre-deploy job (expand/contract); smoke + Playwright E2E in staging; manual approval to prod; feature flags for risky features; one-command rollback to prior SHA.
