@@ -167,3 +167,16 @@ async def test_database_and_notebook_answers_point_to_their_results() -> None:
     )
     assert "operations database" in sql and "chart" in chart and "sandbox" in book
     assert not any(ch.isdigit() for ch in sql + chart)  # no figures the checks could not verify
+
+
+async def test_chat_titles_read_like_a_person_named_them() -> None:
+    async def title(question: str) -> str:
+        msg = [ChatMessage("user", f"Write a short title for this message:\n\n{question}")]
+        text, _ = await StubLLM(FAST).complete("fast", msg)
+        return text
+
+    doc = first("docs", doc="emissions-policy")
+    assert await title(doc["text"]) == doc["title"]
+    assert await title("How busy was Rotterdam in the second half of last year?") == (
+        "How busy was Rotterdam in the second half"
+    )

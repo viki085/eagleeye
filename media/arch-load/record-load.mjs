@@ -75,19 +75,9 @@ async function startK6(profile) {
 
 // --- helpers ---------------------------------------------------------------------------------
 
-async function api(page, path, init = {}) {
-  return page.evaluate(
-    async ({ base, path, init }) => {
-      const token = await window.Clerk.session.getToken();
-      const res = await fetch(base + path, { ...init, headers: { Authorization: `Bearer ${token}` } });
-      return res.status === 204 ? null : res.json();
-    },
-    { base: args.api, path, init },
-  );
-}
-
 async function openSignedIn(email) {
   const { browser, page } = await openRecordingBrowser();
+  page.setDefaultTimeout(15_000); // no step may hang a recording
   await page.goto(`${args.site}/sign-in`, { waitUntil: "load" });
   await page.waitForFunction(() => window.Clerk?.loaded, null, { timeout: 60_000 });
   return { browser, page };
@@ -128,7 +118,7 @@ async function wallClip(n, question, email) {
       answerSeconds: (answered - asked) / 1000, marks,
       note: /something went wrong|error/i.test(text.slice(-400)) ? "CHECK: error text on screen" : `${question.kind} ${((answered - asked) / 1000).toFixed(1)}s`,
     });
-    for (const c of (await api(page, "/v1/chats")).data ?? []) await api(page, `/v1/chats/${c.id}`, { method: "DELETE" });
+    // chats are kept: deleting one would also delete its answer from the admin metrics
   } finally {
     await browser.close();
   }
@@ -164,23 +154,30 @@ async function adminCheckpoint(users) {
     let section = "Overview";
     await sleep(2500);
     for (const [where, label] of CHECKPOINTS[users]) {
+      try {
       if (where !== section) {
-        await clickOn(page, page.getByRole("button", { name: where }).first());
+        await clickOn(page, page.getByRole("tab", { name: where }).first());
         section = where;
         await sleep(1800);
       }
       const target = page.getByText(label, { exact: true }).first();
       await target.scrollIntoViewIfNeeded().catch(() => {});
-      const box = await target.evaluate((el) => {
+      await target.evaluate((el) => {
         const card = el.closest("section, article, [class*='rounded']") ?? el;
         card.scrollIntoView({ behavior: "smooth", block: "center" });
-        const r = card.getBoundingClientRect();
+      });
+      await sleep(1100); // measure only once the smooth scroll has settled
+      const box = await target.evaluate((el) => {
+        const r = (el.closest("section, article, [class*='rounded']") ?? el).getBoundingClientRect();
         return { x: r.x, y: r.y, width: r.width, height: r.height };
       });
-      await sleep(900);
       marks.push({ t: Date.now() - stop.startedAt, type: "metric", label, box });
       await page.evaluate((b) => window.__eeSpotlight?.(b), box).catch(() => {});
       await sleep(4500); // live numbers tick while the metric is held
+      } catch (e) {
+        console.error(`admin-${users}: "${label}" not shown (${e.message.split(String.fromCharCode(10))[0]})`);
+        marks.push({ t: Date.now() - stop.startedAt, type: "missing", label });
+      }
     }
     await smoothScroll(page, -2000, 900);
     await sleep(1500);

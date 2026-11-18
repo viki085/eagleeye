@@ -21,7 +21,7 @@ export function OverviewCharts({ d, hourly }: { d: AdminOverview; hourly: boolea
       <ChartPanel
         className="xl:col-span-8"
         title="Request volume and outcomes"
-        subtitle={hourly ? "Requests per hour by final status (UTC)" : "Requests per day by final status (UTC)"}
+        subtitle={`Requests per ${d.range === "1h" ? "minute" : hourly ? "hour" : "day"} by final status (UTC)`}
         chart={outcomeBars(
           d.series.map((s) => ({
             bucket: s.bucket,
@@ -33,7 +33,7 @@ export function OverviewCharts({ d, hourly }: { d: AdminOverview; hourly: boolea
         )}
         rows={d.series.filter((s) => s.requests > 0)}
         columns={[
-          { key: "b", label: hourly ? "Hour (UTC)" : "Day", render: (r: AdminSeriesPoint) => bucketLabel(r.bucket, hourly) },
+          { key: "b", label: d.range === "1h" ? "Minute (UTC)" : hourly ? "Hour (UTC)" : "Day", render: (r: AdminSeriesPoint) => bucketLabel(r.bucket, hourly) },
           { key: "req", label: "Requests", numeric: true, render: (r: AdminSeriesPoint) => count(r.requests) },
           { key: "ok", label: "Succeeded", numeric: true, render: (r: AdminSeriesPoint) => count(r.succeeded) },
           { key: "fail", label: "Failed", numeric: true, render: (r: AdminSeriesPoint) => count(r.failed) },

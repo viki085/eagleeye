@@ -111,6 +111,15 @@ def pool_question(text: str) -> dict | None:
     return _pool().get(_norm(text))
 
 
+def _chat_title(prompt: str) -> str:
+    """The document's title for a pool document question, else the question's first words."""
+    question = prompt.split(chr(10) * 2, 1)[-1].strip()
+    q = pool_question(question)
+    if q and q.get("title"):
+        return q["title"]
+    return " ".join(question.rstrip("?.!").split()[:8]) or "Load test chat"
+
+
 def _mode(text: str) -> str:
     q = pool_question(text)
     if q is not None:
@@ -191,7 +200,7 @@ class StubLLM:
         if json_mode:
             return "{}"
         if len(messages) == 1:  # chat titles are a single user message
-            return "Load test chat"
+            return _chat_title(messages[0].content)
         return "A sample data file used for load testing."
 
     async def stream(

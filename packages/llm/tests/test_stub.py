@@ -57,7 +57,7 @@ async def test_rewrite_title_and_analysis_code() -> None:
     )
     assert json.loads(raw)["standalone"] == "leave rules"
     title, _ = await llm.complete("fast", [ChatMessage("user", "Title this chat\n\nhello")])
-    assert title == "Load test chat"
+    assert title == "hello"  # the question's first words, as a person would name it
     code, _ = await llm.complete(
         "capable",
         [ChatMessage("system", "Write code"), ChatMessage("user", "Today's date: x\n\nTask: y")],

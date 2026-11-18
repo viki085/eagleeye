@@ -22,7 +22,7 @@ export function StepLatencyTrend({ d, hourly }: { d: AdminOverview; hourly: bool
     <ChartPanel
       className="xl:col-span-8"
       title="Step latency trend"
-      subtitle={`Mean duration of each major pipeline stage per ${hourly ? "hour" : "day"} (UTC) · sub-steps omitted`}
+      subtitle={`Mean duration of each major pipeline stage per ${d.range === "1h" ? "minute" : hourly ? "hour" : "day"} (UTC) · sub-steps omitted`}
       chart={timeSeries(
         d.step_trend.map((p) => ({ x: p.bucket, y: Math.round(p.avg_ms) / 1000, series: stepGroupLabel(p.step) })),
         "avg seconds",
@@ -35,7 +35,7 @@ export function StepLatencyTrend({ d, hourly }: { d: AdminOverview; hourly: bool
       )}
       rows={d.step_trend}
       columns={[
-        { key: "b", label: hourly ? "Hour (UTC)" : "Day", render: (r: TrendRow) => bucketLabel(r.bucket, hourly) },
+        { key: "b", label: d.range === "1h" ? "Minute (UTC)" : hourly ? "Hour (UTC)" : "Day", render: (r: TrendRow) => bucketLabel(r.bucket, hourly) },
         { key: "s", label: "Stage", render: (r: TrendRow) => stepGroupLabel(r.step) },
         { key: "n", label: "Executions", numeric: true, render: (r: TrendRow) => count(r.executions) },
         { key: "avg", label: "Avg", numeric: true, render: (r: TrendRow) => duration(r.avg_ms) },
