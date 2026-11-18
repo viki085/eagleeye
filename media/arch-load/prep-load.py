@@ -1,3 +1,4 @@
+# ruff: noqa: E501, S603, S607
 """Prepare Part 2 (the load test) for the Remotion edit, from the recorded run.
 
   public/load/wall-NN.mp4       the 12 wall clips (4K originals, for the 1-4 big windows)
@@ -50,17 +51,56 @@ def walls() -> list[dict]:
 
 def mosaic(metas: list[dict]) -> None:
     """16 tiles: the 12 clips from just before the question is typed, then 4 repeats later on."""
-    inputs, layout = [], []
+    inputs, layout, starts = [], [], []
     for k in range(16):
         m = metas[k % 12]
         start = max(0.0, m["ready"] - 1 + (6 if k >= 12 else 0))
-        inputs += ["-stream_loop", "-1", "-ss", f"{start:.2f}", "-i", str(OUT / f"{m['name']}-960.mp4")]
+        inputs += ["-stream_loop", "-1", "-i", str(OUT / f"{m['name']}-960.mp4")]
+        starts.append(start)
         layout.append(f"{(k % 4) * 960}_{(k // 4) * 540}")
-    chains = "".join(f"[{k}:v]setpts=PTS-STARTPTS,fps=30[v{k}];" for k in range(16))
+    # trim (frame-accurate) rather than -ss, which snaps to the clip start on these recordings
+    chains = "".join(f"[{k}:v]trim=start={starts[k]:.2f},setpts=PTS-STARTPTS,fps=30[v{k}];" for k in range(16))
     stack = "".join(f"[v{k}]" for k in range(16))
     ff(*inputs, "-filter_complex", f"{chains}{stack}xstack=inputs=16:layout={'|'.join(layout)}[out]",
        "-map", "[out]", "-t", str(MOSAIC_S), "-an", "-c:v", "h264_nvenc", "-preset", "p5",
        "-cq", "23", "-pix_fmt", "yuv420p", str(OUT / "mosaic.mp4"))
+
+
+STAGE_S = 9
+BORDER = "drawbox=x=0:y=0:w=iw:h=ih:color=0x3ddc84@0.5:t=3"
+# windows per stage -> (columns, rows, tile width, tile height, source)
+STAGES = {
+    2: (2, 1, 1920, 1080, "4k"), 4: (2, 2, 1920, 1080, "4k"), 8: (4, 2, 960, 540, "960"),
+    64: (8, 8, 480, 270, "mosaic"), 256: (16, 16, 240, 135, "mosaic"),
+}
+
+
+def stage(n: int, metas: list[dict]) -> None:
+    """One video per wall stage (3840x2160), so the edit decodes a single video for it. For 64
+    and 256 the 4x4 mosaic is itself tiled (2x2 / 4x4 copies, time-shifted so tiles differ)."""
+    cols, rows, tw, th, kind = STAGES[n]
+    copies = cols * rows if kind != "mosaic" else (cols // 4) ** 2
+    cw, ch = (tw * 4, th * 4) if kind == "mosaic" else (tw, th)
+    per_row = cols if kind != "mosaic" else cols // 4
+    inputs, chains, layout = [], [], []
+    for k in range(copies):
+        if kind == "mosaic":
+            src, start = OUT / "mosaic.mp4", (k * 5.3) % (MOSAIC_S - STAGE_S - 1)
+        else:
+            m = metas[k % len(metas)]
+            name = f"{m['name']}.mp4" if kind == "4k" else f"{m['name']}-960.mp4"
+            src, start = OUT / name, m["asked"] + 1.8  # question shown, answer streaming
+        inputs += ["-stream_loop", "-1", "-i", str(src)]
+        border = "" if kind == "mosaic" else f",{BORDER}"
+        chains.append(f"[{k}:v]trim=start={start:.2f},setpts=PTS-STARTPTS,fps=30,scale={cw}:{ch}:flags=lanczos{border}[v{k}]")
+        layout.append(f"{(k % per_row) * cw}_{(k // per_row) * ch}")
+    grid_h = ch * (copies // per_row if copies >= per_row else 1)
+    top = (2160 - grid_h) // 2
+    stack = "".join(f"[v{k}]" for k in range(copies))
+    graph = ";".join(chains) + f";{stack}xstack=inputs={copies}:layout={'|'.join(layout)}:fill=0x020403[g];"         f"[g]pad=3840:2160:(3840-iw)/2:{top}:color=0x020403[out]"
+    ff(*inputs, "-filter_complex", graph, "-map", "[out]", "-t", str(STAGE_S), "-an",
+       "-c:v", "h264_nvenc", "-preset", "p5", "-cq", "21", "-pix_fmt", "yuv420p",
+       str(OUT / f"wall-stage-{n}.mp4"))
 
 
 def admin() -> dict:
@@ -92,6 +132,8 @@ if __name__ == "__main__":
     RUN_T0 = timeline["t0"]
     metas = walls()
     mosaic(metas)
+    for n in STAGES:
+        stage(n, metas)
     data = {
         "totals": timeline["totals"],
         "minutes": timeline["minutes"],

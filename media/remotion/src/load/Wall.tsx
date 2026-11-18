@@ -32,12 +32,16 @@ function grid(n: number, inset: number) {
 export const Wall: React.FC<{ n: number; sinceStage: number; fps: number }> = ({ n, sinceStage, fps }) => {
   const zoom = 1 + Math.max(0, 1 - sinceStage / 0.45) * (n > 1 ? 0.9 : 0.15);
   let tiles: React.ReactNode[] = [];
-  if (n <= 8) {
+  if (n > 1) {
+    // pre-built by prep-load.py: one video per stage (16 is the mosaic itself)
+    const src = n === 16 ? "load/mosaic.mp4" : `load/wall-stage-${n}.mp4`;
+    tiles = [<Window key="stage" src={src} startFrom={0} fps={fps} x={0} y={0} w={W} h={H} />];
+  } else if (n <= 8) {
     const g = grid(n, n === 1 ? 140 : 40);
     tiles = g.map((b, i) => {
       const clip = DATA.walls[i % DATA.walls.length];
       const src = n <= 4 ? `load/${clip.name}.mp4` : `load/${clip.name}-960.mp4`;
-      return <Window key={i} src={src} startFrom={Math.max(0, clip.ready - 1)} fps={fps} label={`user ${i + 1} · ${clip.kind}`} {...b} />;
+      return <Window key={i} src={src} startFrom={clip.asked + 1.6} fps={fps} label={`user ${i + 1} · ${clip.kind}`} {...b} />;
     });
   } else {
     const per = n === 16 ? 1 : n === 64 ? 2 : 4;
