@@ -86,7 +86,7 @@ function StatusRow({ d, range }: { d: AdminOverview; range: AdminRange }) {
   const p = d.live.presence;
   const online = p ? p.online.company + p.online.demo : null;
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 2xl:grid-cols-4">
       <StatusCard
         label="Online now" icon="users" value={online === null ? "—" : count(online)}
         status={online ? "ok" : "idle"}

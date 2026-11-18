@@ -42,19 +42,19 @@ function Row({ event }: { event: ServerLogEvent }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="grid w-full grid-cols-[9.5rem_6.5rem_5.5rem_1fr] items-start gap-2 text-left text-[11px] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
+        className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2 gap-y-0.5 text-left md:grid-cols-[9.5rem_6.5rem_5.5rem_1fr] text-[11px] hover:bg-black/[0.02] dark:hover:bg-white/[0.03]"
       >
         <span className="font-mono tabular-nums text-neutral-500">{event.time.slice(5, 19)} UTC</span>
         <span className="truncate text-neutral-600 dark:text-neutral-300">{event.service}</span>
         <span>
           <LevelPill level={event.level} />
         </span>
-        <span className={`font-mono text-neutral-800 dark:text-neutral-200 ${open ? "whitespace-pre-wrap break-words" : "truncate"}`}>
+        <span className={`col-span-3 font-mono text-neutral-800 md:col-span-1 dark:text-neutral-200 ${open ? "whitespace-pre-wrap break-words" : "truncate"}`}>
           {event.message}
         </span>
       </button>
       {open && (event.logger || extra) && (
-        <pre className="ml-[22rem] mt-1 max-h-60 overflow-auto rounded bg-neutral-50 p-2 font-mono text-[10px] text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
+        <pre className="mt-1 md:ml-[22rem] max-h-60 overflow-auto rounded bg-neutral-50 p-2 font-mono text-[10px] text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
           {[event.logger ? `logger: ${event.logger}` : "", extra ?? ""].filter(Boolean).join("\n")}
         </pre>
       )}

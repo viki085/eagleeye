@@ -25,9 +25,9 @@ export function Panel({ title, subtitle, children, actions, className = "" }: {
   className?: string;
 }) {
   return (
-    <section className={`${CARD} min-w-0 p-4 ${className}`}>
-      <header className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <section className={`${CARD} min-w-0 p-3 sm:p-4 ${className}`}>
+      <header className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-1 basis-48">
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">{title}</h3>
           {subtitle && <p className="mt-0.5 text-xs text-neutral-500">{subtitle}</p>}
         </div>
@@ -37,6 +37,8 @@ export function Panel({ title, subtitle, children, actions, className = "" }: {
     </section>
   );
 }
+
+const STICKY = "sticky left-0 z-[1] bg-white dark:bg-[#1a1a19]";
 
 export interface Column<T> {
   key: string;
@@ -56,8 +58,9 @@ export function DataTable<T>({ rows, columns, empty = "Nothing here yet." }: {
       <table className="w-full text-left text-xs">
         <thead className="text-[10px] uppercase tracking-[0.06em] text-neutral-500">
           <tr className="border-b border-black/[0.08] dark:border-white/10">
-            {columns.map((c) => (
-              <th key={c.key} className={`px-2 py-2 font-semibold ${c.numeric ? "text-right" : ""}`}>
+            {columns.map((c, j) => (
+              // the first column stays in place while a wide table scrolls sideways (phones)
+              <th key={c.key} className={`px-2 py-2 font-semibold ${c.numeric ? "text-right" : ""} ${j === 0 ? STICKY : ""}`}>
                 {c.label}
               </th>
             ))}
@@ -66,10 +69,10 @@ export function DataTable<T>({ rows, columns, empty = "Nothing here yet." }: {
         <tbody>
           {rows.map((row, i) => (
             <tr key={i} className="border-t border-black/[0.05] hover:bg-black/[0.02] dark:border-white/[0.06] dark:hover:bg-white/[0.03]">
-              {columns.map((c) => (
+              {columns.map((c, j) => (
                 <td
                   key={c.key}
-                  className={`px-2 py-1.5 ${c.numeric ? "text-right tabular-nums" : ""}`}
+                  className={`px-2 py-1.5 ${c.numeric ? "text-right tabular-nums" : "max-md:min-w-32"} ${j === 0 ? `${STICKY} max-md:whitespace-nowrap` : ""}`}
                 >
                   {c.render(row)}
                 </td>

@@ -29,7 +29,7 @@ export function ConsoleNav({ active, onSelect }: { active: SectionId; onSelect: 
       <p className="hidden px-4 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400 lg:block">
         Reports
       </p>
-      <div role="tablist" aria-orientation="vertical" className="flex gap-1 overflow-x-auto px-2 py-2 lg:flex-col lg:overflow-visible lg:py-0">
+      <div role="tablist" aria-orientation="vertical" className="flex gap-1 overflow-x-auto px-2 py-2 [scrollbar-width:none] lg:flex-col lg:overflow-visible lg:py-0 [&::-webkit-scrollbar]:hidden">
         {SECTIONS.map((s) => {
           const selected = s.id === active;
           return (
@@ -38,7 +38,11 @@ export function ConsoleNav({ active, onSelect }: { active: SectionId; onSelect: 
               type="button"
               role="tab"
               aria-selected={selected}
-              onClick={() => onSelect(s.id)}
+              onClick={(e) => {
+                onSelect(s.id);
+                // phones: the strip scrolls sideways; keep the chosen section in view
+                e.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+              }}
               className={`relative flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13px] transition-colors ${
                 selected
                   ? "bg-[#2a78d6]/10 font-semibold text-[#1d5fae] dark:bg-[#3987e5]/15 dark:text-[#8ab8f0]"

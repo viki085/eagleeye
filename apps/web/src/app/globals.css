@@ -82,3 +82,12 @@ body {
 /* iPhone notch and home bar: pad fixed edges by the safe area (needs viewport-fit=cover). */
 @utility pt-safe { padding-top: env(safe-area-inset-top); }
 @utility pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Touch screens: iOS zooms the page into any input with text under 16px when it is tapped. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

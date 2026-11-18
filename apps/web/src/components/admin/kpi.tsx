@@ -62,14 +62,14 @@ export function KpiCard({ label, icon, value, delta, hint, trend }: {
   trend?: readonly (number | null)[];
 }) {
   return (
-    <section aria-label={label} className={`${CARD} flex min-w-0 flex-col gap-2 p-4`}>
+    <section aria-label={label} className={`${CARD} flex min-w-0 flex-col gap-2 p-3 sm:p-4`}>
       <header className="flex items-center justify-between gap-2">
         <h3 className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">{label}</h3>
         <span className="rounded-md bg-[#2a78d6]/10 p-1.5 text-[#2a78d6] dark:text-[#3987e5]">
           <Icon name={icon} className="h-3.5 w-3.5" />
         </span>
       </header>
-      <p className="text-[28px] font-semibold leading-none tracking-tight text-neutral-900 dark:text-neutral-50">{value}</p>
+      <p className="text-[22px] sm:text-[28px] font-semibold leading-none tracking-tight text-neutral-900 dark:text-neutral-50">{value}</p>
       <div className="min-h-[20px]">{delta ?? (hint && <span className="text-[11px] text-neutral-500">{hint}</span>)}</div>
       {delta && hint && <p className="-mt-1 text-[11px] text-neutral-500">{hint}</p>}
       {trend && <Sparkline values={trend} />}
