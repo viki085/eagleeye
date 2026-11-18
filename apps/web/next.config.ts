@@ -64,7 +64,8 @@ function contentSecurityPolicy(): string {
     "style-src": ["'self'", "'unsafe-inline'"],
     "font-src": ["'self'", "data:"],
     // blob: the document viewer shows PDFs fetched with the user's token from a blob URL
-    "frame-src": ["'self'", "blob:", "https://challenges.cloudflare.com"],
+    // youtube-nocookie: the videos on the demo sign-in page (loaded only when a visitor presses play)
+    "frame-src": ["'self'", "blob:", "https://challenges.cloudflare.com", "https://www.youtube-nocookie.com"],
     "worker-src": ["'self'", "blob:"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],

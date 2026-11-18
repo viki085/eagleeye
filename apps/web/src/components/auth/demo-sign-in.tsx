@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { BrandPanel } from "@/components/auth/brand-panel";
 import { BrandIcon } from "@/components/brand/brand-icon";
+import { DemoVideos } from "@/components/demo/demo-videos";
 import { friendlyAuthError } from "@/lib/sign-in";
 
 const USERNAME = process.env.NEXT_PUBLIC_DEMO_USERNAME ?? "";
@@ -175,6 +176,7 @@ export function DemoSignIn() {
             <li>Your chats and uploads are private to your visit and deleted after 24 hours. Still, don&apos;t upload confidential files.</li>
             <li>Each visit has 30 minutes a day. You can come back later the same day and carry on where you left off.</li>
           </ul>
+          <DemoVideos />
         </div>
       </main>
     </div>
