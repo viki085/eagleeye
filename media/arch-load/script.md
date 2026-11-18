@@ -60,8 +60,8 @@ Small pulses also go to Postgres (usage recorded) and CloudWatch (logs).
 
 ## 6 · Scaling (2:40–3:05)
 **Screen:** the API, Redis and worker boxes move inside an "ECS Fargate" frame with a load balancer in
-front. A user counter climbs, and the boxes multiply to the real counts from the test (API 2 → 4,
-agent workers 3 → 11). A CloudWatch gauge shows the queue metric driving it.
+front. A user counter climbs, and the boxes multiply to the real counts from the test (agent
+workers 1 → 5 → 7 → 9, API 1 → 2). A CloudWatch gauge shows the queue metric driving it.
 - **Narrator:** "For a handful of users, one small server is enough. When the whole company arrives, the same services run on a cluster that grows on its own: the more questions waiting in the queue, the more workers it starts."
 - **Narrator:** "Let's put that to the test."
 

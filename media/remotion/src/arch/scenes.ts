@@ -154,13 +154,15 @@ export const SCENES: Record<number, SceneDef> = {
 
 /** Scaling scene: users and task counts over the scene (seconds → values). */
 export const SCALE = {
-  usersAt: [[1.5, 1], [4, 50], [8, 1000], [12.5, 2000]] as [number, number][],
+  // real counts from the recorded 2,000-user load test (media/arch-load/raw/run/timeline.json):
+  // running tasks while each user level was held (peaks of 11 workers / 4 API tasks came a
+  // minute later, during the ramp-down; Part 2's results card gives those)
+  usersAt: [[1.5, 1], [3.5, 50], [6, 500], [9, 1000], [12.5, 2000]] as [number, number][],
   tasks: {
-    // preliminary: replaced by the real ECS task counts from the load test
-    api: [[1.5, 1], [6, 2], [10, 3], [12.5, 4]] as [number, number][],
-    agent: [[1.5, 1], [5, 3], [8, 6], [10.5, 9], [12.5, 11]] as [number, number][],
-    ingest: [[1.5, 1], [9, 2]] as [number, number][],
-    gateway: [[1.5, 1], [10, 2]] as [number, number][],
+    api: [[1.5, 1], [11.5, 1], [12.8, 2]] as [number, number][],
+    agent: [[1.5, 1], [6, 1], [7.2, 5], [9, 5], [10.2, 7], [12, 7], [12.8, 9]] as [number, number][],
+    ingest: [[1.5, 1]] as [number, number][],
+    gateway: [[1.5, 1]] as [number, number][],
   },
-  preliminary: true,
+  preliminary: false,
 };
