@@ -20,7 +20,7 @@ describe("demo videos", () => {
     expect(url.searchParams.get("rel")).toBe("0");
   });
 
-  it("has the product demo published", () => {
-    expect(publishedVideos(DEMO_VIDEOS)[0]?.id).toBe("_pjZODEwXyk");
+  it("has both videos published, the product demo first", () => {
+    expect(publishedVideos(DEMO_VIDEOS).map((v) => v.id)).toEqual(["_pjZODEwXyk", "klPBlEWFGSM"]);
   });
 });

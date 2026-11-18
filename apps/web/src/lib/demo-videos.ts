@@ -10,7 +10,7 @@ export interface DemoVideo {
 
 export const DEMO_VIDEOS: DemoVideo[] = [
   { id: "_pjZODEwXyk", title: "Product demo", minutes: 5, thumb: "/videos/product-demo.jpg" },
-  { id: "", title: "How it works, and how it scales", minutes: 6, thumb: "/videos/how-it-scales.jpg" },
+  { id: "klPBlEWFGSM", title: "How it works, and how it scales", minutes: 6, thumb: "/videos/how-it-scales.jpg" },
 ];
 
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
