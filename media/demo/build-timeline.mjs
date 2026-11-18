@@ -27,8 +27,6 @@ const ZONES = [
   ["profile", "typing", 5.0],
   ["notebook", "figure_enlarged", 12.0],
   ["upload", "ready", 2.0],
-  ["answer_start", "steps_open", 1.2],
-  ["steps_open", "answer_end", 6.0],
   ["answer_start", "answer_end", 5.0],
 ];
 
@@ -39,14 +37,17 @@ const ANCHORS = [
   [2, "s2-02", "preview", 300],
   [2, "s2-03", "enterprise", 200],
   [2, "s2-04", "viewer_open", 800],
-  [3, "s3-01", "answer_start", 300],
-  [3, "s3-02", "read", 0],
-  [3, "s3-03", "source_open", 0],
+  [3, "s3-01", "typing", 600], // over the typed request
+  [3, "s3-02", "answer_end", 1600], // "built around his notes", over a freeze at the top of the brief
+  [3, "s3-03", "read~claim", 200], // each source line plays on the highlight it describes
+  [3, "s3-04", "read~alarm|SOP", 200],
+  [3, "s3-05", "read~reliab|2026|measure", 200],
+  [3, "s3-06", "source_open", 0],
   [4, "s4-01", "read", 0],
   [5, "s5-01", "read", 0],
   [6, "s6-01", "start", 500],
-  [6, "s6-02", "steps_open", 200],
-  [6, "s6-03", "step_write", 0],
+  [6, "s6-02", "answer_start", 600],
+  [6, "s6-03", "step_write", 0], // each step line starts when its stage appears in the panel
   [6, "s6-04", "step_run", 0],
   [6, "s6-05", "step_answer", 0],
   [6, "s6-06", "download_hover", -1500],
@@ -54,9 +55,12 @@ const ANCHORS = [
   [7, "s7-02", "read", 300],
 ];
 
+// freeze frames: [marker, ms after it, how long to hold] — keeps a view on screen while its line plays
+const HOLDS = { 2: [["preview", 2600, 9000]], 3: [["answer_end", 1500, 4800]] };
+
 // per-scene zones, checked before the general ones: the EDA wait plays near real time so the
 // step-by-step narration fits
-const SCENE_ZONES = { 6: [["steps_open", "answer_end", null, 1.3]] };
+const SCENE_ZONES = { 2: [["upload", "ready", null, 1.0]], 6: [["answer_start", "answer_end", null, 1.0]] };
 
 function segmentsFor(markers, endMs, n) {
   const at = (type) => markers.find((m) => m.type === type)?.t;
@@ -66,17 +70,27 @@ function segmentsFor(markers, endMs, n) {
     if (s === undefined || e === undefined || e <= s) continue;
     if (zones.some((z) => s < z.e && e > z.s)) continue; // first matching zone wins
     const speed = fixed ?? Math.min(16, Math.max(1, (e - s) / (target * 1000)));
-    if (speed > 1.05) zones.push({ s, e, speed });
+    zones.push({ s, e, speed }); // a real-time zone (speed 1) still blocks the general rules
   }
   zones.sort((x, y) => x.s - y.s);
   const segs = [];
   let cursor = 0;
   for (const z of zones) {
     if (z.s > cursor) segs.push({ startMs: cursor, endMs: z.s, speed: 1 });
-    segs.push({ startMs: z.s, endMs: z.e, speed: Number(z.speed.toFixed(2)) });
+    segs.push({ startMs: z.s, endMs: z.e, speed: z.speed > 1.05 ? Number(z.speed.toFixed(2)) : 1 });
     cursor = z.e;
   }
   if (cursor < endMs) segs.push({ startMs: cursor, endMs, speed: 1 });
+  // insert freeze frames by splitting the segment that contains each hold point
+  for (const [marker, after, ms] of HOLDS[n] ?? []) {
+    const t = at(marker);
+    if (t === undefined) continue;
+    const point = t + after;
+    const i = segs.findIndex((g) => point > g.startMs && point < g.endMs && !g.holdMs);
+    if (i < 0) continue;
+    const g = segs[i];
+    segs.splice(i, 1, { ...g, endMs: point }, { startMs: point, endMs: point, speed: 1, holdMs: ms }, { ...g, startMs: point });
+  }
   return segs;
 }
 
@@ -84,6 +98,10 @@ function segmentsFor(markers, endMs, n) {
 function mapTime(segs, ms) {
   let out = 0;
   for (const s of segs) {
+    if (s.holdMs) {
+      if (ms > s.startMs) out += s.holdMs;
+      continue;
+    }
     if (ms <= s.endMs) return out + (Math.max(ms, s.startMs) - s.startMs) / s.speed;
     out += (s.endMs - s.startMs) / s.speed;
   }
@@ -122,16 +140,25 @@ for (const n of [1, 2, 3, 4, 5, 6, 7]) {
   const sceneStart = cursorMs;
   let sceneLen = mapTime(segs, endMs);
   for (const [scene, id, anchor, offset] of ANCHORS.filter((a) => a[0] === n)) {
-    const m = rec.markers.find((x) => x.type === anchor) ?? rec.markers[0];
-    const end = placeLine(id, sceneStart + mapTime(segs, m.t) + offset);
+    // "read#2" = the second read marker; "read~claim" = the read marker whose text matches
+    const [type, rest] = anchor.split(/[#~]/);
+    const ofType = rec.markers.filter((x) => x.type === type);
+    const m = anchor.includes("~")
+      ? ofType.find((x) => new RegExp(rest, "i").test(x.label ?? ""))
+      : ofType[Number(rest ?? 1) - 1];
+    if (!m) {
+      console.warn(`scene ${n}: no marker for ${anchor}; ${id} follows the previous line`);
+    }
+    const end = placeLine(id, m ? sceneStart + mapTime(segs, m.t) + offset : 0);
     sceneLen = Math.max(sceneLen, end - sceneStart + 400);
   }
   const holdMs = sceneLen - mapTime(segs, endMs);
-  if (holdMs > 30) segs.push({ startMs: endMs - 40, endMs: endMs - 39, speed: 0.001, holdMs });
+  if (holdMs > 30) segs.push({ startMs: endMs, endMs, speed: 1, holdMs });
   let fr = f(sceneStart);
   const segments = segs.map((s) => {
     const frames = s.holdMs ? f(s.holdMs) : Math.max(1, f((s.endMs - s.startMs) / s.speed));
-    const seg = { startMs: s.startMs, endMs: s.endMs, speed: s.holdMs ? 0.001 : s.speed, from: fr, frames };
+    // a hold shows one frame for its whole length (Remotion: a tiny playback rate)
+    const seg = { startMs: s.holdMs ? Math.max(0, s.startMs - 40) : s.startMs, endMs: s.endMs, speed: s.holdMs ? 0.001 : s.speed, from: fr, frames };
     fr += frames;
     return seg;
   });
@@ -147,6 +174,7 @@ cursorMs += cardMs;
 
 const timeline = { fps: FPS, durationInFrames: f(cursorMs), items, lines: placed };
 writeFileSync(`${PUBLIC}/timeline.json`, JSON.stringify(timeline, null, 2));
-const mm = Math.floor(cursorMs / 60000), ss = Math.round((cursorMs % 60000) / 1000);
+const totalS = Math.round(cursorMs / 1000);
+const mm = Math.floor(totalS / 60), ss = totalS % 60;
 console.log(`timeline: ${mm}:${String(ss).padStart(2, "0")} (${items.length} items, ${placed.length} lines)`);
 for (const it of items) console.log(`  ${it.kind}${it.scene ? " " + it.scene : ""}: ${(it.from / FPS).toFixed(1)}s +${(it.frames / FPS).toFixed(1)}s`);

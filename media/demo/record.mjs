@@ -35,6 +35,7 @@ mkdirSync(OUT, { recursive: true });
 // ---------- helpers ----------
 
 async function api(page, path, init) {
+  await page.waitForFunction(() => window.Clerk?.session, null, { timeout: 60_000 }); // Clerk ready
   return page.evaluate(
     async ({ base, path, init }) => {
       const token = await window.Clerk.session.getToken();
@@ -93,6 +94,26 @@ class Scene {
   }
 }
 
+/** While the agent works, keep its steps panel open (it redraws as steps arrive, which can
+ * close it again). Calls onTick with the panel's text every half second. */
+async function keepStepsOpen(scene, onTick) {
+  const { page } = scene;
+  let marked = false;
+  while (await page.getByLabel("Stop answering").count()) {
+    const live = page.locator("main button[aria-expanded]").filter({ hasText: /Working/ }).last();
+    if ((await live.count()) && (await live.getAttribute("aria-expanded").catch(() => null)) === "false") {
+      await clickOn(page, live).catch(() => {});
+      if (!marked) {
+        scene.mark("steps_open");
+        marked = true;
+      }
+    }
+    if (onTick) await onTick(await page.locator("main").innerText().catch(() => ""));
+    await sleep(500);
+  }
+  if (!marked) scene.mark("steps_open");
+}
+
 async function ask(scene, text, { expandSteps = false } = {}) {
   const { page } = scene;
   await clickOn(page, page.getByLabel("Message"));
@@ -101,23 +122,12 @@ async function ask(scene, text, { expandSteps = false } = {}) {
   await sleep(400);
   await clickOn(page, page.getByRole("button", { name: "Send", exact: true }));
   scene.mark("answer_start");
-  const toggle = page.locator("main button[aria-expanded]").last();
   await page.getByLabel("Stop answering").waitFor({ timeout: 60_000 });
-  if (expandSteps) {
-    await toggle.waitFor({ timeout: 30_000 });
-    await sleep(600);
-    await clickOn(page, toggle);
-    scene.mark("steps_open");
-  }
+  if (expandSteps) await keepStepsOpen(scene);
   await page.getByLabel("Stop answering").waitFor({ state: "detached", timeout: ANSWER_TIMEOUT_MS });
   await sleep(1500); // charts and pictures finish drawing
   scene.mark("answer_end");
-  if (expandSteps) {
-    await sleep(1200);
-    const done = page.locator("main button[aria-expanded]").filter({ hasText: /Worked for/ }).last();
-    if ((await done.getAttribute("aria-expanded")) === "true") await clickOn(page, done);
-    scene.mark("steps_closed");
-  }
+  // the steps panel is left as the app leaves it (it closes itself when the answer completes)
 }
 
 /**
@@ -137,7 +147,10 @@ async function readAnswer(scene, targets) {
       const scope = /figure|img/.test(t.sel) ? bubble : prose;
       const re = new RegExp(t.text ?? ".", "i");
       const el = [...scope.querySelectorAll(t.sel)].find((e) => !e.hasAttribute("data-ee-stop") && re.test(e.textContent || e.getAttribute("alt") || ""));
-      if (el) el.setAttribute("data-ee-stop", String(n++));
+      if (el) {
+        el.setAttribute("data-ee-stop", String(n++));
+        el.setAttribute("data-ee-target", String(targets.indexOf(t)));
+      }
     }
     if (n === 0 && prose.querySelector("p")) prose.querySelector("p").setAttribute("data-ee-stop", String(n++));
     return n;
@@ -154,7 +167,8 @@ async function readAnswer(scene, targets) {
     const rect = { x: box.x, y: box.y, width: box.width, height: Math.min(box.height, 300) };
     await page.evaluate((r) => window.__eeSpotlight(r), rect);
     scene.mark("read", { rect, label: (await el.innerText()).slice(0, 80) });
-    await sleep(STOP_MS);
+    const ti = Number(await el.getAttribute("data-ee-target"));
+    await sleep(targets[ti]?.ms ?? STOP_MS);
     await page.evaluate(() => window.__eeSpotlight(null));
     await sleep(200);
   }
@@ -252,15 +266,13 @@ const scenes = {
     await sleep(900);
     await clickOn(page, page.getByText("Fleet and Market Review 2025").first());
     s.mark("viewer_open");
-    await sleep(3500); // the PDF renders
+    await sleep(2500); // the PDF renders
     const frame = await page.locator("dialog iframe").boundingBox();
     if (frame) {
       await moveTo(page, frame.x + frame.width / 2, frame.y + frame.height / 2);
-      await smoothScroll(page, 900, 1600);
-      await sleep(700);
-      await smoothScroll(page, 900, 1600);
+      await smoothScroll(page, 1800, 1300); // one quick scroll to the chart page
       s.mark("charts_page");
-      await sleep(2200);
+      await sleep(2000);
     }
     await clickOn(page, page.locator("dialog").getByLabel("Close"));
     await sleep(700);
@@ -290,10 +302,12 @@ const scenes = {
     await sleep(600);
     await ask(s, Q.brief, { expandSteps: true });
     await requireCleanAnswer(page);
+    // each stop is held while the Expert names where that part came from
     await readAnswer(s, [
-      { sel: "p, li, table", text: "claims by type" },
-      { sel: "p, li", text: "temperature alarm|30 minutes" },
-      { sel: "p, li, table", text: "2026" },
+      { sel: "h1, h2, h3, h4, p", text: "brief|meeting", ms: 4800 },
+      { sel: "p, li, table", text: "claims", ms: 6300 },
+      { sel: "p, li", text: "temperature alarm|30 minutes", ms: 7700 },
+      { sel: "p, li, table", text: "2026", ms: 7200 },
     ]);
     const chip = page.locator('[aria-label="Sources"] button').filter({ hasText: /Reefer/ }).first();
     await chip.evaluate((e) => e.scrollIntoView({ block: "center", behavior: "smooth" }));
@@ -315,7 +329,7 @@ const scenes = {
     const s = new Scene(4, page);
     await s.start();
     await sleep(600);
-    await ask(s, Q.brent);
+    await ask(s, Q.brent, { expandSteps: true });
     await readAnswer(s, [
       { sel: "p", text: "Brent|\\$" },
       { sel: "figure, img", text: "." },
@@ -329,7 +343,7 @@ const scenes = {
     const s = new Scene(5, page);
     await s.start();
     await sleep(600);
-    await ask(s, Q.database);
+    await ask(s, Q.database, { expandSteps: true });
     await readAnswer(s, [
       { sel: "p", text: "worst|Asia" },
       { sel: "figure", text: "." },
@@ -397,23 +411,14 @@ const scenes = {
     await clickOn(page, page.getByRole("button", { name: "Send", exact: true }));
     s.mark("answer_start");
     await page.getByLabel("Stop answering").waitFor({ timeout: 60_000 });
-    const toggle = page.locator("main button[aria-expanded]").last();
-    await toggle.waitFor({ timeout: 30_000 });
-    await sleep(500);
-    await clickOn(page, toggle);
-    s.mark("steps_open");
-    // a marker when each stage shows up in the steps panel (the narration follows them)
     const stages = [["step_write", /write notebook/i], ["step_run", /run notebook/i], ["step_answer", /plan & answer[\s\S]*plan & answer/i]];
-    while (await page.getByLabel("Stop answering").count()) {
-      const text = await page.locator("main").innerText().catch(() => "");
+    await keepStepsOpen(s, (text) => {
       while (stages.length && stages[0][1].test(text)) s.mark(stages.shift()[0]);
-      await sleep(400);
-    }
+    });
     for (const [name] of stages) s.mark(name);
     await sleep(2500);
     s.mark("answer_end");
-    const doneSteps = page.locator("main button[aria-expanded]").filter({ hasText: /Worked for/ }).last();
-    if ((await doneSteps.getAttribute("aria-expanded")) === "true") await clickOn(page, doneSteps);
+
     await requireCleanAnswer(page);
     await readAnswer(s, [
       { sel: "p, li", text: "speed" },
@@ -466,12 +471,17 @@ const scenes = {
     await sleep(1200);
     await s.start();
     await sleep(800);
+    const showSteps = async (label) => {
+      await sleep(900);
+      const done = page.locator("main button[aria-expanded]").filter({ hasText: /Worked for/ }).last();
+      if ((await done.getAttribute("aria-expanded")) === "false") await clickOn(page, done);
+      s.mark("read", { label });
+      await sleep(3200);
+    };
     await ask(s, Q.guard_injection);
-    await sleep(2200);
-    s.mark("read", { label: "declined" });
+    await showSteps("declined");
     await ask(s, Q.guard_salary);
-    await sleep(2500);
-    s.mark("read", { label: "not available" });
+    await showSteps("not available");
     await s.end();
     await pre.browser.close();
   },
@@ -496,7 +506,7 @@ try {
         await scenes[n](session.page);
         break;
       } catch (e) {
-        if (!(e instanceof Retake) || attempt >= 3 || !["3", "6"].includes(n)) throw e;
+        if (!(e instanceof Retake) || attempt >= 5 || !["3", "6"].includes(n)) throw e;
         console.log(`scene ${n}: retake ${attempt} (${e.message})`);
         await currentScene?.discard();
         await deleteNewestChat(session.page);

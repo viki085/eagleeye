@@ -38,12 +38,12 @@ const Subtitle: React.FC<{ line: Line }> = ({ line }) => {
   const frame = useCurrentFrame();
   const opacity = interpolate(frame, [0, 6, line.frames - 6, line.frames], [0, 1, 1, 0], { extrapolateRight: "clamp" });
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 54, opacity }}>
-      <div style={{ maxWidth: 1380, textAlign: "center", fontFamily: FONT }}>
+    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: 30, opacity }}>
+      <div style={{ maxWidth: 1240, textAlign: "center", fontFamily: FONT }}>
         <div style={{ display: "inline-block", marginBottom: 10, padding: "4px 12px", borderRadius: 6, background: "rgba(10,10,10,0.78)", color: GOLD, fontSize: 18, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
           {line.character === "narrator" ? "Narrator" : "Expert"}
         </div>
-        <div style={{ padding: "12px 22px", borderRadius: 10, background: "rgba(10,10,10,0.78)", color: "#f2f2f2", fontSize: 32, lineHeight: 1.35, fontWeight: 500 }}>
+        <div style={{ padding: "12px 22px", borderRadius: 10, background: "rgba(10,10,10,0.78)", color: "#f2f2f2", fontSize: 27, lineHeight: 1.35, fontWeight: 500 }}>
           {line.text}
         </div>
       </div>

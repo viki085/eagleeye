@@ -37,10 +37,25 @@
   {
     "id": "s3-02",
     "character": "expert",
-    "text": "Every figure comes from the live database, through read-only queries limited to what Vikram is allowed to see. Every policy point carries a citation."
+    "text": "The brief is built around the topics in his own uploaded notes."
   },
   {
     "id": "s3-03",
+    "character": "expert",
+    "text": "These claim counts come straight from a query on the operations database."
+  },
+  {
+    "id": "s3-04",
+    "character": "expert",
+    "text": "The alarm rules are quoted from the company's Reefer SOP, an enterprise document, with citations."
+  },
+  {
+    "id": "s3-05",
+    "character": "expert",
+    "text": "And the reliability comparison is a second database query, with context from a network review report."
+  },
+  {
+    "id": "s3-06",
     "character": "narrator",
     "text": "And every citation opens the exact passage in the original document."
   },

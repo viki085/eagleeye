@@ -10,21 +10,21 @@
     "id": "chart",
     "scene": 3,
     "who": "vikram.k@grandlineshipping.com",
-    "text": "In two or three sentences: how did the Brent oil price move during 2025, according to the chart in the Fleet and Market Review 2025?",
+    "text": "In a short paragraph: how did the Brent oil price move during 2025, according to the chart in the Fleet and Market Review 2025?",
     "want": "Reads the values off the chart; the chart picture appears in the answer"
   },
   {
     "id": "database",
     "scene": 4,
     "who": "vikram.k@grandlineshipping.com",
-    "text": "Which trade lane had the worst schedule reliability in 2024, and how did it trend month by month on that lane? Show it as a chart and keep the answer short.",
+    "text": "Which trade lane had the worst schedule reliability in 2024, and how did it trend month by month on that lane? Show it as a chart and summarise it in a few sentences.",
     "want": "Names the lane; formatted SQL; table; a monthly line chart"
   },
   {
     "id": "brief",
     "scene": 5,
     "who": "vikram.k@grandlineshipping.com",
-    "text": "Using my account review notes, give me a short brief for Thursday's meeting with Hunt, Williams and Francis: their 2025 claims by type, what our Reefer SOP says about temperature alarms, and Asia - North Europe schedule reliability in 2024 compared with 2026. Keep it concise.",
+    "text": "Using my account review notes, give me a short brief for Thursday's meeting with Hunt, Williams and Francis: their 2025 claims by type, what our Reefer SOP says about temperature alarms, and Asia - North Europe schedule reliability in 2024 compared with 2026. Keep it to a short brief: two or three sentences per topic.",
     "want": "One answer from three sources: the uploaded notes, enterprise policies (cited) and the database (tables/chart)"
   },
   {
