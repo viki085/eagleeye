@@ -71,7 +71,8 @@ class MakeChartTool:
         ctx.numeric_evidence.extend(chart.values)
         await ctx.sink.emit(CHART, payload)
         content = (
-            f"Chart '{intent.title}' is shown to the user below your answer. "
+            f"Chart '{intent.title}' is shown to the user below your answer (call it 'the chart'; "
+            "never 'above', and no placeholder text for it). "
             f"Computed from the data: {chart.summary}"
         )
         return ToolResult(True, content, f"{intent.type} chart")
