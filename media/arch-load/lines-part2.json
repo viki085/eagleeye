@@ -1,0 +1,82 @@
+[
+  {
+    "id": "b7-01",
+    "character": "narrator",
+    "text": "The test: two thousand simulated employees, each signing in and asking real questions. Nine in ten are about documents, some query the database, some try to break the rules, and a few ask for a full analysis."
+  },
+  {
+    "id": "b8-01",
+    "character": "narrator",
+    "text": "One user. Then fifty."
+  },
+  {
+    "id": "b9-01",
+    "character": "narrator",
+    "text": "Five hundred people at once. Online now counts everyone active in the last five minutes."
+  },
+  {
+    "id": "b9-02",
+    "character": "narrator",
+    "text": "Answers in progress are questions being worked on right now; the queue holds the ones waiting for a free worker. When that queue grows, the cluster adds workers."
+  },
+  {
+    "id": "b9-03",
+    "character": "narrator",
+    "text": "Request volume shows every question as it arrives, and how many succeeded."
+  },
+  {
+    "id": "b9-04",
+    "character": "narrator",
+    "text": "Watch the response time. When five hundred people arrive, one worker can't keep up, and answers slow to twenty-seven seconds. The cluster adds four more workers, and the time falls back to under eight."
+  },
+  {
+    "id": "b10-01",
+    "character": "narrator",
+    "text": "At a thousand users, the question is speed. Response time measures how long an answer takes, and the success rate how many finish."
+  },
+  {
+    "id": "b10-02",
+    "character": "narrator",
+    "text": "The slowest-steps chart shows where the time goes: mostly in writing the answer, not in search or the database."
+  },
+  {
+    "id": "b10-03",
+    "character": "narrator",
+    "text": "At a thousand, the bump is small and short. Workers are already running, and the cluster only has to grow a little."
+  },
+  {
+    "id": "b11-01",
+    "character": "narrator",
+    "text": "At two thousand, safety. Every attack is logged by type: prompt injection, attempts to pull out personal data, requests for restricted records, even SQL slipped into a question. Every one was blocked."
+  },
+  {
+    "id": "b11-02",
+    "character": "narrator",
+    "text": "The routing chart confirms the mix: mostly document questions, with database queries, analyses and the blocked attacks in their expected shares."
+  },
+  {
+    "id": "b11-03",
+    "character": "narrator",
+    "text": "The model is simulated for this test, so no real AI bill was run up. Priced at the real model's rates, the fifteen thousand answers would have cost about six dollars and forty cents, and more than half the lookups came straight from the cache."
+  },
+  {
+    "id": "b11-04",
+    "character": "narrator",
+    "text": "With two thousand users, answers slowed to twenty-six seconds while the cluster caught up. With more workers running, they came back to about twelve."
+  },
+  {
+    "id": "b12-01",
+    "character": "narrator",
+    "text": "As the users leave, the cluster scales back down, and the bill stops with it. Over fifteen thousand answers, just two failed."
+  },
+  {
+    "id": "b13-01",
+    "character": "narrator",
+    "text": "Here is the whole test in one picture. Each time more people arrived, answers slowed for a moment; the cluster added workers, and response times came back down. When the users left, the servers went with them."
+  },
+  {
+    "id": "b14-01",
+    "character": "narrator",
+    "text": "EagleEye. Built to answer with evidence, and built to scale."
+  }
+]
