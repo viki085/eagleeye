@@ -20,7 +20,9 @@ EagleEye works and how it scales, in two parts:
 
 **Decisions taken in this plan** (any of them can be changed at approval):
 - **One video, about 6 minutes**, at 4K like the product video: the same Narrator (`ballad`,
-  1.25× speed), no subtitles, the same opening logo and closing "Built with" card style.
+  1.25× speed), no subtitles, the same opening logo. Instead of a "Built with" card, the video ends
+  with an animated summary of how the metrics changed as the services scaled (users, servers per
+  service, response time before → after), then the logo and name.
 - **The load test uses EagleEye's built-in stand-in model, not OpenAI.** Everything else is real:
   - the web app, sign-in tokens, API, queue, workers, autoscaling;
   - the database, vector search, SQL on the operations database;

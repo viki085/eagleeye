@@ -139,7 +139,18 @@ with outlines in turn on:
 - `terraform destroy`.
 - **Narrator:** "As the users leave, the cluster scales back down, and the bill stops with it. The whole test cost [cost] in cloud credit."
 
-## 13 · Close (5:40–5:55)
-**Screen:** the "Built with" card, cross-fading into the EagleEye logo and name, then black, as in the
-product video.
+## 13 · What scaling changed (5:40–6:05)
+**Screen:** replaces the "Built with" card. One animated summary of the run, drawn from the real
+numbers (`raw/run/timeline.json`), built up in turn on a shared time axis (minutes of the test):
+1. **Users** stepping 1 → 50 → 500 → 1,000 → 2,000 and back down.
+2. **Servers per service** (agent workers, API) rising after each step and falling at the end.
+3. **Response time** (average and p95): the rise after each user step and the drop once workers are
+   added, with each drop labelled "before → after" (e.g. "71 s → 11 s").
+4. A short row of headline figures: peak users, answers served, success rate, peak servers.
+
+Separate small charts on the same time axis, not one chart with two scales.
+- **Narrator:** "Here is the whole test in one picture. Each time more people arrived, answers slowed for a moment; the cluster added workers, and response times came back down. When the users left, the servers went with them."
+
+## 14 · Close (6:05–6:15)
+**Screen:** the EagleEye logo and name, then black, as in the product video.
 - **Narrator:** "EagleEye. Built to answer with evidence, and built to scale."
