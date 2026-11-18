@@ -180,3 +180,13 @@ async def test_chat_titles_read_like_a_person_named_them() -> None:
     assert await title("How busy was Rotterdam in the second half of last year?") == (
         "How busy was Rotterdam in the second half"
     )
+
+
+async def test_answers_recognise_a_question_wrapped_with_its_results() -> None:
+    q = first("sql")
+    wrapped = (
+        f"<tool_data source='query_database'>\nResult id: art_1\ncount\n42\n</tool_data>\n\n"
+        f"Answer the user's question: {q['text']}"
+    )
+    answer = await answer_after([ChatMessage("system", "s"), ChatMessage("user", wrapped)], [])
+    assert "operations database" in answer

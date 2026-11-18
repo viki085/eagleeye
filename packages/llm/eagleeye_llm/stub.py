@@ -304,10 +304,22 @@ def _quote(passages: str, span: str) -> str | None:
     return None
 
 
+def _find_pool_question(messages: list[ChatMessage]) -> dict | None:
+    """The pool question this conversation is answering: the latest user message itself, or
+    (when the answer prompt wraps the question with tool results) the longest pool question
+    quoted in it."""
+    question, _ = _since_question(messages)
+    q = pool_question(question)
+    if q:
+        return q
+    text = _norm(question)
+    quoted = [q for key, q in _pool().items() if key in text]
+    return max(quoted, key=lambda q: len(q["text"])) if quoted else None
+
+
 def _pool_answer(messages: list[ChatMessage]) -> str | None:
     """A believable answer for a pool question (shown in the recorded windows)."""
-    question, after = _since_question(messages)
-    q = pool_question(question)
+    q = _find_pool_question(messages)
     if not q:
         return None
     if q["kind"] == "docs" and q.get("span"):
