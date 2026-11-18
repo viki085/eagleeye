@@ -5,7 +5,7 @@
 // The display is 3840x2160 at 150% Windows scaling. Chrome renders at scale 2, so the app lays
 // out as a standard 1920x1080 screen with 4K-sharp text; the capture is scaled to 1920x1080.
 import { chromium } from "playwright";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,18 @@ export const WINDOW_TITLE = `${PAGE_TITLE} - Google Chrome`;
 export async function openRecordingBrowser() {
   // one persistent window (kiosk applies to it) on a fresh, throwaway profile
   const profile = mkdtempSync(join(tmpdir(), "ee-recording-"));
+  // no "Save password?" bubble, no autofill suggestions, no translate bar
+  mkdirSync(join(profile, "Default"), { recursive: true });
+  writeFileSync(
+    join(profile, "Default", "Preferences"),
+    JSON.stringify({
+      credentials_enable_service: false,
+      credentials_enable_autosignin: false,
+      profile: { password_manager_enabled: false, password_manager_leak_detection: false },
+      autofill: { profile_enabled: false, credit_card_enabled: false },
+      translate: { enabled: false },
+    }),
+  );
   const context = await chromium.launchPersistentContext(profile, {
     headless: false,
     channel: "chrome",
@@ -32,7 +44,8 @@ export async function openRecordingBrowser() {
       "--no-default-browser-check",
       "--disable-infobars",
       "--hide-crash-restore-bubble",
-      "--disable-features=Translate,PasswordManagerOnboarding",
+      "--disable-features=Translate,PasswordManagerOnboarding,PasswordLeakDetection,AutofillServerCommunication",
+      "--disable-save-password-bubble",
       "--password-store=basic",
     ],
   });
