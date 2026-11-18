@@ -7,27 +7,27 @@
   {
     "id": "s1-01",
     "character": "narrator",
-    "text": "Vikram is a key account manager. His company runs EagleEye to find answers to business questions."
+    "text": "Vikram is a key account manager at Grand Line Shipping, a global container shipping company and EagleEye helps him find answers to business questions."
   },
   {
     "id": "s2-01",
     "character": "narrator",
-    "text": "On Thursday he meets one of the company's largest customers, so he adds his own meeting notes."
+    "text": "On Thursday he meets one of the company's largest customers, so he adds his recent meeting notes into the app."
   },
   {
     "id": "s2-02",
     "character": "narrator",
-    "text": "A click on any file shows exactly the text EagleEye read from it, the same text it searches and cites."
+    "text": "A click on the file will display its contents, which EagleEye will use to search and cite information."
   },
   {
     "id": "s2-03",
     "character": "narrator",
-    "text": "Alongside his notes sit hundreds of company documents, every policy and report, and the operations database itself."
+    "text": "Alongside his notes sit hundreds of company documents, every policy and report, as well as the company's operations database."
   },
   {
     "id": "s2-04",
     "character": "narrator",
-    "text": "Each document is read the moment it arrives: its text, its tables, even its charts. All of it can be searched, and all of it can be cited."
+    "text": "Each document is processed the moment it is uploaded: its text, tables, and charts. All of it can be searched, and used in generating the response."
   },
   {
     "id": "s3-01",
@@ -62,17 +62,17 @@
   {
     "id": "s4-01",
     "character": "narrator",
-    "text": "This answer was read from a chart. When the review was added, each chart was described in words, so the search can find it like any passage, and the original picture comes back with the answer."
+    "text": "This answer was read from a chart. When the document was added, each chart was described in text, so the search can find it like any passage."
   },
   {
     "id": "s5-01",
     "character": "narrator",
-    "text": "Questions about the business become SQL, shown in full, so anyone can check exactly how an answer was reached."
+    "text": "An SQL query is generated and executed to answer business questions, and the query is made available so anyone can check exactly how an answer was reached."
   },
   {
     "id": "s6-01",
     "character": "narrator",
-    "text": "Emissions will come up too. Vikram uploads a year of voyage data, and EagleEye profiles it at once: columns, gaps, correlations. Then he asks for a full exploratory analysis."
+    "text": "Vikram uploads a year of voyage data, and EagleEye profiles it at once: columns, gaps, correlations. Then he asks for a full exploratory analysis on Vessel Emissions."
   },
   {
     "id": "s6-02",

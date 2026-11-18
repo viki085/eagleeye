@@ -23,7 +23,7 @@ const NOTES = resolve("..", "Trial/data/documents/account-review-notes-hunt-will
 const VOYAGES = resolve("..", "Trial/data/data-files/vessel_fuel_and_emissions.csv");
 const OUT = "raw/scenes";
 const ANSWER_TIMEOUT_MS = 8 * 60 * 1000;
-const STOP_MS = 1500; // a reading stop on a key insight
+const STOP_MS = 1000; // a reading stop on a key insight
 
 const Q = Object.fromEntries(JSON.parse(readFileSync("demo/questions.json", "utf8")).map((q) => [q.id, q.text]));
 Q.brent = "The customer will ask about fuel surcharges. " + Q.chart;
@@ -174,12 +174,58 @@ async function readAnswer(scene, targets) {
   }
 }
 
+/** After "Show on page": scroll the source panel down to the page picture and stop with the
+ * highlighted passage in the middle (found by the highlight's orange outline in the picture). */
+async function showPageHighlight(page, scene) {
+  const img = page.locator('img[alt^="The page, with the cited passage"]').last();
+  await img.waitFor({ timeout: 30_000 });
+  await img.evaluate((el) => (el.complete && el.naturalWidth ? null : new Promise((r) => el.addEventListener("load", r, { once: true }))));
+  const band = await img.evaluate((el) => {
+    const c = document.createElement("canvas");
+    c.width = el.naturalWidth;
+    c.height = el.naturalHeight;
+    const g = c.getContext("2d");
+    g.drawImage(el, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let top = Infinity, bottom = -1, left = Infinity, right = -1;
+    for (let y = 0; y < c.height; y += 2)
+      for (let x = 0; x < c.width; x += 2) {
+        const i = (y * c.width + x) * 4;
+        if (d[i] > 210 && d[i + 1] > 135 && d[i + 1] < 185 && d[i + 2] < 50) {
+          top = Math.min(top, y); bottom = Math.max(bottom, y); left = Math.min(left, x); right = Math.max(right, x);
+        }
+      }
+    return bottom < 0 ? null : { top: top / c.height, bottom: bottom / c.height, left: left / c.width, right: right / c.width };
+  });
+  const f = band ?? { top: 0.2, bottom: 0.35, left: 0.08, right: 0.92 };
+  await img.evaluate((el, f) => {
+    let scroller = el.parentElement;
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    const r = el.getBoundingClientRect();
+    const target = r.top + ((f.top + f.bottom) / 2) * r.height;
+    const box = (scroller ?? document.documentElement).getBoundingClientRect();
+    (scroller ?? window).scrollBy({ top: target - (box.top + box.height / 2), behavior: "smooth" });
+  }, f);
+  await sleep(1300);
+  const r = await img.boundingBox();
+  if (r) {
+    const rect = { x: r.x + f.left * r.width, y: r.y + f.top * r.height, width: (f.right - f.left) * r.width, height: (f.bottom - f.top) * r.height };
+    await page.evaluate((x) => window.__eeSpotlight(x, 8), rect);
+    scene.mark("page_highlight", { rect, found: Boolean(band) });
+    await sleep(3000);
+    await page.evaluate(() => window.__eeSpotlight(null));
+  }
+  await sleep(400);
+}
+
 class Retake extends Error {}
 
 /** A showcase answer must be clean: no work-limit note, no figure-check warning. */
 async function requireCleanAnswer(page) {
   const text = await page.locator("main .prose").last().locator("xpath=..").innerText();
   if (/work limit|couldn.t be matched|could not be generated|may be incomplete/i.test(text)) throw new Retake(text.slice(0, 80));
+  // source labels such as "[Claims data]" instead of citation numbers
+  if (/\[[A-Za-z][A-Za-z ]{2,40}\]/.test(text)) throw new Retake(text.slice(0, 80));
 }
 
 async function deleteNewestChat(page) {
@@ -309,16 +355,22 @@ const scenes = {
       { sel: "p, li", text: "temperature alarm|30 minutes", ms: 7700 },
       { sel: "p, li, table", text: "2026", ms: 7200 },
     ]);
-    const chip = page.locator('[aria-label="Sources"] button').filter({ hasText: /Reefer/ }).first();
+    // the citation whose passage is about alarms (its tooltip holds the passage), else any Reefer SOP one
+    const chips = page.locator('[aria-label="Sources"] button');
+    let chip = chips.filter({ hasText: /Reefer/ }).first();
+    for (const c of await chips.all()) {
+      if (/alarm/i.test((await c.getAttribute("title")) ?? "")) {
+        chip = c;
+        break;
+      }
+    }
     await chip.evaluate((e) => e.scrollIntoView({ block: "center", behavior: "smooth" }));
     await sleep(700);
     await clickOn(page, chip);
     s.mark("source_open");
     await sleep(1800);
     await clickOn(page, page.getByRole("button", { name: /Show on page/ }));
-    await sleep(3500);
-    s.mark("page_highlight");
-    await sleep(2500);
+    await showPageHighlight(page, s);
     await clickOn(page, page.getByLabel("Close source"));
     await sleep(800);
     await s.end();

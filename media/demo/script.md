@@ -11,7 +11,7 @@ long waits for answers are sped up with a visible "⏩" badge. Rehearsed answers
 ### Reading pace (applies to every answer)
 
 When an answer finishes, the camera **scrolls back to the start of the answer**, then stops only
-at the **2–3 key insights** (about 1.5 seconds each), marked with a gold outline, so a viewer can
+at the **2–3 key insights** (about 1.0 second each), marked with a gold outline, so a viewer can
 piece together the question and the answer without the video dragging. The stops for each answer
 are listed in its scene as **Reading stops**.
 
@@ -19,7 +19,7 @@ are listed in its scene as **Reading stops**.
 
 ## 0 · Cold open (0:00–0:10)
 
-**Screen:** dark title card. The EagleEye logo fades in; beneath it, typed: "Grand Line Shipping · Monday, 08:57".
+**Screen:** dark title card. The EagleEye logo slowly fades in.
 
 - **Narrator:** "Every company runs on knowledge scattered across documents, databases and spreadsheets. Finding an answer usually means finding the right person."
 
@@ -27,7 +27,9 @@ are listed in its scene as **Reading stops**.
 
 **Screen:** the sign-in page. Vikram clicks the email box and types `vikram.k@grandlineshipping.com`, presses Continue, types his password (dots), moves to Sign in. *Cut* to his empty chat.
 
-- **Narrator:** "Vikram is a key account manager. His company runs EagleEye to find answers to business questions."
+- **Narrator:** "Vikram is a key account manager at Grand Line Shipping, a global container shipping company and EagleEye helps him find answers to business questions."
+
+**Screen (after the sign-in cut):** a dark card: the words **Grand Line Shipping** type out, and **Wednesday, 08:57 PM** appears below.
 
 ## 2 · A quick tour (0:18–0:50)
 
@@ -37,10 +39,10 @@ are listed in its scene as **Reading stops**.
 2. **Enterprise** tab → scrolls the company documents → opens **Fleet and Market Review 2025** in the **PDF viewer**: the real PDF pages, scrolled from the cover to the page with the Brent and utilisation charts (a 2-second stop on the charts); closes it.
 3. Types "reliability" in the search box → **Data sources** shows the operations database's tables and columns that match.
 
-- **Narrator:** "On Thursday he meets one of the company's largest customers, so he adds his own meeting notes."
-- **Narrator:** "A click on any file shows exactly the text EagleEye read from it, the same text it searches and cites."
-- **Narrator:** "Alongside his notes sit hundreds of company documents, every policy and report, and the operations database itself."
-- **Narrator:** "Each document is read the moment it arrives: its text, its tables, even its charts. All of it can be searched, and all of it can be cited."
+- **Narrator:** "On Thursday he meets one of the company's largest customers, so he adds his recent meeting notes into the app."
+- **Narrator:** "A click on the file will display its contents, which EagleEye will use to search and cite information."
+- **Narrator:** "Alongside his notes sit hundreds of company documents, every policy and report, as well as the company's operations database."
+- **Narrator:** "Each document is processed the moment it is uploaded: its text, tables, and charts. All of it can be searched, and used in generating the response."
 
 ## 3 · One request, three sources (0:50–1:45) · chat "Hunt, Williams and Francis"
 
@@ -66,7 +68,7 @@ Then he clicks citation **[7]** → the source panel → **Show on page**: the p
 The answer gives the monthly prices and shows the **chart picture** from the PDF.
 **Reading stops (2):** "fell overall during 2025, from $79.3 … to $62.5" · the chart picture.
 
-- **Narrator:** "This answer was read from a chart. When the review was added, each chart was described in words, so the search can find it like any passage, and the original picture comes back with the answer."
+- **Narrator:** "This answer was read from a chart. When the document was added, each chart was described in text, so the search can find it like any passage."
 
 ## 5 · The SQL, in plain sight (2:15–2:40) · same chat
 
@@ -76,7 +78,7 @@ The answer gives the monthly prices and shows the **chart picture** from the PDF
 The answer, the line chart, then he opens **table & SQL** and the formatted SQL unfolds; the **steps** panel briefly expanded.
 **Reading stops (2):** "Asia – North Europe … 30.6%" · the chart; then the SQL (2 seconds).
 
-- **Narrator:** "Questions about the business become SQL, shown in full, so anyone can check exactly how an answer was reached."
+- **Narrator:** "An SQL query is generated and executed to answer business questions, and the query is made available so anyone can check exactly how an answer was reached."
 
 ## 6 · A full exploratory analysis (2:40–3:50) · new chat "Fleet emissions"
 
@@ -86,11 +88,12 @@ The answer, the line chart, then he opens **table & SQL** and the formatted SQL 
 2. **Drags the file from "My data files" into the message box**: the reference `[vessel_fuel_and_emissions.csv]` drops in, and he types the rest around it (sped up):
 
 > Do a full exploratory analysis of [vessel_fuel_and_emissions.csv]: data quality, distributions and outliers, how speed, vessel class and routing relate to carbon intensity, and the three findings that matter most for cutting emissions.
+
 1. The **steps panel opens** and the notebook builds in close to real time, while the Expert explains each stage as it appears in the panel: the safety check and plan → writing the notebook → running it in the sandbox → writing and checking the findings.
 **Reading stops (3):** finding 1 (speed: r = 0.657; above 17 knots vs at most 13) · finding 2 (vessel classes) · the data-quality line.
 Then the camera scrolls the notebook's numbered cells, pauses on the distribution plots, the correlation heatmap and speed against carbon intensity by vessel class, enlarges one figure, and hovers **Download .ipynb**.
 
-- **Narrator:** "Emissions will come up too. Vikram uploads a year of voyage data, and EagleEye profiles it at once: columns, gaps, correlations. Then he asks for a full exploratory analysis."
+- **Narrator:** "Vikram uploads a year of voyage data, and EagleEye profiles it at once: columns, gaps, correlations. Then he asks for a full exploratory analysis on Vessel Emissions."
 - **Narrator:** "Here is what happens behind the scenes. A safety check reads the request first, then the planner decides this needs a full notebook."
 - **Narrator:** "The analysis agent loads the file and writes the notebook: eight cells, from data quality through to comparisons by vessel class."
 - **Narrator:** "Now the notebook runs, as real Python, in an isolated sandbox with no network access. Five figures and seven tables come back from his data."

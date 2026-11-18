@@ -1,7 +1,8 @@
 import React from "react";
 import { AbsoluteFill, Audio, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { BuiltWith } from "./BuiltWith";
-import { TitleCard } from "./TitleCard";
+import { CosmicZoom } from "./CosmicZoom";
+import { TitleCard, TypedCard } from "./TitleCard";
 import type { Item, Line, Segment, Timeline } from "./types";
 
 const GOLD = "#C5A368";
@@ -65,9 +66,11 @@ export const Demo: React.FC<{ timeline: Timeline }> = ({ timeline }) => (
   <AbsoluteFill style={{ background: "#0a0a0a" }}>
     {timeline.items.map((item, i) => (
       <Sequence key={i} from={item.from} durationInFrames={item.frames}>
-        {item.kind === "title" && <TitleCard title={item.title} subtitle={item.subtitle} />}
+        {item.kind === "title" && <TitleCard title={item.title} />}
+        {item.kind === "typed" && <TypedCard line1={item.line1} line2={item.line2} />}
         {item.kind === "clip" && <Clip item={item} fps={timeline.fps} />}
         {item.kind === "card" && <BuiltWith />}
+        {item.kind === "finale" && <CosmicZoom />}
         {item.kind === "caption" && <Caption text={item.text} frames={item.frames} />}
       </Sequence>
     ))}

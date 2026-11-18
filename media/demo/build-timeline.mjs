@@ -44,7 +44,7 @@ const ANCHORS = [
   [2, "s2-04", "viewer_open", 800],
   [3, "s3-01", "typing", 600], // over the typed request
   [3, "s3-02", "answer_end", 1600], // "built around his notes", over a freeze at the top of the brief
-  [3, "s3-03", "read~claim", 200], // each source line plays on the highlight it describes
+  [3, "s3-03", "read~claim|deviation|damage|database shows", 200], // each source line plays on the highlight it describes
   [3, "s3-04", "read~alarm|SOP", 200],
   [3, "s3-05", "read~reliab|2026|measure", 200],
   [3, "s3-06", "source_open", 0],
@@ -127,7 +127,7 @@ function placeLine(id, wantMs) {
 }
 
 // 0 · cold open
-items.push({ kind: "title", from: 0, frames: f(11000), title: "EagleEye", subtitle: "Grand Line Shipping · Monday, 08:57" });
+items.push({ kind: "title", from: 0, frames: f(11000), title: "EagleEye" });
 placeLine("s0-01", 900);
 cursorMs = 11000;
 
@@ -138,6 +138,12 @@ for (const n of [1, 2, 3, 4, 5, 6, 7]) {
   copyFileSync(`raw/scenes/s${n}.mp4`, `${PUBLIC}/scenes/s${n}.mp4`);
   const endMs = rec.seconds * 1000;
   const segs = segmentsFor(rec.markers, endMs, n);
+  if (n === 2) {
+    // after the sign-in cut: the company and the time, typed on a dark card
+    items.push({ kind: "typed", from: f(cursorMs), frames: f(4200), line1: "Grand Line Shipping", line2: "Wednesday, 08:57 PM" });
+    cursorMs += 4200;
+    lastLineEnd = Math.max(lastLineEnd, cursorMs - 400); // no narration over the card
+  }
   if (n === 7) {
     items.push({ kind: "caption", from: f(cursorMs), frames: f(1800), text: "Meanwhile…" });
     cursorMs += 1800;
@@ -176,6 +182,10 @@ const cardMs = 10000;
 items.push({ kind: "card", card: "builtwith", from: f(cursorMs), frames: f(cardMs) });
 placeLine("s8-01", cursorMs + 1000);
 cursorMs += cardMs;
+
+// 9 · cosmic zoom finale (no voice)
+items.push({ kind: "finale", from: f(cursorMs), frames: f(10000) });
+cursorMs += 10000;
 
 const timeline = { fps: FPS, durationInFrames: f(cursorMs), items, lines: placed };
 writeFileSync(`${PUBLIC}/timeline.json`, JSON.stringify(timeline, null, 2));
