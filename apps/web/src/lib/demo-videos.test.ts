@@ -21,6 +21,6 @@ describe("demo videos", () => {
   });
 
   it("has both videos published, the product demo first", () => {
-    expect(publishedVideos(DEMO_VIDEOS).map((v) => v.id)).toEqual(["_pjZODEwXyk", "klPBlEWFGSM"]);
+    expect(publishedVideos(DEMO_VIDEOS).map((v) => v.id)).toEqual(["_pjZODEwXyk", "wci40OXVd4w"]);
   });
 });

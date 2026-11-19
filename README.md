@@ -8,7 +8,7 @@
 
 [![Live demo](https://img.shields.io/badge/Live_demo-eagleeye--z85t.vercel.app-C5A368?style=for-the-badge)](https://eagleeye-z85t.vercel.app/demo)
 [![Product demo video](https://img.shields.io/badge/Video-Product_demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=_pjZODEwXyk)
-[![Architecture and load test video](https://img.shields.io/badge/Video-How_it_scales-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=klPBlEWFGSM)
+[![Architecture and load test video](https://img.shields.io/badge/Video-How_it_scales-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=wci40OXVd4w)
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
@@ -71,11 +71,11 @@ code, and a load test to 2,000 concurrent users with autoscaling.
       <sub>Cited answers, database questions, cross-source analysis, notebooks and guardrails.</sub>
     </td>
     <td width="50%" align="center">
-      <a href="https://www.youtube.com/watch?v=klPBlEWFGSM">
+      <a href="https://www.youtube.com/watch?v=wci40OXVd4w">
         <img src="docs/assets/video-how-it-scales.jpg" alt="How EagleEye works and scales" />
       </a>
       <br />
-      <b><a href="https://www.youtube.com/watch?v=klPBlEWFGSM">How it works, and how it scales</a></b> · 6 min
+      <b><a href="https://www.youtube.com/watch?v=wci40OXVd4w">How it works, and how it scales</a></b> · 6 min
       <br />
       <sub>The animated architecture, then a recorded load test to 2,000 users.</sub>
     </td>
