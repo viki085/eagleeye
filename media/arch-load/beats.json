@@ -1,0 +1,22 @@
+{
+  "_comment": "Admin console beats for Part 2: one per narrated metric. Each beat's footage is the recording while that metric was held (spotlight removed by unspot.py); the edit draws its own highlight while the line plays. 'pre' adds the clean lead-in (clip seconds) before the first metric; 'extra' moves the highlight to a second metric on the same screen when the line reaches 'phrase'.",
+  "admin-500": [
+    { "label": "Online now", "line": "b9-01", "pre": 2.2 },
+    {
+      "label": "Answers in progress", "line": "b9-02",
+      "extra": { "label": "Queue: agent", "phrase": "the queue holds", "box": { "x": 918.2, "y": 129.98, "width": 323.1, "height": 106.66 } }
+    },
+    { "label": "Request volume and outcomes", "line": "b9-03" }
+  ],
+  "admin-1000": [
+    { "label": "Avg response time", "line": "b10-01", "pre": 2.2, "extra": { "label": "Success rate", "phrase": "the success rate" } },
+    { "label": "Slowest pipeline steps", "line": "b10-02" }
+  ],
+  "admin-2000": [
+    { "label": "Safety events by category", "line": "b11-01", "pre": 16.4 },
+    { "label": "Request routing distribution", "line": "b11-02" }
+  ],
+  "admin-cost": [
+    { "label": "LLM cost", "line": "b11-03", "pre": 2.2, "note": "Model simulated · cost estimated at gpt-6-luna rates from the recorded token counts" }
+  ]
+}

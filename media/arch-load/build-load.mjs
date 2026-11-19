@@ -14,16 +14,16 @@ const lines = JSON.parse(readFileSync("arch-load/lines-part2.json", "utf8"));
 const data = JSON.parse(readFileSync("public/load-data.json", "utf8"));
 mkdirSync("public/load-lines", { recursive: true });
 const sec = (id) => durations[id].seconds / TEMPO;
-const mark = (clip, label) => data.admin[clip].marks.find((m) => m.label === label).t;
+const beatsData = JSON.parse(readFileSync("public/load-beats.json", "utf8"));
+const textOf = Object.fromEntries(lines.map((l) => [l.id, l.text]));
 
-// An admin segment: clip time [from, to] shown from scene time `at`; `lines` anchor voice lines
-// to the clip's marks (scene time = at + mark - from).
-const admin = (src, at, from, to, anchored) => ({
-  type: "admin", src: `load/${src}.mp4`, at, from, to,
-  anchors: Object.fromEntries(anchored.map(([id, label]) => [id, at + mark(src, label) - from])),
-  spot: data.admin[src].marks.filter((m) => m.t >= from && m.t <= to).map((m) => ({ t: at + m.t - from, label: m.label })),
-});
-
+// An admin console checkpoint: one beat per narrated metric (public/load-beats.json, made by
+// prep-beats.py). Each beat holds its footage until its voice line has finished; the highlight
+// appears as the line starts and disappears when it ends, before the next beat fades in.
+const FADE = 0.5; // cross-fade between beats (Admin.tsx FADE)
+const LEAD = 0.35; // a fresh beat settles before its line starts
+const TAIL = 0.55; // after a line: the highlight fades out, then a breath before moving on
+const beats = (clip, opts = {}) => ({ type: "beats", clip, ...opts });
 // run-time windows (seconds into the load test) each wall stage covers: the user counter and the
 // k6 log follow the real run
 const SCENES = [
@@ -33,27 +33,27 @@ const SCENES = [
     parts: [{ type: "wall", at: 0, stages: [[0, 1], [2.5, 2], [5, 4], [7.5, 8]], run: [0, 250] }],
   },
   {
-    n: 9, min: 51,
+    n: 9, min: 30,
     parts: [
       { type: "wall", at: 0, stages: [[0, 16], [2.5, 64]], run: [250, 420], until: 5.2 },
-      admin("admin-500", 5.5, 2.2, 33.0, [["b9-01", "Online now"], ["b9-02", "Answers in progress"], ["b9-03", "Request volume and outcomes"]]),
+      beats("admin-500", { at: 5.5 }),
       { type: "chart", after: "admin", upTo: 10.5, callout: { minutes: [6, 9], label: "500 users" } , line: "b9-04" },
     ],
   },
   {
-    n: 10, min: 33,
+    n: 10, min: 20,
     parts: [
       { type: "wall", at: 0, stages: [[0, 64], [1.6, 256]], run: [420, 650], until: 3.8 },
-      admin("admin-1000", 4.0, 2.2, 19.5, [["b10-01", "Avg response time"], ["b10-02", "Slowest pipeline steps"]]),
+      beats("admin-1000", { at: 4.0 }),
       { type: "chart", after: "admin", upTo: 14.5, callout: { minutes: [10, 13], label: "1,000 users" }, line: "b10-03" },
     ],
   },
   {
-    n: 11, min: 66,
+    n: 11, min: 40,
     parts: [
       { type: "wall", at: 0, stages: [[0, 256]], run: [650, 930], until: 3.3, glitch: true },
-      admin("admin-2000", 3.5, 16.4, 44.0, [["b11-01", "Safety events by category"], ["b11-02", "Request routing distribution"]]),
-      { ...admin("admin-cost", 0, 2.2, 21.0, [["b11-03", "LLM cost"]]), after: "admin", note: "Model simulated · cost estimated at gpt-6-luna rates from the recorded token counts" },
+      beats("admin-2000", { at: 3.5 }),
+      beats("admin-cost", { after: true }),
       { type: "chart", after: "admin", upTo: 21.5, callout: { minutes: [15, 18], label: "2,000 users" }, line: "b11-04" },
     ],
   },
@@ -78,15 +78,29 @@ for (const s of SCENES) {
     return t;
   };
   for (const p of s.parts) {
-    if (p.type === "admin") {
-      const shift = p.after ? Math.max(cursor, lineEnd) + 0.4 - p.at : 0;
-      const seg = { ...p, at: p.at + shift, spot: p.spot.map((x) => ({ ...x, t: x.t + shift })) };
-      for (const [id, t] of Object.entries(p.anchors)) place(id, t + shift);
-      seg.end = seg.at + (seg.to - seg.from);
-      seg.holdUntil = Math.max(seg.end, lineEnd + 0.3); // freeze the last frame while a line ends
-      cursor = seg.holdUntil;
-      delete seg.anchors;
-      parts.push(seg);
+    if (p.type === "beats") {
+      let at = p.after ? Math.max(cursor, lineEnd) + 0.2 : p.at;
+      const out = [];
+      for (const [i, b] of beatsData[p.clip].entries()) {
+        const settle = b.lead > 0 ? b.lead : (i === 0 && !p.after ? 0 : FADE) + LEAD;
+        const t0 = place(b.line, at + settle);
+        const t1 = t0 + sec(b.line);
+        const highlights = [];
+        if (b.extra) {
+          const text = textOf[b.line];
+          const switchAt = t0 + (t1 - t0) * (text.indexOf(b.extra.phrase) / text.length) - 0.25;
+          highlights.push({ t0, t1: switchAt, box: b.box, label: b.label });
+          highlights.push({ t0: switchAt + 0.15, t1: t1 + 0.15, box: b.extra.box, label: b.extra.label });
+        } else {
+          highlights.push({ t0, t1: t1 + 0.15, box: b.box, label: b.label });
+        }
+        const done = t1 + TAIL;
+        out.push({ src: b.src, at, seconds: b.seconds, end: done + FADE, highlights, note: b.note });
+        at = done;
+      }
+      const end = out.at(-1).end;
+      parts.push({ type: "beats", at: out[0].at, end, beats: out });
+      cursor = end - FADE + 0.1;
     } else if (p.type === "chart") {
       const at = Math.max(cursor, lineEnd) + 0.4;
       const t = place(p.line, at + 0.5);

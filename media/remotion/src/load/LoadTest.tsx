@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { LogoOutro } from "../LogoOutro";
-import { AdminSegment, type AdminPart } from "./Admin";
+import { AdminBeats, type BeatsPart } from "./Admin";
 import { Headlines, ScalingChart } from "./Charts";
 import { AMBER, DATA, FONT, GOLD, GREEN, INK, MONO, MUTED, TIMELINE, clamp01, fmt, usersAt, type LoadScene, type Part } from "./data";
 import { K6Log, Scanlines, Typed, UserCounter, appear, glitch } from "./Hacker";
@@ -95,10 +95,6 @@ function renderPart(scene: LoadScene, part: Part, t: number, fps: number): React
   switch (part.type) {
     case "briefing": return <Briefing t={t} />;
     case "wall": return <WallScene part={part} t={t} fps={fps} />;
-    case "admin": {
-      const p = part as unknown as AdminPart;
-      return t >= p.at && t <= p.holdUntil + 0.3 ? <AdminSegment part={p} t={t} fps={fps} /> : null;
-    }
     case "chart": {
       const at = part.at;
       const end = part.end as number;
@@ -126,7 +122,8 @@ const SceneView: React.FC<{ scene: LoadScene }> = ({ scene }) => {
   return (
     <AbsoluteFill style={{ background: "#000" }}>
       {scene.parts.map((p, i) => {
-        const from = Math.round((p.type === "admin" ? p.at : 0) * fps);
+        if (p.type === "beats") return <AdminBeats key={i} part={p as unknown as BeatsPart} />;
+        const from = 0;
         return (
           <Sequence key={i} from={from} layout="none">
             <PartAt scene={scene} part={p} offset={from / fps} />
