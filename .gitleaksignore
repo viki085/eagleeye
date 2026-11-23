@@ -3,4 +3,4 @@
 
 # Fake AWS key used as test input for the output secret-redaction filter (git history; the
 # current file carries an inline gitleaks:allow marker on that line).
-f84656d85a14d1cbdbfea800c2e520269266ec28:packages/agents/tests/test_units.py:aws-access-token:167
+f3521ce38b2359d8df38a99f7555f470f6fd9453:packages/agents/tests/test_units.py:aws-access-token:167

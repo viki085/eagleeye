@@ -31,6 +31,8 @@ ignore = ["S101"]
 "scripts/**" = ["E501", "S310"]
 # multimodal PDF eval: fixed https source URLs, long result lines
 "evals/multimodal/**" = ["E501", "S310"]
+# offline video-production scripts: fixed ffmpeg/ffprobe command lines, long frame-math lines
+"media/**" = ["E501", "S603", "S607"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
